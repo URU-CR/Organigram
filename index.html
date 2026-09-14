@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Obsazení organigramu ÚRÚ ČR</title>
+<style>
+:root{
+  --bg:#EEF0F3; --card:#fff; --ink:#1B2430; --muted:#5D6B7A; --line:#D5DAE1;
+  --accent:#1D4ED8; --accent-ink:#fff; --danger:#B42318; --ok:#067647;
+  --empty:#F7F8FA;
+  --c-desu:#D9E2F3; --c-mmr:#FFD966; --c-uur:#E2EFD9; --c-md:#FDD1FA; --c-mpo:#8FFFFF; --c-nove:#FBE4D5;
+  --c-desu-d:#4472C4; --c-mmr-d:#C79400; --c-uur-d:#70AD47; --c-md-d:#C25BB9; --c-mpo-d:#0E9AA7; --c-nove-d:#ED7D31;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font:14px/1.4 "Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;color:var(--ink);background:var(--bg);display:flex;flex-direction:column;overflow:hidden}
+button{font:inherit;color:inherit;cursor:pointer;border:1px solid var(--line);background:#fff;border-radius:6px;padding:6px 11px}
+button:hover{background:#F3F5F8}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button.primary:hover{background:#1740B0}
+button.small{padding:2px 7px;font-size:12px;border-radius:5px}
+button:focus-visible,[tabindex]:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+input[type=text],input[type=search],select{font:inherit;padding:6px 9px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink)}
+
+/* top bar */
+header{background:#fff;border-bottom:1px solid var(--line);padding:10px 18px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+header h1{font-size:17px;margin:0;font-weight:600;white-space:nowrap}
+header h1 small{display:block;font-size:12px;font-weight:400;color:var(--muted)}
+.stats{display:flex;gap:16px;align-items:baseline;flex-wrap:wrap}
+.stat{white-space:nowrap}
+.stat b{font-size:18px;font-weight:600}
+.stat span{color:var(--muted);font-size:12px;margin-left:4px}
+.legend{display:flex;gap:8px;flex-wrap:wrap;font-size:12px}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px;margin-right:4px;border:1px solid rgba(0,0,0,.15)}
+.actions{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+
+/* layout */
+main{flex:1;display:grid;grid-template-columns:1fr 330px;min-height:0}
+#tree{overflow:auto;padding:16px 18px 60px}
+aside{background:#fff;border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+aside .pool-head{padding:12px 14px 8px;border-bottom:1px solid var(--line)}
+aside .pool-head h2{margin:0 0 8px;font-size:15px;font-weight:600}
+aside .pool-head h2 span{color:var(--muted);font-weight:400}
+.filters{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.filters label{font-size:12px;display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border:1px solid var(--line);border-radius:12px;cursor:pointer}
+.filters label input{margin:0}
+#pool{flex:1;overflow:auto;padding:10px 14px;display:flex;flex-direction:column;gap:5px;transition:background .15s}
+#pool.over{background:#EAF0FF}
+#pool .hint{color:var(--muted);font-size:13px;padding:20px 6px;text-align:center}
+#pool .group{font-size:11px;color:var(--muted);margin:8px 0 2px;padding-bottom:2px;border-bottom:1px solid var(--line)}
+
+/* units */
+.unit{background:var(--card);border:1px solid var(--line);border-radius:8px;margin:0 0 8px;box-shadow:0 1px 0 rgba(27,36,48,.04)}
+.unit>.uhead{display:flex;align-items:center;gap:10px;padding:8px 10px 8px 0;cursor:default;border-radius:8px}
+.unit>.uhead.over{background:#EAF0FF}
+.uhead .bar{width:6px;align-self:stretch;border-radius:8px 0 0 8px;margin-right:2px}
+.uhead .tog{width:22px;height:22px;border:0;background:none;padding:0;color:var(--muted);font-size:12px;flex:none}
+.uhead .uname{font-weight:600;flex:1;min-width:0}
+.uhead .uname .lvl{font-weight:400;color:var(--muted);font-size:12px;margin-left:6px}
+.uhead .fill{font-variant-numeric:tabular-nums;color:var(--muted);font-size:13px;white-space:nowrap}
+.uhead .fill.full{color:var(--ok)}
+.uhead .fill.over-cap{color:var(--danger)}
+.uhead .srcbadge{font-size:11px;padding:1px 7px;border-radius:10px;border:1px solid rgba(0,0,0,.12)}
+.ubody{padding:0 10px 8px 34px}
+.unit.collapsed>.ubody,.unit.collapsed>.children{display:none}
+.children{padding:0 0 4px 22px;position:relative}
+.children::before{content:"";position:absolute;left:12px;top:0;bottom:12px;border-left:2px solid var(--line)}
+.children>.unit{position:relative}
+.children>.unit::before{content:"";position:absolute;left:-10px;top:18px;width:10px;border-top:2px solid var(--line)}
+.sekce>.uhead .uname{font-size:15px}
+
+/* positions */
+.pos{display:grid;grid-template-columns:150px 1fr auto;align-items:center;gap:8px;padding:3px 0;border-top:1px dashed #E7EAEF}
+.pos:first-child{border-top:0}
+.pos .plabel{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;min-width:0}
+.pos .plabel .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:text}
+.pos .plabel .cat{flex:none;width:8px;height:8px;border-radius:50%;background:#7C8796}
+.pos .plabel .cat.nad{background:#fff;border:2px solid #7C8796;width:9px;height:9px}
+.slot{min-height:30px;border:1px dashed var(--line);border-radius:6px;background:var(--empty);display:flex;align-items:center;padding:2px 4px;transition:background .12s,border-color .12s}
+.slot.over{background:#EAF0FF;border-color:var(--accent);border-style:solid}
+.slot.filled{border-style:solid;background:#fff}
+.slot .empty{color:#9AA5B3;font-size:12px;padding:0 6px}
+.pos .del{opacity:0;transition:opacity .1s}
+.pos:hover .del{opacity:1}
+.addpos{margin-top:6px;display:flex;gap:6px;align-items:center}
+.addpos select{padding:3px 6px;font-size:12px}
+
+/* person chip */
+.person{display:inline-flex;align-items:center;gap:7px;padding:4px 9px 4px 6px;border-radius:6px;border:1px solid rgba(0,0,0,.14);cursor:grab;user-select:none;max-width:100%;background:var(--c-nove);font-size:13px;line-height:1.25}
+.person:active{cursor:grabbing}
+.person.dragging{opacity:.4}
+.person .nm{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.person .meta{color:#3D4956;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.person.hl{box-shadow:0 0 0 3px #FFE58F}
+.person.dim{opacity:.35}
+.person.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%,60%{box-shadow:0 0 0 4px var(--accent)}100%{box-shadow:0 0 0 3px #FFE58F}}
+.gsearch{position:relative;display:flex;align-items:center;gap:6px}
+.gsearch input{width:300px}
+.gsearch .cnt{font-size:12px;color:var(--muted);white-space:nowrap}
+#sres{position:absolute;top:100%;left:0;margin-top:4px;width:440px;max-height:360px;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(27,36,48,.16);z-index:25;display:none}
+#sres.open{display:block}
+#sres .r{padding:6px 10px;border-bottom:1px solid #EEF0F3;cursor:pointer;display:grid;grid-template-columns:1fr auto;gap:2px 8px;font-size:13px}
+#sres .r:hover{background:#F3F5F8}
+#sres .r .w{grid-column:1/-1;font-size:11px;color:var(--muted)}
+#sres .r .s{font-size:11px;padding:0 6px;border-radius:8px;border:1px solid rgba(0,0,0,.12);align-self:center}
+#sres .r.un .w{color:var(--danger)}
+#sres .more{padding:6px 10px;font-size:11px;color:var(--muted)}
+body.presenting .gsearch{display:none}
+.person.src-DESÚ{background:var(--c-desu)}.person.src-MMR{background:var(--c-mmr)}.person.src-ÚÚR{background:var(--c-uur)}
+.person.src-MD{background:var(--c-md)}.person.src-MPO{background:var(--c-mpo)}.person.src-Nové{background:var(--c-nove)}
+.person.src-Jiný{background:#E5E7EB}
+.person .loc{margin-left:auto;flex:none;font-size:10px;font-weight:700;letter-spacing:.02em;padding:1px 5px;border-radius:4px;background:rgba(255,255,255,.75);border:1px solid rgba(0,0,0,.18);color:#1B2430}
+.person .loc.inh{opacity:.7;font-weight:600}
+.person .loc.none{background:#FEE2E2;border-color:#F5A3A3;color:#B42318}
+#pool .person .loc{margin-left:0;align-self:flex-end;margin-top:-16px}
+.uhead select.locsel,.box select.locsel{font-size:11px;padding:1px 4px;border:1px solid var(--line);border-radius:5px;background:#fff;max-width:150px;color:var(--ink)}
+.uhead select.locsel.inh,.box select.locsel.inh{color:var(--muted)}
+.box .locsel{max-width:100%}
+/* location view */
+#locview{overflow:auto;padding:16px 18px 60px;display:none}
+body.view-loc #tree{display:none} body.view-loc #locview{display:block}
+.loccols{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;align-items:start}
+.loccol{background:var(--card);border:1px solid var(--line);border-radius:8px;min-height:120px;transition:background .12s}
+.loccol.over{background:#EAF0FF;border-color:var(--accent)}
+.loccol .lh{padding:10px 12px;border-bottom:1px solid var(--line);display:flex;align-items:baseline;gap:8px}
+.loccol .lh b{font-size:15px}.loccol .lh .abbr{font-size:11px;font-weight:700;padding:1px 6px;border:1px solid var(--line);border-radius:4px;color:var(--muted)}
+.loccol .lh .n{margin-left:auto;color:var(--muted);font-variant-numeric:tabular-nums}
+.loccol .lb{padding:6px 10px 10px}
+.loccol .lu{font-size:12px;font-weight:600;margin:8px 0 4px;color:var(--ink)}
+.loccol .lu span{font-weight:400;color:var(--muted)}
+.loccol .people{display:flex;flex-direction:column;gap:3px}
+.loccol .person{display:flex}
+.loccol .person .meta{display:none}
+.loccol .srcline{font-size:11px;color:var(--muted);padding:0 12px 8px;border-bottom:1px solid #EEF0F3}
+.loccol.none .lh{background:#FFF7ED}
+body.presenting #locview .loccol .lb .person{cursor:default}
+#pool .person{display:flex;flex-direction:column;align-items:flex-start;gap:1px;cursor:grab}#pool .person .nm,#pool .person .meta{white-space:normal;overflow:visible}
+
+/* popover */
+#pop{position:fixed;z-index:20;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(27,36,48,.18);padding:12px 14px;width:320px;font-size:13px}
+#pop h3{margin:0 0 6px;font-size:14px}
+#pop dl{margin:0 0 10px;display:grid;grid-template-columns:110px 1fr;gap:3px 8px}
+#pop dt{color:var(--muted)}#pop dd{margin:0}
+#pop .row{display:flex;gap:6px;justify-content:flex-end}
+
+/* dialog */
+dialog{border:0;border-radius:10px;padding:0;max-width:960px;width:92vw;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+dialog::backdrop{background:rgba(27,36,48,.45)}
+dialog .dhead{padding:16px 20px 10px;border-bottom:1px solid var(--line)}
+dialog .dhead h2{margin:0 0 4px;font-size:17px}
+dialog .dhead p{margin:0;color:var(--muted)}
+dialog .dbody{padding:12px 20px;max-height:60vh;overflow:auto}
+dialog .dfoot{padding:12px 20px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end;align-items:center}
+dialog .dfoot .left{margin-right:auto;color:var(--muted)}
+table.map{width:100%;border-collapse:collapse;font-size:13px}
+table.map th{text-align:left;font-weight:600;color:var(--muted);padding:6px 8px;border-bottom:1px solid var(--line);position:sticky;top:0;background:#fff}
+table.map td{padding:6px 8px;border-bottom:1px solid #EEF0F3;vertical-align:middle}
+table.map td select{width:100%;max-width:420px}
+.conf{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+.conf.hi{background:var(--ok)}.conf.mid{background:#D89B00}.conf.lo{background:var(--danger)}
+.impopts{display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.impopts label{display:inline-flex;gap:6px;align-items:center}
+#toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:9px 16px;border-radius:8px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:30}
+#toast.show{opacity:1}
+.kbd{font-size:11px;color:var(--muted)}
+
+/* box diagram view */
+#chart{overflow:auto;padding:20px 24px 60px;display:none}
+body.view-chart #tree{display:none} body.view-chart #chart{display:block}
+.viewsw{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.viewsw button{border:0;border-radius:0;padding:6px 10px}
+.viewsw button.on{background:var(--ink);color:#fff}
+.zoom{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.zoom input{width:90px}
+.zoom[hidden]{display:none}
+.zoom input.crit{width:110px;accent-color:var(--danger)}
+.box.crit{box-shadow:0 0 0 3px var(--danger);border-color:var(--danger)}
+.box.crit .bh{background:#FEF3F2}
+.box .pct{display:none;font-weight:700;color:var(--danger);font-variant-numeric:tabular-nums}
+.box.crit .pct{display:inline}
+body.critmode .box:not(.crit){opacity:.55}
+.oc{transform-origin:0 0;display:inline-block;min-width:100%}
+.oc ul{list-style:none;margin:0;padding:0}
+.oc-row{display:flex;justify-content:center}
+.oc-row>li{position:relative;padding:22px 6px 0;display:flex;flex-direction:column;align-items:center}
+.oc-row>li::before{content:"";position:absolute;top:0;left:0;right:0;border-top:2px solid var(--line);height:22px}
+.oc-row>li::after{content:"";position:absolute;top:0;left:50%;height:22px;border-left:2px solid var(--line)}
+.oc-row>li:first-child::before{left:50%}.oc-row>li:last-child::before{right:50%}
+.oc-row>li:only-child::before{border-top:0}
+.oc-root>li{padding-top:0}.oc-root>li::before,.oc-root>li::after{display:none}
+.oc-down{position:relative;padding-top:22px}
+.oc-down::before{content:"";position:absolute;top:0;left:50%;height:22px;border-left:2px solid var(--line)}
+.oc-stack{list-style:none;margin:0;padding:0 0 0 18px;position:relative;width:100%}
+.oc-stack::before{content:"";position:absolute;left:6px;top:-22px;bottom:22px;border-left:2px solid var(--line)}
+.oc-down.stack-only::before{display:none}
+.oc-row>li.oc-stackcol::after{left:6px}
+.oc-stack>li{position:relative;padding-top:8px}
+.oc-stack>li::before{content:"";position:absolute;left:-12px;top:30px;width:12px;border-top:2px solid var(--line)}
+.box{width:200px;background:#fff;border:1px solid var(--line);border-radius:7px;box-shadow:0 1px 0 rgba(27,36,48,.05);text-align:left;overflow:hidden;transition:box-shadow .12s}
+.box.over{box-shadow:0 0 0 3px #B8C8F5;border-color:var(--accent)}
+.box .bh{padding:6px 8px 5px;border-top:4px solid #999;display:flex;flex-direction:column;gap:2px}
+.box .bn{font-size:12px;font-weight:600;line-height:1.25}
+.box .bm{display:flex;justify-content:space-between;align-items:center;gap:4px;font-size:11px;color:var(--muted)}
+.box .bm .locsel{flex:1;min-width:0;max-width:105px}
+.box .bm .fill{flex:none}
+.box .bm .fill{font-variant-numeric:tabular-nums}
+.box .bm .fill.full{color:var(--ok)}
+.box .bp{padding:4px 6px 6px;border-top:1px solid #EEF0F3;display:flex;flex-direction:column;gap:3px}
+.box .person{padding:2px 6px;font-size:11px;gap:4px;border-radius:4px;cursor:grab}
+.box .person .meta{display:none}
+.box .person.lead{border-width:2px}
+.box .free{font-size:11px;color:#9AA5B3;padding:1px 6px;border:1px dashed var(--line);border-radius:4px}
+.box.sekce{width:230px}.box.sekce .bn{font-size:13px}
+.box.predseda{width:260px}
+.box .bopen{border:0;background:none;padding:0;font-size:11px;color:var(--accent);cursor:pointer}
+
+
+/* auth / presentation / print */
+#auth{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:50}
+#auth .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:28px 30px;width:380px;box-shadow:0 12px 40px rgba(27,36,48,.12)}
+#auth h1{font-size:18px;margin:0 0 4px}#auth p{color:var(--muted);margin:0 0 16px;font-size:13px}
+#auth input{width:100%;margin-bottom:10px}#auth button{width:100%}
+#auth .msg{margin-top:10px;font-size:13px;color:var(--muted)}
+#auth .msg.err{color:var(--danger)}
+.user{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.user .dot{width:8px;height:8px;border-radius:50%;background:var(--ok)}
+.user .dot.busy{background:#D89B00}.user .dot.err{background:var(--danger)}
+body.presenting header .actions,body.presenting header .viewsw,body.presenting header .zoom,body.presenting aside,body.presenting .box .bopen,body.presenting .pos .del,body.presenting .addpos,body.presenting select.locsel{display:none!important}
+body.presenting main{grid-template-columns:1fr}
+body.presenting header{padding:8px 24px}
+#presExit{position:fixed;right:16px;top:12px;z-index:40;display:none}
+body.presenting #presExit{display:inline-block}
+table.ov{border-collapse:collapse;width:100%;font-size:13px}
+table.ov th,table.ov td{padding:5px 8px;border-bottom:1px solid #EEF0F3;text-align:right;white-space:nowrap}
+table.ov th{color:var(--muted);font-weight:600;position:sticky;top:0;background:#fff}
+table.ov th:first-child,table.ov td:first-child{text-align:left;white-space:normal}
+table.ov tr.sekce td{font-weight:600;background:#F7F8FA}
+table.ov tr.odbor td:first-child{padding-left:20px}
+table.ov tr.odd td:first-child{padding-left:38px;color:var(--muted)}
+table.ov td.z{color:#B6BEC9}
+.ovh{font-size:14px;font-weight:600;margin:14px 0 6px}
+.loglist{font-size:13px}.loglist div{padding:5px 0;border-bottom:1px solid #EEF0F3;display:grid;grid-template-columns:130px 1fr;gap:10px}
+.loglist time{color:var(--muted);font-variant-numeric:tabular-nums}
+@media print{header .actions,header .viewsw,header .zoom,aside,#presExit,.bopen,.addpos,.pos .del,select.locsel{display:none!important}main{display:block}#chart,#tree,#locview{overflow:visible;padding:0}body{background:#fff}.oc{transform:none!important}}
+
+@media (max-width:900px){main{grid-template-columns:1fr}aside{max-height:40vh;border-left:0;border-top:1px solid var(--line)}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Obsazení organigramu ÚRÚ ČR<small>návrh organizační struktury z 10. 9. 2026</small></h1>
+  <div class="stats" id="stats"></div>
+  <span class="user" id="user"><span class="dot" id="syncDot"></span><span id="userMail"></span></span>
+  <div class="legend" id="legend"></div>
+  <div class="gsearch"><input type="search" id="search" placeholder="Hledat všude – jméno, útvar, číslo místa…" autocomplete="off"><span class="cnt" id="scnt"></span><div id="sres"></div></div>
+  <div class="viewsw" role="group" aria-label="Pohled"><button id="vwTree" class="on">Strom</button><button id="vwChart">Diagram</button><button id="vwLoc">Lokality</button></div>
+  <span class="zoom" id="zoomWrap" hidden>Zvětšení <input type="range" id="zoom" min="50" max="120" value="85"> <span id="zoomVal">85 %</span></span>
+  <span class="zoom" id="critWrap" hidden title="Zvýrazní útvary s obsazeností v daném intervalu">Kritické <input type="range" class="crit" id="crit" min="0" max="3" step="1" value="0" list="critTicks"> <span id="critVal">vypnuto</span><datalist id="critTicks"><option value="0"></option><option value="1"></option><option value="2"></option><option value="3"></option></datalist></span>
+  <div class="actions">
+    <button id="btnImport" class="primary">Nahrát Excel s lidmi</button>
+    <button id="btnUndo" title="Zpět (Ctrl+Z)" disabled>↶ Zpět</button>
+    <button id="btnRedo" title="Znovu (Ctrl+Y)" disabled>↷</button>
+    <button id="btnExport">Exportovat obsazení (xlsx)</button>
+    <button id="btnVacant" title="Seznam neobsazených míst pro personální oddělení">Volná místa (xlsx)</button>
+    <button id="btnSave">Uložit stav (json)</button>
+    <button id="btnLoad">Načíst stav (json)</button>
+    <button id="btnOverview">Přehled</button>
+    <button id="btnLog">Historie</button>
+    <button id="btnPresent">Prezentace</button>
+    <button id="btnCollapse" title="Sbalit / rozbalit vše">Sbalit vše</button>
+    <button id="btnReset" title="Vrátí prázdný organigram">Vymazat vše</button>
+    <button id="btnLogout">Odhlásit</button>
+    <input type="file" id="fileXlsx" accept=".xlsx,.xlsm,.xls,.csv" hidden>
+    <input type="file" id="fileJson" accept=".json" hidden>
+  </div>
+</header>
+<main>
+  <div id="tree"></div>
+  <div id="locview"></div>
+  <div id="chart"></div>
+  <aside>
+    <div class="pool-head">
+      <h2>Nezařazení <span id="poolCount"></span></h2>
+      <div class="filters" id="filters"></div>
+      <div style="margin-top:8px;display:flex;gap:6px"><button class="small" id="btnAddPerson">+ přidat osobu ručně</button></div>
+    </div>
+    <div id="pool"></div>
+  </aside>
+</main>
+<button id="presExit" class="primary">Ukončit prezentaci (Esc)</button>
+<div id="pop" hidden></div>
+<div id="auth"><div class="card"><h1>Obsazení organigramu ÚRÚ ČR</h1><p>Přihlaste se e-mailem – přijde vám odkaz, kterým se přihlásíte.</p>
+  <input type="text" id="authMail" placeholder="vase.jmeno@urad.cz" autocomplete="email"><button id="authBtn" class="primary">Poslat přihlašovací odkaz</button><div class="msg" id="authMsg"></div></div></div>
+
+<dialog id="dlgOverview"><div class="dhead"><h2>Přehled obsazení</h2><p>Počty míst a obsazení podle útvarů, zdrojových úřadů a lokalit.</p></div><div class="dbody" id="ovBody"></div>
+<div class="dfoot"><button id="ovXlsx">Stáhnout jako xlsx</button><button id="ovClose" class="primary">Zavřít</button></div></dialog>
+<dialog id="dlgLog"><div class="dhead"><h2>Historie změn</h2><p>Posledních 300 změn obsazení.</p></div><div class="dbody loglist" id="logBody"></div><div class="dfoot"><button id="logClose" class="primary">Zavřít</button></div></dialog>
+<div id="toast"></div>
+
+<dialog id="dlgMap">
+  <div class="dhead"><h2>Zařazení importovaných lidí</h2><p id="mapIntro"></p></div>
+  <div class="dbody">
+    <div class="impopts">
+      <label>Zdrojový úřad těchto lidí: <select id="impSrc"></select></label>
+      <label><input type="checkbox" id="impReplace"> nahradit dříve importované lidi tohoto úřadu</label>
+    </div>
+    <table class="map"><thead><tr><th>Útvar ve zdrojovém úřadu</th><th>Lidí</th><th>Cílový útvar v ÚRÚ</th></tr></thead><tbody id="mapBody"></tbody></table>
+  </div>
+  <div class="dfoot">
+    <span class="left"><span class="conf hi"></span>jistá shoda &nbsp; <span class="conf mid"></span>návrh k ověření &nbsp; <span class="conf lo"></span>bez návrhu</span>
+    <button id="mapCancel">Zrušit</button>
+    <button id="mapPoolOnly">Jen nahrát do nezařazených</button>
+    <button id="mapOk" class="primary">Zařadit podle tabulky</button>
+  </div>
+</dialog>
+
+<dialog id="dlgPerson">
+  <div class="dhead"><h2>Přidat osobu</h2></div>
+  <div class="dbody" style="display:grid;grid-template-columns:140px 1fr;gap:8px 10px;align-items:center">
+    <label>Jméno</label><input type="text" id="npName" placeholder="Příjmení Jméno, titul">
+    <label>Zdrojový úřad</label><select id="npSrc"></select>
+    <label>Současný útvar</label><input type="text" id="npUnit">
+    <label>Označení místa</label><input type="text" id="npRole" placeholder="např. specialista staveb drah">
+    <label>Platová třída</label><input type="text" id="npClass">
+    <label>Úvazek</label><input type="text" id="npFte" value="1">
+  </div>
+  <div class="dfoot"><button id="npCancel">Zrušit</button><button id="npOk" class="primary">Přidat</button></div>
+</dialog>
+
+<script src="vendor/xlsx.full.min.js"></script>
+<script src="vendor/supabase.js"></script>
+<script src="config.js"></script>
+<script src="structure.js"></script>
+<script src="app.js"></script>
+</body
+</html>
