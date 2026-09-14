@@ -120,6 +120,40 @@ body.presenting .gsearch{display:none}
 .box .locsel{max-width:100%}
 /* location view */
 #locview{overflow:auto;padding:16px 18px 60px;display:none}
+/* systemizace view */
+#sysview{overflow:auto;padding:0 0 60px;display:none;background:#fff}
+body.view-sys #tree{display:none} body.view-sys #sysview{display:block}
+body.view-sys main{grid-template-columns:1fr}
+body.view-sys aside{display:none}
+.sysbar{position:sticky;top:0;z-index:6;background:#fff;border-bottom:1px solid var(--line);padding:8px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px}
+.sysbar .sum{color:var(--muted)}
+.sysbar .sum b{color:var(--ink)}
+.sysbar .bulk{display:flex;gap:6px;align-items:center;margin-left:auto;padding:4px 8px;border:1px solid var(--line);border-radius:6px;background:#F7F8FA}
+.sysbar .bulk[hidden]{display:none}
+.sysbar .bulk input,.sysbar .bulk select{padding:3px 6px;font-size:12px}
+table.sys{border-collapse:collapse;width:100%;font-size:12px}
+table.sys th{position:sticky;top:46px;z-index:5;background:#F3F5F8;color:var(--muted);font-weight:600;text-align:left;padding:5px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+table.sys td{padding:2px 6px;border-bottom:1px solid #EEF0F3;vertical-align:middle;white-space:nowrap}
+table.sys tr.ug td{background:#F7F8FA;font-weight:600;padding:8px 6px 4px;border-top:2px solid var(--line);white-space:normal}
+table.sys tr.ug td .lv{font-weight:400;color:var(--muted);margin-left:6px}
+table.sys tr.ug td .bar{display:inline-block;width:5px;height:14px;border-radius:2px;vertical-align:-2px;margin-right:8px}
+table.sys tr.sel td{background:#EAF0FF}
+table.sys input[type=text],table.sys input[type=number],table.sys input[type=date],table.sys select{font:inherit;padding:2px 5px;border:1px solid transparent;border-radius:4px;background:transparent;width:100%;min-width:0}
+table.sys input:hover,table.sys select:hover{border-color:var(--line);background:#fff}
+table.sys input:focus,table.sys select:focus{border-color:var(--accent);background:#fff;outline:0}
+table.sys input[type=number]{width:52px;text-align:right}
+table.sys .st{font-variant-numeric:tabular-nums;text-align:center;color:var(--muted)}
+table.sys .st b{color:var(--ink)}
+table.sys td.who{white-space:normal;max-width:220px;font-size:11px}
+table.sys td.who .pc{font-weight:600}
+table.sys td.who.mis .pc{color:var(--danger)}
+table.sys td.who .m{color:var(--muted)}
+table.sys td.num{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+table.sys tr.nad td.num::after{content:" ○";color:#7C8796}
+table.sys td.cls input{font-weight:600}
+table.sys tr.mis td.cls input{color:var(--danger)}
+.pos .plabel .clsb{flex:none;font-size:10px;font-weight:700;padding:0 4px;border-radius:3px;background:#EEF0F3;color:#3D4956}
+body.presenting #sysview input,body.presenting #sysview select{pointer-events:none}
 body.view-loc #tree{display:none} body.view-loc #locview{display:block}
 .loccols{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;align-items:start}
 .loccol{background:var(--card);border:1px solid var(--line);border-radius:8px;min-height:120px;transition:background .12s}
@@ -256,7 +290,7 @@ table.ov td.z{color:#B6BEC9}
   <span class="user" id="user"><span class="dot" id="syncDot"></span><span id="userMail"></span></span>
   <div class="legend" id="legend"></div>
   <div class="gsearch"><input type="search" id="search" placeholder="Hledat všude – jméno, útvar, číslo místa…" autocomplete="off"><span class="cnt" id="scnt"></span><div id="sres"></div></div>
-  <div class="viewsw" role="group" aria-label="Pohled"><button id="vwTree" class="on">Strom</button><button id="vwChart">Diagram</button><button id="vwLoc">Lokality</button></div>
+  <div class="viewsw" role="group" aria-label="Pohled"><button id="vwTree" class="on">Strom</button><button id="vwChart">Diagram</button><button id="vwLoc">Lokality</button><button id="vwSys">Systemizace</button></div>
   <span class="zoom" id="zoomWrap" hidden>Zvětšení <input type="range" id="zoom" min="50" max="120" value="85"> <span id="zoomVal">85 %</span></span>
   <span class="zoom" id="critWrap" hidden title="Zvýrazní útvary s obsazeností v daném intervalu">Kritické <input type="range" class="crit" id="crit" min="0" max="3" step="1" value="0" list="critTicks"> <span id="critVal">vypnuto</span><datalist id="critTicks"><option value="0"></option><option value="1"></option><option value="2"></option><option value="3"></option></datalist></span>
   <div class="actions">
@@ -265,6 +299,7 @@ table.ov td.z{color:#B6BEC9}
     <button id="btnRedo" title="Znovu (Ctrl+Y)" disabled>↷</button>
     <button id="btnExport">Exportovat obsazení (xlsx)</button>
     <button id="btnVacant" title="Seznam neobsazených míst pro personální oddělení">Volná místa (xlsx)</button>
+    <button id="btnSys" title="Návrh systemizace služebních a pracovních míst ve formuláři MV">Systemizace (xlsx)</button>
     <button id="btnSave">Uložit stav (json)</button>
     <button id="btnLoad">Načíst stav (json)</button>
     <button id="btnOverview">Přehled</button>
@@ -280,6 +315,7 @@ table.ov td.z{color:#B6BEC9}
 <main>
   <div id="tree"></div>
   <div id="locview"></div>
+  <div id="sysview"></div>
   <div id="chart"></div>
   <aside>
     <div class="pool-head">

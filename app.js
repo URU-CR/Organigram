@@ -153,7 +153,7 @@ function renderUnit(u){
   u.positions.forEach(p=>{
     const row=document.createElement('div'); row.className='pos'; row.dataset.pid=p.id;
     const lab=document.createElement('div'); lab.className='plabel';
-    lab.innerHTML=`<span class="cat ${p.cat==='nad'?'nad':''}" title="${p.cat==='nad'?'nadpožadavek (nové místo)':'delimitace'}"></span><span class="t" title="Dvojklik: přejmenovat">${esc(p.label)}</span>`;
+    lab.innerHTML=`<span class="cat ${p.cat==='nad'?'nad':''}" title="${p.cat==='nad'?'nadpožadavek (nové místo)':'delimitace'}"></span><span class="t" title="Dvojklik: přejmenovat">${esc(p.label)}</span>${(()=>{const c=sysOf(u,p).cls;return c?`<span class="clsb" title="platová třída místa">${c}</span>`:'';})()}`;
     lab.querySelector('.t').ondblclick=()=>{const n=prompt('Označení místa:',p.label);if(n!==null&&n.trim()){p.label=n.trim();save();render();}};
     const slot=document.createElement('div'); slot.className='slot'+(p.person?' filled':'');
     if(p.person&&state.people[p.person]) slot.appendChild(personChip(state.people[p.person]));
@@ -186,6 +186,7 @@ function render(){
   tree.scrollTop=scroll;
   if(document.body.classList.contains('view-chart')) renderChart(); else $('#chart').innerHTML='';
   if(document.body.classList.contains('view-loc')) renderLoc(); else $('#locview').innerHTML='';
+  if(document.body.classList.contains('view-sys')) renderSys(); else $('#sysview').innerHTML='';
   // pool
   const pool=$('#pool'); pool.innerHTML='';
   const assigned=new Set(allPositions().map(x=>x.p.person).filter(Boolean));
@@ -457,9 +458,9 @@ let chartFresh=true;
 const CRIT_STEPS=[null,25,50,75]; let critLevel=0;
 function isCrit(u){ const v=CRIT_STEPS[critLevel]; if(!v) return false; const c=childrenOf(u.id).length?subtreeCount(u):{total:u.positions.length,filled:u.positions.filter(p=>p.person).length}; if(!c.total) return false; return 100*c.filled/c.total<=v; }
 $('#crit').oninput=()=>{ critLevel=+$('#crit').value; const v=CRIT_STEPS[critLevel]; $('#critVal').textContent=v?`obsazeno 0–${v} %`:'vypnuto'; document.body.classList.toggle('critmode',!!v); render(); };
-function setView(v){ state.view=v; if(v==='chart') chartFresh=true; document.body.classList.toggle('view-chart',v==='chart'); document.body.classList.toggle('view-loc',v==='loc');
-  $('#vwTree').classList.toggle('on',v!=='chart'&&v!=='loc'); $('#vwChart').classList.toggle('on',v==='chart'); $('#vwLoc').classList.toggle('on',v==='loc'); $('#zoomWrap').hidden=v!=='chart'; $('#critWrap').hidden=v!=='chart'; render(); }
-$('#vwTree').onclick=()=>setView('tree'); $('#vwChart').onclick=()=>setView('chart'); $('#vwLoc').onclick=()=>setView('loc');
+function setView(v){ state.view=v; if(v==='chart') chartFresh=true; document.body.classList.toggle('view-chart',v==='chart'); document.body.classList.toggle('view-loc',v==='loc'); document.body.classList.toggle('view-sys',v==='sys');
+  $('#vwTree').classList.toggle('on',v!=='chart'&&v!=='loc'&&v!=='sys'); $('#vwSys').classList.toggle('on',v==='sys'); $('#vwChart').classList.toggle('on',v==='chart'); $('#vwLoc').classList.toggle('on',v==='loc'); $('#zoomWrap').hidden=v!=='chart'; $('#critWrap').hidden=v!=='chart'; render(); }
+$('#vwTree').onclick=()=>setView('tree'); $('#vwChart').onclick=()=>setView('chart'); $('#vwLoc').onclick=()=>setView('loc'); $('#vwSys').onclick=()=>setView('sys');
 $('#zoom').oninput=()=>{ state.zoom=+$('#zoom').value; $('#zoomVal').textContent=state.zoom+' %'; const oc=$('#chart .oc'); if(oc) oc.style.transform='scale('+state.zoom/100+')'; };
 
 function boxEl(u){
@@ -519,6 +520,105 @@ function renderLoc(){
     grid.appendChild(col); });
   c.appendChild(grid); c.scrollTop=st;
 }
+
+// ---------- systemizace ----------
+const SYS_TYP={sluz:'služební',prac:'pracovní'};
+function stupen(u,p){ if(p.kind!=='head') return 0; return {predseda:4,sekce:3,odbor:2,odd:1}[u.level]||0; }
+function defaultOzn(u,p){ if(p.kind==='asst') return 'ORef/VRef'; if(p.kind==='ref') return 'ORa';
+  return {predseda:'vedoucí služebního úřadu',sekce:'VRa/místopředseda/'+u.name.replace(/^Místopředseda – /,''),odbor:'VRa/ředitel odboru/'+u.name.replace(/^Odbor /,'odbor '),odd:'ORa/vedoucí oddělení/'+u.name.replace(/^(Samostatné )?[Oo]ddělení /,m=>m.toLowerCase())}[u.level]||p.label; }
+function defaultCls(u,p){ if(p.kind==='asst') return 9; if(p.kind==='ref') return 13; return {predseda:16,sekce:15,odbor:14,odd:13}[u.level]||13; }
+function sysOf(u,p){ const typ=p.typ||(p.kind==='asst'?'prac':'sluz');
+  return {typ, fte:p.fte??1, ozn:p.ozn??defaultOzn(u,p), obor:p.obor||'', kod:p.kod||'', odb:p.odb||'', cls:p.cls??defaultCls(u,p), obc:p.obc??(typ==='sluz'), zk:!!p.zk, zanik:p.zanik||''}; }
+function personCls(h){ const n=parseInt(String(h.cls||'').replace(/\D/g,'')); return isNaN(n)?null:n; }
+function clsMismatch(u,p){ if(!p.person||!state.people[p.person]) return false; const pc=personCls(state.people[p.person]); const sc=sysOf(u,p).cls; return pc!==null&&sc&&pc!==sc; }
+let sysSel=new Set(), sysFilter={q:'',free:false,mis:false};
+function sysRows(){ const rows=[]; let n=0; const m=byId();
+  for(const u of state.units){ for(const p of u.positions){ n++; rows.push({n,u,p,sys:sysOf(u,p)}); } } return rows; }
+function renderSys(){
+  const c=$('#sysview'); const st=c.scrollTop; c.innerHTML='';
+  const all=sysRows(); const q=sysFilter.q.toLowerCase();
+  const rows=all.filter(r=>(!q||unitPath(r.u).join(' ').toLowerCase().includes(q)||r.sys.ozn.toLowerCase().includes(q))&&(!sysFilter.free||!r.p.person)&&(!sysFilter.mis||clsMismatch(r.u,r.p)));
+  const sluz=all.filter(r=>r.sys.typ==='sluz').length, prac=all.length-sluz, mis=all.filter(r=>clsMismatch(r.u,r.p)).length, fte=all.reduce((a,r)=>a+(+r.sys.fte||0),0);
+  const bar=document.createElement('div'); bar.className='sysbar';
+  bar.innerHTML=`<span class="sum"><b>${all.length}</b> míst · <b>${sluz}</b> služebních · <b>${prac}</b> pracovních · úvazky <b>${fte.toLocaleString('cs-CZ')}</b>${mis?` · <b style="color:var(--danger)">${mis}</b> nesoulad tříd`:''}</span>
+    <input type="search" id="sysQ" placeholder="filtr útvaru / označení…" value="${esc(sysFilter.q)}" style="width:220px">
+    <label><input type="checkbox" id="sysFree" ${sysFilter.free?'checked':''}> jen neobsazená</label>
+    <label><input type="checkbox" id="sysMis" ${sysFilter.mis?'checked':''}> jen nesoulad třídy</label>
+    <span class="kbd">Vybrat: klik na zaškrtávátko řádku nebo útvaru · Shift = rozsah</span>
+    <div class="bulk" id="sysBulk" ${sysSel.size?'':'hidden'}><b>${sysSel.size} vybraných:</b>
+      <select id="bkField"><option value="cls">platová třída</option><option value="typ">typ místa</option><option value="obor">obor služby</option><option value="kod">kód činností</option><option value="odb">odb. požadavky</option><option value="fte">úvazek</option><option value="obc">občanství ČR</option><option value="zk">zákaz konkurence</option></select>
+      <input type="text" id="bkVal" placeholder="hodnota" style="width:120px"><button class="small primary" id="bkApply">Nastavit</button><button class="small" id="bkClear">Zrušit výběr</button></div>`;
+  c.appendChild(bar);
+  const t=document.createElement('table'); t.className='sys';
+  t.innerHTML=`<thead><tr><th></th><th>#</th><th title="stupeň řízení (4 = vedoucí úřadu … 1 = vedoucí oddělení)">St.</th><th>Typ</th><th style="min-width:260px">Funkční a služební označení</th><th>Úvazek</th><th>Obor služby</th><th>Kód činn.</th><th>Odb. pož.</th><th>Tř.</th><th title="požadavek na státní občanství ČR">Obč.</th><th title="zákaz konkurence">Z.k.</th><th>Zánik</th><th>Obsazeno</th></tr></thead>`;
+  const tb=document.createElement('tbody'); let lastU=null, lastClicked=null; const visIds=rows.map(r=>r.p.id);
+  const bind=(el,r,field,conv)=>{ el.onchange=()=>{ let v=conv?conv(el):el.value; if(v===''||v===null||v===undefined) delete r.p[field]; else r.p[field]=v; logChange&&logChange('systemizace',`${r.u.name} / ${r.sys.ozn}: ${field} = ${v}`); save(); render(); }; };
+  rows.forEach(r=>{
+    if(r.u!==lastU){ lastU=r.u; const tr=document.createElement('tr'); tr.className='ug'; const uid=r.u.id;
+      const ids=rows.filter(x=>x.u===r.u).map(x=>x.p.id); const allSel=ids.every(i=>sysSel.has(i));
+      tr.innerHTML=`<td><input type="checkbox" ${allSel?'checked':''} title="vybrat celý útvar"></td><td colspan="13"><span class="bar" style="background:${SRC_DARK[r.u.src]}"></span>${esc(unitPath(r.u).slice(1).join(' › ')||r.u.name)}<span class="lv">${LEVEL_LBL[r.u.level]} · ${r.u.positions.length} míst · ${esc(r.u.src)}</span></td>`;
+      tr.querySelector('input').onchange=e=>{ ids.forEach(i=>e.target.checked?sysSel.add(i):sysSel.delete(i)); renderSys(); };
+      tb.appendChild(tr); }
+    const tr=document.createElement('tr'); const S=r.sys; const mis=clsMismatch(r.u,r.p); tr.className=(sysSel.has(r.p.id)?'sel ':'')+(r.p.cat==='nad'?'nad ':'')+(mis?'mis':''); tr.dataset.pid=r.p.id;
+    const h=r.p.person?state.people[r.p.person]:null; const stp=stupen(r.u,r.p);
+    tr.innerHTML=`<td><input type="checkbox" ${sysSel.has(r.p.id)?'checked':''}></td><td class="num">${r.n}</td><td class="st">${stp?`<b>${stp}</b>`:'ost.'}</td>
+      <td><select><option value="sluz" ${S.typ==='sluz'?'selected':''}>služ.</option><option value="prac" ${S.typ==='prac'?'selected':''}>prac.</option></select></td>
+      <td><input type="text" value="${esc(S.ozn)}" title="${esc(r.p.label)} · ${r.p.cat==='nad'?'nadpožadavek':'delimitace'}"></td>
+      <td><input type="number" step="0.1" min="0" max="1" value="${S.fte}"></td>
+      <td><input type="text" value="${esc(S.obor)}" placeholder="např. 41, 63" style="width:90px"></td>
+      <td><input type="text" value="${esc(S.kod)}" placeholder="1.00.13" style="width:70px"></td>
+      <td><input type="text" value="${esc(S.odb)}" style="width:110px"></td>
+      <td class="cls"><input type="number" min="1" max="16" value="${S.cls}"></td>
+      <td><input type="checkbox" ${S.obc?'checked':''}></td><td><input type="checkbox" ${S.zk?'checked':''}></td>
+      <td><input type="date" value="${esc(S.zanik)}" style="width:125px"></td>
+      <td class="who ${mis?'mis':''}">${h?`<span class="pc">${esc(h.name)}</span> <span class="m">${esc(h.src)}${h.cls?' · tř. '+esc(h.cls):''}${mis?' ≠ místo '+S.cls:''}</span>`:'<span class="m">volné</span>'}</td>`;
+    const [chk,sel,ozn,fte,obor,kod,odb,cls,obc,zk,zanik]=tr.querySelectorAll('input,select');
+    chk.onclick=e=>{ if(e.shiftKey&&lastClicked){ const a=visIds.indexOf(lastClicked),b=visIds.indexOf(r.p.id); const [lo,hi]=[Math.min(a,b),Math.max(a,b)]; for(let i=lo;i<=hi;i++) chk.checked?sysSel.add(visIds[i]):sysSel.delete(visIds[i]); } else { chk.checked?sysSel.add(r.p.id):sysSel.delete(r.p.id); } lastClicked=r.p.id; renderSys(); };
+    bind(sel,r,'typ'); bind(ozn,r,'ozn',e=>e.value.trim()); bind(fte,r,'fte',e=>e.value===''?'':Math.max(0,Math.min(1,+e.value))); bind(obor,r,'obor',e=>e.value.trim()); bind(kod,r,'kod',e=>e.value.trim()); bind(odb,r,'odb',e=>e.value.trim());
+    bind(cls,r,'cls',e=>e.value===''?'':parseInt(e.value)); bind(obc,r,'obc',e=>e.checked); bind(zk,r,'zk',e=>e.checked); bind(zanik,r,'zanik');
+    tb.appendChild(tr); });
+  t.appendChild(tb); c.appendChild(t); c.scrollTop=st;
+  $('#sysQ').oninput=()=>{ sysFilter.q=$('#sysQ').value; const st2=c.scrollTop; renderSys(); $('#sysQ').focus(); $('#sysQ').setSelectionRange(99,99); };
+  $('#sysFree').onchange=()=>{ sysFilter.free=$('#sysFree').checked; renderSys(); };
+  $('#sysMis').onchange=()=>{ sysFilter.mis=$('#sysMis').checked; renderSys(); };
+  const bk=$('#bkApply'); if(bk){ const fld=$('#bkField'), val=$('#bkVal');
+    const syncPh=()=>{ val.placeholder={cls:'např. 13',typ:'sluz / prac',obor:'např. 41, 63',kod:'např. 1.00.13',odb:'text',fte:'0–1',obc:'ano / ne',zk:'ano / ne'}[fld.value]; }; syncPh(); fld.onchange=syncPh;
+    bk.onclick=()=>{ const f=fld.value; let raw=val.value.trim(); let v;
+      if(f==='cls') v=raw===''?'':parseInt(raw); else if(f==='fte') v=raw===''?'':+raw.replace(',','.'); else if(f==='typ') v=/^p/i.test(raw)?'prac':'sluz'; else if(f==='obc'||f==='zk') v=/^(a|y|1|t)/i.test(raw); else v=raw;
+      let n=0; for(const u of state.units) for(const p of u.positions) if(sysSel.has(p.id)){ if(v===''||Number.isNaN(v)) delete p[f]; else p[f]=v; n++; }
+      logChange&&logChange('systemizace',`hromadně ${f} = ${v} u ${n} míst`); save(); render(); toast(`Nastaveno u ${n} míst.`); };
+    $('#bkClear').onclick=()=>{ sysSel.clear(); renderSys(); }; }
+}
+// export in the MV form layout
+$('#btnSys').onclick=()=>{
+  const A=[]; const put=(r,c,v)=>{ while(A.length<=r) A.push([]); A[r][c]=v; };
+  const H=[['Správní úřad:',null,null,null,'Úřad rozvoje území ČR'],['IČO :',null,null,null,'24858234'],['Kapitola státního rozpočtu:',null,null,null,''],[],['NÁVRH SYSTEMIZACE '],['SLUŽEBNÍCH A PRACOVNÍCH MÍST'],[],
+    ['Služební/pracovní místa',null,null,null,null,null,null,'Rozdělení',null,null,null,null,null,null,null,null,null,'Platová třída','Požadavek na státní občanství ČR','Zákaz konkurence','Datum zániku místa'],
+    ['Pořad. číslo','Představený/Ved. zaměstnanec',null,null,null,'Ostatní','Funkční  a služební označení služebního/pracovního místa','Služební místa',null,null,null,null,null,'Pracovní místa'],
+    [null,'4. stupeň řízení','3. stupeň řízení','2. stupeň řízení','1. stupeň řízení',null,null,'Představení','Ostatní','Úvazek na služ. místě','Obor služby ','Kód správ. činností','Odb. požadavky','Vedoucí zaměst.','Ostatní','Úvazek na prac. místě','Kód prací'],
+    ['a','b','c','d','e','f','g','h','i','j',null,'l','m','n','o','p','q','r','s','t','v']];
+  H.forEach((r,i)=>r.forEach((v,j)=>{ if(v!==null&&v!==undefined) put(i,j,v); }));
+  let n=0; const first=12;
+  for(const u of state.units) for(const p of u.positions){ const S=sysOf(u,p); const st=stupen(u,p); const r=first-1+n; n++;
+    put(r,0,n); if(st) put(r,5-st,1); else put(r,5,1); put(r,6,S.ozn);
+    if(S.typ==='sluz'){ put(r,st?7:8,1); put(r,9,+S.fte); put(r,10,S.obor); put(r,11,S.kod); put(r,12,S.odb); }
+    else { put(r,st?13:14,1); put(r,15,+S.fte); put(r,16,S.kod); }
+    put(r,17,S.cls); if(S.obc) put(r,18,1); if(S.zk) put(r,19,1); if(S.zanik) put(r,20,S.zanik); }
+  const last=first+n-1, tot=last+1; const col=i=>String.fromCharCode(65+i); const sum=i=>({f:`SUM(${col(i)}${first}:${col(i)}${last})`});
+  put(tot-1,0,'Celkem:'); [1,2,3,4,5,7,8,9,13,14,15,18,19].forEach(i=>put(tot-1,i,sum(i)));
+  put(tot,1,'Služební a pracovní místa :'); put(tot,7,'Služební místa:'); put(tot,13,'Pracovní místa:');
+  put(tot+1,1,'b+c+d+e+f ='); put(tot+1,3,{f:`SUM(B${tot}:F${tot})`}); put(tot+1,7,'h+i ='); put(tot+1,8,{f:`H${tot}+I${tot}`}); put(tot+1,13,'n+o ='); put(tot+1,14,{f:`N${tot}+O${tot}`});
+  const ws=XLSX.utils.aoa_to_sheet(A);
+  const M=s=>{ const d=XLSX.utils.decode_range(s); return d; };
+  ws['!merges']=['A1:D1','E1:T1','A2:D2','E2:T2','E3:T3','A5:U5','A6:U6','A8:G8','H8:Q8','R8:R10','S8:S10','T8:T10','U8:U10','A9:A10','B9:E9','F9:F10','G9:G10','H9:M9','N9:Q9',
+    `A${tot}:A${tot+2}`,`B${tot+1}:F${tot+1}`,`B${tot+2}:C${tot+2}`,`D${tot+2}:F${tot+2}`,`G${tot}:G${tot+2}`,`H${tot+1}:I${tot+1}`,`J${tot}:J${tot+2}`,`N${tot+1}:O${tot+1}`,`P${tot}:P${tot+2}`,`Q${tot}:Q${tot+2}`,`R${tot}:R${tot+2}`,`S${tot}:S${tot+2}`,`T${tot}:T${tot+2}`,`U${tot}:U${tot+2}`].map(M);
+  ws['!cols']=[4.3,5.7,5.7,5.7,5.7,5.5,46,5.2,4.7,6.2,8,7.7,12.7,6.5,5.8,6,6.5,3.8,6,5.8,10].map(w=>({wch:w}));
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Systemizace');
+  // second sheet: same data with unit names, for work
+  const flat=sysRows().map(r=>{const h=r.p.person?state.people[r.p.person]:null; return {'Pořad. č.':r.n,'Sekce':unitPath(r.u)[1]||'','Útvar':r.u.name,'Stupeň řízení':stupen(r.u,r.p)||'','Typ':SYS_TYP[r.sys.typ],'Funkční označení':r.sys.ozn,'Úvazek':+r.sys.fte,'Obor služby':r.sys.obor,'Kód činností':r.sys.kod,'Odb. požadavky':r.sys.odb,'Platová třída':r.sys.cls,'Občanství ČR':r.sys.obc?'ano':'','Zákaz konkurence':r.sys.zk?'ano':'','Datum zániku':r.sys.zanik,'Kategorie':r.p.cat==='nad'?'nadpožadavek':'delimitace','Lokalita':(()=>{const l=h?personLoc(h).id:unitLoc(r.u);return l?LOC[l].name:'';})(),'Obsazeno':h?h.name:'','Zdrojový úřad':h?h.src:'','Třída zaměstnance':h?h.cls:''};});
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(flat),'Podle útvarů');
+  XLSX.writeFile(wb,`URU_systemizace_${stamp()}.xlsx`);
+};
 function renderChart(){
   const c=$('#chart'); const sl=c.scrollLeft, st=c.scrollTop; c.innerHTML='';
   const oc=document.createElement('div'); oc.className='oc'; oc.style.transform='scale('+(state.zoom||85)/100+')';
@@ -569,8 +669,10 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&document.body.clas
 // ---------- auth & boot ----------
 async function boot(){
   renderLegend();
-  if(!window.supabase||!window.CONFIG||!/^https:\/\/.+\.supabase\.co/.test(CONFIG.SUPABASE_URL)){ $('#authMsg').className='msg err'; $('#authMsg').textContent='Aplikace není nakonfigurována – doplňte config.js.'; return; }
-  sb=supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_ANON_KEY);
+  if(!window.supabase||!window.CONFIG||!/^https:\/\/[a-z0-9-]+\.supabase\.co/.test(String(CONFIG.SUPABASE_URL).trim())){ $('#authMsg').className='msg err'; $('#authMsg').textContent='Aplikace není nakonfigurována – doplňte config.js.'; return; }
+  const url=String(CONFIG.SUPABASE_URL).trim().replace(/\/(rest|auth|storage|realtime)\/v1.*$/,'').replace(/\/+$/,'');
+  const key=String(CONFIG.SUPABASE_ANON_KEY).trim();
+  sb=supabase.createClient(url,key);
   $('#authBtn').onclick=async()=>{ const email=$('#authMail').value.trim(); if(!email) return; $('#authMsg').className='msg'; $('#authMsg').textContent='Odesílám…';
     const {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin+location.pathname,shouldCreateUser:false}});
     if(error){ $('#authMsg').className='msg err'; $('#authMsg').textContent='Nepodařilo se: '+error.message; } else { $('#authMsg').textContent='Hotovo – zkontrolujte e-mail a klikněte na odkaz.'; } };
@@ -585,7 +687,7 @@ async function start(){
   try{ await loadRemote(); }catch(e){ $('#authMsg').className='msg err'; $('#authMsg').textContent='Načtení dat selhalo: '+(e.message||e)+' (zkontrolujte tabulky a RLS)'; return; }
   $('#auth').style.display='none';
   $('#zoom').value=state.zoom; $('#zoomVal').textContent=state.zoom+' %';
-  setView(state.view==='chart'||state.view==='loc'?state.view:'tree'); setDot('','připojeno');
+  setView(['chart','loc','sys'].includes(state.view)?state.view:'tree'); setDot('','připojeno');
   sb.channel('organigram').on('postgres_changes',{event:'UPDATE',schema:'public',table:'organigram_state',filter:'id=eq.'+STATE_ID},payload=>{
     if(payload.new&&payload.new.version>version&&!dirty&&!saving){ const v=state.view,z=state.zoom,c=state.collapsed; state=payload.new.data; version=payload.new.version; state.view=v; state.zoom=z; state.collapsed=c; render(); toast('Stav aktualizován z jiného okna.'); } }).subscribe();
   window.addEventListener('beforeunload',e=>{ if(dirty||saving){ flush(); e.preventDefault(); e.returnValue=''; } });
