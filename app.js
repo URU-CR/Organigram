@@ -1,3 +1,5 @@
+const APP_VERSION='2026-09-14.4';
+
 const STRUCTURE = window.STRUCTURE;
 const SOURCES = ['DESÚ','MMR','ÚÚR','MD','MPO','Nové','Jiný'];
 const LOCATIONS = [
@@ -186,7 +188,7 @@ function render(){
   tree.scrollTop=scroll;
   if(document.body.classList.contains('view-chart')) renderChart(); else $('#chart').innerHTML='';
   if(document.body.classList.contains('view-loc')) renderLoc(); else $('#locview').innerHTML='';
-  if(document.body.classList.contains('view-sys')) renderSys(); else $('#sysview').innerHTML='';
+  if(document.body.classList.contains('view-sys')){ try{ renderSys(); }catch(e){ console.error(e); $('#sysview').innerHTML='<div style="padding:20px;color:var(--danger)">Pohled Systemizace se nepodařilo vykreslit: '+esc(e.message||e)+'<br><span style="color:var(--muted);font-size:12px">'+esc((e.stack||'').split('\n').slice(0,3).join(' | '))+'</span></div>'; } } else $('#sysview').innerHTML='';
   // pool
   const pool=$('#pool'); pool.innerHTML='';
   const assigned=new Set(allPositions().map(x=>x.p.person).filter(Boolean));
@@ -668,7 +670,7 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&document.body.clas
 
 // ---------- auth & boot ----------
 async function boot(){
-  renderLegend();
+  renderLegend(); const vr=$('#ver'); if(vr) vr.textContent='verze '+APP_VERSION; console.log('ÚRÚ organigram app.js',APP_VERSION);
   if(!window.supabase||!window.CONFIG||!/^https:\/\/[a-z0-9-]+\.supabase\.co/.test(String(CONFIG.SUPABASE_URL).trim())){ $('#authMsg').className='msg err'; $('#authMsg').textContent='Aplikace není nakonfigurována – doplňte config.js.'; return; }
   const url=String(CONFIG.SUPABASE_URL).trim().replace(/\/(rest|auth|storage|realtime)\/v1.*$/,'').replace(/\/+$/,'');
   const key=String(CONFIG.SUPABASE_ANON_KEY).trim();
