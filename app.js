@@ -1,4 +1,4 @@
-const APP_VERSION='2026-09-14.4';
+const APP_VERSION='2026-09-14.5';
 
 const STRUCTURE = window.STRUCTURE;
 const SOURCES = ['DESÚ','MMR','ÚÚR','MD','MPO','Nové','Jiný'];
@@ -537,7 +537,7 @@ let sysSel=new Set(), sysFilter={q:'',free:false,mis:false};
 function sysRows(){ const rows=[]; let n=0; const m=byId();
   for(const u of state.units){ for(const p of u.positions){ n++; rows.push({n,u,p,sys:sysOf(u,p)}); } } return rows; }
 function renderSys(){
-  const c=$('#sysview'); const st=c.scrollTop; c.innerHTML='';
+  const c=$('#sysview'); const st=c.scrollTop; c.innerHTML='<div style="padding:20px;color:var(--muted)">Sestavuji tabulku…</div>';
   const all=sysRows(); const q=sysFilter.q.toLowerCase();
   const rows=all.filter(r=>(!q||unitPath(r.u).join(' ').toLowerCase().includes(q)||r.sys.ozn.toLowerCase().includes(q))&&(!sysFilter.free||!r.p.person)&&(!sysFilter.mis||clsMismatch(r.u,r.p)));
   const sluz=all.filter(r=>r.sys.typ==='sluz').length, prac=all.length-sluz, mis=all.filter(r=>clsMismatch(r.u,r.p)).length, fte=all.reduce((a,r)=>a+(+r.sys.fte||0),0);
@@ -630,6 +630,8 @@ function renderChart(){
   if(chartFresh){const pb=c.querySelector('.box.predseda'); const sc=(state.zoom||85)/100; c.scrollLeft=Math.max(0,pb.offsetLeft*sc+pb.offsetWidth*sc/2-c.clientWidth/2); c.scrollTop=0; chartFresh=false;} else {c.scrollLeft=sl; c.scrollTop=st;}
 }
 
+window.addEventListener('error',e=>{ try{ const t=$('#toast'); t.textContent='Chyba: '+(e.message||e.error||'?'); t.style.background='var(--danger)'; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>{t.classList.remove('show');t.style.background='';},8000); }catch(_){} });
+window.addEventListener('unhandledrejection',e=>{ try{ const t=$('#toast'); t.textContent='Chyba: '+(e.reason&&e.reason.message||e.reason||'?'); t.style.background='var(--danger)'; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>{t.classList.remove('show');t.style.background='';},8000); }catch(_){} });
 let toastT; function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),3500);}
 
 
