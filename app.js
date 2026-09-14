@@ -1,4 +1,4 @@
-const APP_VERSION='2026-09-14.5';
+const APP_VERSION='2026-09-14.6';
 
 const STRUCTURE = window.STRUCTURE;
 const SOURCES = ['DESÚ','MMR','ÚÚR','MD','MPO','Nové','Jiný'];
@@ -677,10 +677,12 @@ async function boot(){
   const url=String(CONFIG.SUPABASE_URL).trim().replace(/\/(rest|auth|storage|realtime)\/v1.*$/,'').replace(/\/+$/,'');
   const key=String(CONFIG.SUPABASE_ANON_KEY).trim();
   sb=supabase.createClient(url,key);
-  $('#authBtn').onclick=async()=>{ const email=$('#authMail').value.trim(); if(!email) return; $('#authMsg').className='msg'; $('#authMsg').textContent='Odesílám…';
+  $('#authBtn').onclick=async()=>{ const email=$('#authMail').value.trim(); const pass=$('#authPass').value; if(!email) return; $('#authMsg').className='msg'; $('#authMsg').textContent=pass?'Přihlašuji…':'Odesílám odkaz…';
+    if(pass){ const {error}=await sb.auth.signInWithPassword({email,password:pass});
+      if(error){ $('#authMsg').className='msg err'; $('#authMsg').textContent='Nepodařilo se: '+(error.message==='Invalid login credentials'?'nesprávný e-mail nebo heslo':error.message); } return; }
     const {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin+location.pathname,shouldCreateUser:false}});
-    if(error){ $('#authMsg').className='msg err'; $('#authMsg').textContent='Nepodařilo se: '+error.message; } else { $('#authMsg').textContent='Hotovo – zkontrolujte e-mail a klikněte na odkaz.'; } };
-  $('#authMail').addEventListener('keydown',e=>{ if(e.key==='Enter') $('#authBtn').click(); });
+    if(error){ $('#authMsg').className='msg err'; $('#authMsg').textContent='Nepodařilo se: '+(error.message.includes('rate limit')?'vyčerpán hodinový limit odeslaných e-mailů – zkuste to později, nebo se přihlaste heslem':error.message); } else { $('#authMsg').textContent='Hotovo – zkontrolujte e-mail a klikněte na odkaz.'; } };
+  ['#authMail','#authPass'].forEach(id=>$(id).addEventListener('keydown',e=>{ if(e.key==='Enter') $('#authBtn').click(); }));
   $('#btnLogout').onclick=async()=>{ await flush(); await sb.auth.signOut(); location.reload(); };
   sb.auth.onAuthStateChange(async(ev,session)=>{ if(session&&!currentUser){ currentUser=session.user; await start(); } });
   const {data:{session}}=await sb.auth.getSession();

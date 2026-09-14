@@ -285,7 +285,7 @@ table.ov td.z{color:#B6BEC9}
 </head>
 <body>
 <header>
-  <h1>Obsazení organigramu ÚRÚ ČR<small>návrh organizační struktury z 10. 9. 2026 · <span id="ver" title="verze app.js se doplní po načtení skriptu">index 2026-09-14.5</span></small></h1>
+  <h1>Obsazení organigramu ÚRÚ ČR<small>návrh organizační struktury z 10. 9. 2026 · <span id="ver" title="verze app.js se doplní po načtení skriptu">index 2026-09-14.6</span></small></h1>
   <div class="stats" id="stats"></div>
   <span class="user" id="user"><span class="dot" id="syncDot"></span><span id="userMail"></span></span>
   <div class="legend" id="legend"></div>
@@ -328,8 +328,8 @@ table.ov td.z{color:#B6BEC9}
 </main>
 <button id="presExit" class="primary">Ukončit prezentaci (Esc)</button>
 <div id="pop" hidden></div>
-<div id="auth"><div class="card"><h1>Obsazení organigramu ÚRÚ ČR</h1><p>Přihlaste se e-mailem – přijde vám odkaz, kterým se přihlásíte.</p>
-  <input type="text" id="authMail" placeholder="vase.jmeno@urad.cz" autocomplete="email"><button id="authBtn" class="primary">Poslat přihlašovací odkaz</button><div class="msg" id="authMsg"></div></div></div>
+<div id="auth"><div class="card"><h1>Obsazení organigramu ÚRÚ ČR</h1><p>Zadejte e-mail. S heslem se přihlásíte rovnou, bez hesla vám přijde přihlašovací odkaz e-mailem.</p>
+  <input type="text" id="authMail" placeholder="vase.jmeno@urad.cz" autocomplete="email"><input type="password" id="authPass" placeholder="Heslo (máte-li nastavené; jinak nechte prázdné)" autocomplete="current-password"><button id="authBtn" class="primary">Přihlásit</button><div class="msg" id="authMsg"></div></div></div>
 
 <dialog id="dlgOverview"><div class="dhead"><h2>Přehled obsazení</h2><p>Počty míst a obsazení podle útvarů, zdrojových úřadů a lokalit.</p></div><div class="dbody" id="ovBody"></div>
 <div class="dfoot"><button id="ovXlsx">Stáhnout jako xlsx</button><button id="ovClose" class="primary">Zavřít</button></div></dialog>
@@ -368,8 +368,8 @@ table.ov td.z{color:#B6BEC9}
 
 <script src="vendor/xlsx.full.min.js"></script>
 <script src="vendor/supabase.js"></script>
-<script src="config.js?v=2026-09-14.5"></script>
-<script src="structure.js?v=2026-09-14.5"></script>
-<script src="app.js?v=2026-09-14.5"></script>
+<script src="config.js?v=2026-09-14.6"></script>
+<script src="structure.js?v=2026-09-14.6"></script>
+<script src="app.js?v=2026-09-14.6"></script>
 </body
 </html>
