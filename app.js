@@ -1,4 +1,4 @@
-const APP_VERSION='2026-09-15.2';
+const APP_VERSION='2026-09-15.3';
 
 const STRUCTURE = window.STRUCTURE;
 const SOURCES = ['DESÚ','MMR','ÚÚR','MD','MPO','Nové','Jiný'];
@@ -562,11 +562,11 @@ function renderCC(){
   c.appendChild(bar);
   const srcs=SOURCES.filter(s=>Object.values(stats).some(S=>S.src[s]));
   const t=document.createElement('table'); t.className='cc';
-  t.innerHTML=`<thead><tr><th>Kód</th><th>Název střediska</th><th>Útvary</th><th style="text-align:right">Míst</th><th style="text-align:right">Obsazeno</th><th style="text-align:right">Úvazky</th>${srcs.map(s=>`<th style="text-align:right">${s}</th>`).join('')}<th>Lokality</th><th></th></tr></thead>`;
+  t.innerHTML=`<thead><tr><th>Kód</th><th class="rs" style="width:${state.ccNameW||340}px" title="Tažením za okraj změníte šířku">Název střediska<span class="grip"></span></th><th>Útvary</th><th style="text-align:right">Míst</th><th style="text-align:right">Obsazeno</th><th style="text-align:right">Úvazky</th>${srcs.map(s=>`<th style="text-align:right">${s}</th>`).join('')}<th>Lokality</th><th></th></tr></thead>`;
   const tb=document.createElement('tbody'); const T={total:0,filled:0,fte:0,src:{}};
   centers.forEach(cc=>{ const S=stats[cc.id]; T.total+=S.total; T.filled+=S.filled; T.fte+=S.fte; srcs.forEach(x=>T.src[x]=(T.src[x]||0)+(S.src[x]||0));
     const tr=document.createElement('tr');
-    tr.innerHTML=`<td><input class="code" value="${esc(cc.code)}"></td><td><input class="name" value="${esc(cc.name)}"></td>
+    tr.innerHTML=`<td><input class="code" value="${esc(cc.code)}"></td><td><input class="name" value="${esc(cc.name)}" title="${esc(cc.name)}"></td>
       <td>${S.units.map(u=>`<span class="u ${u.cc===cc.id?'':'inh'}" title="${u.cc===cc.id?'přiřazeno přímo':'zděděno z nadřízeného'}">${esc(u.name.replace(/^Místopředseda – /,''))}</span>`).join('')||'<span class="small">žádný útvar</span>'}</td>
       <td class="n">${S.total}</td><td class="n">${S.filled}</td><td class="n">${S.fte.toLocaleString('cs-CZ',{maximumFractionDigits:2})}</td>${srcs.map(x=>`<td class="n">${S.src[x]||''}</td>`).join('')}
       <td class="small">${[...S.locs].map(l=>LOC[l].abbr).join(', ')}</td><td>${S.units.length?'':'<button class="small del">×</button>'}</td>`;
@@ -577,6 +577,12 @@ function renderCC(){
     tb.appendChild(tr); });
   const tot=document.createElement('tr'); tot.className='tot'; tot.innerHTML=`<td></td><td>Celkem</td><td></td><td class="n">${T.total}</td><td class="n">${T.filled}</td><td class="n">${T.fte.toLocaleString('cs-CZ',{maximumFractionDigits:2})}</td>${srcs.map(x=>`<td class="n">${T.src[x]||''}</td>`).join('')}<td></td><td></td>`; tb.appendChild(tot);
   t.appendChild(tb); c.appendChild(t);
+  const th=t.querySelector('th.rs'), grip=th.querySelector('.grip');
+  grip.onmousedown=e=>{ e.preventDefault(); const x0=e.clientX, w0=th.getBoundingClientRect().width; th.classList.add('dragging');
+    const mv=ev=>{ const w=Math.max(140,Math.min(700,w0+ev.clientX-x0)); th.style.width=w+'px'; state.ccNameW=Math.round(w); };
+    const up=()=>{ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); th.classList.remove('dragging'); persist&&persist(); };
+    document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up); };
+  grip.ondblclick=()=>{ delete state.ccNameW; render(); };
   // mapping table
   const h=document.createElement('div'); h.className='cch'; h.innerHTML='Přiřazení útvarů ke střediskům<span>středisko se dědí z nadřízeného útvaru, dokud u útvaru nezvolíte jiné</span>'; c.appendChild(h);
   const t2=document.createElement('table'); t2.className='cc'; t2.innerHTML='<thead><tr><th>Útvar</th><th>Středisko</th><th style="text-align:right">Míst</th><th style="text-align:right">Obsazeno</th></tr></thead>';

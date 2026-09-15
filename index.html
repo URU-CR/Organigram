@@ -133,7 +133,11 @@ table.cc th{text-align:left;font-weight:600;color:var(--muted);padding:6px 8px;b
 table.cc td{padding:5px 8px;border-bottom:1px solid #EEF0F3;vertical-align:top}
 table.cc td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 table.cc input.code{width:64px;font-weight:700;font-variant-numeric:tabular-nums}
-table.cc input.name{width:100%;min-width:180px}
+table.cc input.name{width:100%;min-width:120px;text-overflow:ellipsis}
+table.cc th.rs{position:relative}
+table.cc th.rs .grip{position:absolute;top:0;right:-4px;width:9px;height:100%;cursor:col-resize;user-select:none}
+table.cc th.rs .grip::after{content:"";position:absolute;left:4px;top:6px;bottom:6px;border-left:2px solid var(--line)}
+table.cc th.rs .grip:hover::after,table.cc th.rs.dragging .grip::after{border-color:var(--accent)}
 table.cc input{font:inherit;padding:3px 6px;border:1px solid transparent;border-radius:4px;background:transparent}
 table.cc input:hover{border-color:var(--line);background:#fff}table.cc input:focus{border-color:var(--accent);background:#fff;outline:0}
 table.cc .u{display:inline-block;font-size:11px;padding:1px 6px;border-radius:9px;background:#EEF0F3;margin:1px 2px 1px 0;white-space:nowrap}
@@ -314,7 +318,7 @@ table.ov td.z{color:#B6BEC9}
 </head>
 <body>
 <header>
-  <h1>Obsazení organigramu ÚRÚ ČR<small>návrh organizační struktury z 10. 9. 2026 · <span id="ver" title="verze app.js se doplní po načtení skriptu">index 2026-09-15.2</span></small></h1>
+  <h1>Obsazení organigramu ÚRÚ ČR<small>návrh organizační struktury z 10. 9. 2026 · <span id="ver" title="verze app.js se doplní po načtení skriptu">index 2026-09-15.3</span></small></h1>
   <div class="stats" id="stats"></div>
   <span class="user" id="user"><span class="dot" id="syncDot"></span><span id="userMail"></span></span>
   <div class="legend" id="legend"></div>
@@ -398,8 +402,8 @@ table.ov td.z{color:#B6BEC9}
 
 <script src="vendor/xlsx.full.min.js"></script>
 <script src="vendor/supabase.js"></script>
-<script src="config.js?v=2026-09-15.2"></script>
-<script src="structure.js?v=2026-09-15.2"></script>
-<script src="app.js?v=2026-09-15.2"></script>
+<script src="config.js?v=2026-09-15.3"></script>
+<script src="structure.js?v=2026-09-15.3"></script>
+<script src="app.js?v=2026-09-15.3"></script>
 </body
 </html>
