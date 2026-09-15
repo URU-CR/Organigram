@@ -1,4 +1,4 @@
-const APP_VERSION='2026-09-15.1';
+const APP_VERSION='2026-09-15.2';
 
 const STRUCTURE = window.STRUCTURE;
 const SOURCES = ['DESÚ','MMR','ÚÚR','MD','MPO','Nové','Jiný'];
@@ -526,13 +526,22 @@ function renderLoc(){
 
 // ---------- střediska (nákladová) ----------
 function ensureCenters(){ if(state.centers&&state.centers.length) return false; state.centers=[]; state.units.forEach(u=>{delete u.cc;}); generateCenters(); return true; }
+const CC_MERGES=[
+  {test:/^(Samostatné )?[Oo]ddělení (personální|ekonomické)$/, name:'Odd. personální a ekonomické'},
+  {test:/staveb pozemních komunikací/i, name:'Odd. staveb pozemních komunikací'},
+  {test:/vyvlastnění a právních činností/i, name:'Odd. vyvlastnění a právních činností'},
+  {test:/odvolacích řízení/i, name:'Odd. odvolacích řízení'}];
 function generateCenters(){
-  const m=byId(); let cid=1; const add=(code,name,unit)=>{ const c={id:'c'+(cid++),code:String(code),name}; state.centers.push(c); if(unit) unit.cc=c.id; return c; };
+  let cid=1; const add=(code,name,unit)=>{ const c={id:'c'+(cid++),code:String(code),name}; state.centers.push(c); if(unit) unit.cc=c.id; return c; };
+  const short=n=>n.replace(/^Samostatné oddělení/,'Odd.').replace(/^Oddělení/,'Odd.');
+  const addGroup=(units,codeOf)=>{ const done=new Map(); units.forEach(u=>{ const mg=CC_MERGES.find(x=>x.test.test(u.name));
+    if(mg){ if(done.has(mg)){ u.cc=done.get(mg).id; return; } const c=add(codeOf(),mg.name,u); done.set(mg,c); return; }
+    add(codeOf(),u.level==='odbor'?u.name:short(u.name),u); }); };
   const pred=state.units.find(u=>u.level==='predseda'); add(100,'Vedení úřadu',pred);
-  let k=1; childrenOf(pred.id).filter(u=>u.level==='odd').forEach(u=>add(100+10*(k++),u.name.replace(/^Samostatné oddělení/,'Odd.').replace(/^Oddělení/,'Odd.'),u));
+  let k=1; addGroup(childrenOf(pred.id).filter(u=>u.level==='odd'),()=>100+10*(k++));
   childrenOf(pred.id).filter(u=>u.level==='sekce').forEach((sk,i)=>{ const base=(i+2)*100; let j=1;
-    childrenOf(sk.id).filter(u=>u.level==='odbor').forEach(u=>add(base+10*(j++),u.name,u));
-    let k=1; childrenOf(sk.id).filter(u=>u.level==='odd').forEach(u=>add(base+10*j+(k++),u.name.replace(/^Samostatné oddělení/,'Odd.').replace(/^Oddělení/,'Odd.'),u)); });
+    addGroup(childrenOf(sk.id).filter(u=>u.level==='odbor'),()=>base+10*(j++));
+    let m=1; const jj=j; addGroup(childrenOf(sk.id).filter(u=>u.level==='odd'),()=>base+10*jj+(m++)); });
 }
 function unitCC(u){ const m=byId(); let c=u; while(c){ if(c.cc) return c.cc; c=m[c.parent]; } return null; }
 function unitCCSource(u){ const m=byId(); let c=u; while(c){ if(c.cc) return c; c=m[c.parent]; } return null; }
