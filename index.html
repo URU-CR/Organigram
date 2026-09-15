@@ -120,6 +120,35 @@ body.presenting .gsearch{display:none}
 .box .locsel{max-width:100%}
 /* location view */
 #locview{overflow:auto;padding:16px 18px 60px;display:none}
+/* střediska view */
+#ccview{overflow:auto;padding:14px 18px 60px;display:none}
+body.view-cc #tree{display:none} body.view-cc #ccview{display:block}
+body.view-cc main{grid-template-columns:1fr}
+body.view-cc aside{display:none}
+.ccbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;font-size:13px}
+.ccbar .sum{color:var(--muted)}.ccbar .sum b{color:var(--ink)}
+.ccbar .sp{margin-left:auto;display:flex;gap:6px}
+table.cc{border-collapse:collapse;width:100%;font-size:13px;background:#fff;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+table.cc th{text-align:left;font-weight:600;color:var(--muted);padding:6px 8px;border-bottom:1px solid var(--line);background:#F3F5F8;white-space:nowrap}
+table.cc td{padding:5px 8px;border-bottom:1px solid #EEF0F3;vertical-align:top}
+table.cc td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+table.cc input.code{width:64px;font-weight:700;font-variant-numeric:tabular-nums}
+table.cc input.name{width:100%;min-width:180px}
+table.cc input{font:inherit;padding:3px 6px;border:1px solid transparent;border-radius:4px;background:transparent}
+table.cc input:hover{border-color:var(--line);background:#fff}table.cc input:focus{border-color:var(--accent);background:#fff;outline:0}
+table.cc .u{display:inline-block;font-size:11px;padding:1px 6px;border-radius:9px;background:#EEF0F3;margin:1px 2px 1px 0;white-space:nowrap}
+table.cc .u.inh{background:#fff;border:1px dashed var(--line);color:var(--muted)}
+table.cc tr.tot td{font-weight:600;background:#F7F8FA}
+table.cc td.small{font-size:11px;color:var(--muted);white-space:nowrap}
+.cch{font-size:14px;font-weight:600;margin:18px 0 6px}
+.cch span{font-weight:400;color:var(--muted);font-size:12px;margin-left:8px}
+table.cc tr.lv-sekce td:first-child{font-weight:600}
+table.cc tr.lv-odbor td:first-child{padding-left:24px}
+table.cc tr.lv-odd td:first-child{padding-left:44px;color:var(--muted)}
+table.cc tr.lv-odd.top td:first-child{padding-left:24px;color:var(--ink)}
+table.cc select.ccsel{font:inherit;font-size:12px;padding:2px 5px;border:1px solid var(--line);border-radius:5px;background:#fff;max-width:320px}
+table.cc select.ccsel.inh{color:var(--muted)}
+body.presenting #ccview input,body.presenting #ccview select{pointer-events:none}
 /* systemizace view */
 #sysview{overflow:auto;padding:0 0 60px;display:none;background:#fff}
 body.view-sys #tree{display:none} body.view-sys #sysview{display:block}
@@ -285,12 +314,12 @@ table.ov td.z{color:#B6BEC9}
 </head>
 <body>
 <header>
-  <h1>Obsazení organigramu ÚRÚ ČR<small>návrh organizační struktury z 10. 9. 2026 · <span id="ver" title="verze app.js se doplní po načtení skriptu">index 2026-09-14.6</span></small></h1>
+  <h1>Obsazení organigramu ÚRÚ ČR<small>návrh organizační struktury z 10. 9. 2026 · <span id="ver" title="verze app.js se doplní po načtení skriptu">index 2026-09-15.1</span></small></h1>
   <div class="stats" id="stats"></div>
   <span class="user" id="user"><span class="dot" id="syncDot"></span><span id="userMail"></span></span>
   <div class="legend" id="legend"></div>
   <div class="gsearch"><input type="search" id="search" placeholder="Hledat všude – jméno, útvar, číslo místa…" autocomplete="off"><span class="cnt" id="scnt"></span><div id="sres"></div></div>
-  <div class="viewsw" role="group" aria-label="Pohled"><button id="vwTree" class="on">Strom</button><button id="vwChart">Diagram</button><button id="vwLoc">Lokality</button><button id="vwSys">Systemizace</button></div>
+  <div class="viewsw" role="group" aria-label="Pohled"><button id="vwTree" class="on">Strom</button><button id="vwChart">Diagram</button><button id="vwLoc">Lokality</button><button id="vwSys">Systemizace</button><button id="vwCC">Střediska</button></div>
   <span class="zoom" id="zoomWrap" hidden>Zvětšení <input type="range" id="zoom" min="50" max="120" value="85"> <span id="zoomVal">85 %</span></span>
   <span class="zoom" id="critWrap" hidden title="Zvýrazní útvary s obsazeností v daném intervalu">Kritické <input type="range" class="crit" id="crit" min="0" max="3" step="1" value="0" list="critTicks"> <span id="critVal">vypnuto</span><datalist id="critTicks"><option value="0"></option><option value="1"></option><option value="2"></option><option value="3"></option></datalist></span>
   <div class="actions">
@@ -316,6 +345,7 @@ table.ov td.z{color:#B6BEC9}
   <div id="tree"></div>
   <div id="locview"></div>
   <div id="sysview"></div>
+  <div id="ccview"></div>
   <div id="chart"></div>
   <aside>
     <div class="pool-head">
@@ -368,8 +398,8 @@ table.ov td.z{color:#B6BEC9}
 
 <script src="vendor/xlsx.full.min.js"></script>
 <script src="vendor/supabase.js"></script>
-<script src="config.js?v=2026-09-14.6"></script>
-<script src="structure.js?v=2026-09-14.6"></script>
-<script src="app.js?v=2026-09-14.6"></script>
+<script src="config.js?v=2026-09-15.1"></script>
+<script src="structure.js?v=2026-09-15.1"></script>
+<script src="app.js?v=2026-09-15.1"></script>
 </body
 </html>
