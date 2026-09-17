@@ -1,4 +1,4 @@
-const APP_VERSION='2026-09-17.3';
+const APP_VERSION='2026-09-18.1';
 
 const STRUCTURE = window.STRUCTURE;
 const SOURCES = ['DESÚ','MMR','ÚÚR','MD','MPO','Nové','Jiný'];
@@ -22,7 +22,7 @@ function locSelect(u,cls){ const sel=document.createElement('select'); sel.class
   const src=unitLocSource(u); const inh=src&&src!==u?src:null;
   sel.innerHTML=`<option value="">${inh?'dle nadřízeného: '+LOC[inh.loc].abbr:'— lokalita —'}</option>`+LOCATIONS.map(l=>`<option value="${l.id}">${l.abbr} · ${l.name}</option>`).join('');
   sel.value=u.loc||''; sel.title='Lokalita útvaru – přenese se na všechny jeho zaměstnance, kteří nemají nastavenou vlastní';
-  sel.onclick=e=>e.stopPropagation(); sel.onchange=()=>{ u.loc=sel.value||null; logChange&&logChange('lokalita útvaru',u.name+' → '+(u.loc?LOC[u.loc].name:'dle nadřízeného')); save(); render(); }; return sel; }
+  sel.disabled=!ROLE.org; sel.onclick=e=>e.stopPropagation(); sel.onchange=()=>{ u.loc=sel.value||null; logChange&&logChange('lokalita útvaru',u.name+' → '+(u.loc?LOC[u.loc].name:'dle nadřízeného')); save(); render(); }; return sel; }
 const SRC_COLOR = {'DESÚ':'var(--c-desu)','MMR':'var(--c-mmr)','ÚÚR':'var(--c-uur)','MD':'var(--c-md)','MPO':'var(--c-mpo)','Nové':'var(--c-nove)','Jiný':'#E5E7EB'};
 const SRC_DARK  = {'DESÚ':'var(--c-desu-d)','MMR':'var(--c-mmr-d)','ÚÚR':'var(--c-uur-d)','MD':'var(--c-md-d)','MPO':'var(--c-mpo-d)','Nové':'var(--c-nove-d)','Jiný':'#6B7280'};
 const LEVEL_LBL = {predseda:'úřad',sekce:'sekce',odbor:'odbor',odd:'oddělení'};
@@ -32,6 +32,7 @@ const STATE_ID = 'main';
 
 // ---------- state ----------
 
+const ROLE={name:'admin',org:true,it:true};  // org = úpravy organigramu/lidí, it = úpravy IT vybavení
 let state = null;   // {units:[{id,parent,name,level,src,positions:[{id,kind,label,cat,person}]}], people:{id:{...}}, collapsed:{}}
 let people = {};    // id -> person
 let pidCounter = 1;
@@ -120,14 +121,14 @@ function esc(s){ return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&
 function personChip(p, opts={}){
   const d=document.createElement('div');
   d.className='person src-'+(SOURCES.includes(p.src)?p.src:'Jiný');
-  d.draggable=true; d.dataset.pid=p.id; d.tabIndex=0;
+  d.draggable=ROLE.org; d.dataset.pid=p.id; d.tabIndex=0;
   const meta=[p.src, p.role, p.cls?('tř. '+p.cls):null, (p.fte&&p.fte!=1)?('úv. '+p.fte):null].filter(Boolean).join(' · ');
   d.innerHTML=`<span class="nm">${esc(p.name)}</span><span class="meta">${esc(meta)}</span>`; d.appendChild(locTag(p));
   d.title=[p.name,p.src,p.unit,p.role,p.posId].filter(Boolean).join('\n');
   d.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/pid',p.id);e.dataTransfer.effectAllowed='move';d.classList.add('dragging');});
   d.addEventListener('dragend',()=>d.classList.remove('dragging'));
   d.addEventListener('click',e=>{e.stopPropagation();showPop(p,d);});
-  d.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){e.preventDefault();showPop(p,d);} if(e.key==='Delete'||e.key==='Backspace'){unassign(p.id);render();} });
+  d.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){e.preventDefault();showPop(p,d);} if(ROLE.org&&(e.key==='Delete'||e.key==='Backspace')){unassign(p.id);render();} });
   return d;
 }
 
@@ -148,7 +149,7 @@ function renderUnit(u){
   // drop on header -> first free slot
   head.addEventListener('dragover',e=>{e.preventDefault();head.classList.add('over');});
   head.addEventListener('dragleave',()=>head.classList.remove('over'));
-  head.addEventListener('drop',e=>{e.preventDefault();head.classList.remove('over');const pid=e.dataTransfer.getData('text/pid');if(!pid)return;placeInUnit(pid,u);});
+  head.addEventListener('drop',e=>{e.preventDefault();head.classList.remove('over');const pid=e.dataTransfer.getData('text/pid');if(!pid||!ROLE.org)return;placeInUnit(pid,u);});
   div.appendChild(head);
 
   const body=document.createElement('div'); body.className='ubody';
@@ -162,7 +163,7 @@ function renderUnit(u){
     else slot.innerHTML='<span class="empty">volné místo</span>';
     slot.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move';slot.classList.add('over');});
     slot.addEventListener('dragleave',()=>slot.classList.remove('over'));
-    slot.addEventListener('drop',e=>{e.preventDefault();e.stopPropagation();slot.classList.remove('over');const pid=e.dataTransfer.getData('text/pid');if(pid)assign(pid,p.id);});
+    slot.addEventListener('drop',e=>{e.preventDefault();e.stopPropagation();slot.classList.remove('over');const pid=e.dataTransfer.getData('text/pid');if(pid&&ROLE.org)assign(pid,p.id);});
     const del=document.createElement('button'); del.className='small del'; del.textContent='×'; del.title=p.person?'Uvolnit místo':'Odebrat místo';
     del.onclick=()=>{ if(p.person){unassign(p.person);} else { if(confirm('Odebrat toto místo z organigramu?')){u.positions=u.positions.filter(x=>x!==p);} } save();render(); };
     row.append(lab,slot,del); body.appendChild(row);
@@ -268,16 +269,16 @@ function showPop(p,anchor){
     ${p.note?`<dt>Poznámka</dt><dd>${esc(p.note)}</dd>`:''}
     <dt>V ÚRÚ</dt><dd>${cur?esc(unitPath(cur.u).slice(-2).join(' › '))+' – '+esc(cur.p.label):'<i>nezařazen/a</i>'}</dd>
     <dt>IT vybavení</dt><dd>${(()=>{const its=personItems(p);return its.length?esc(its.map(x=>catById()[x.id].name).join(', ')):'<i>nic</i>';})()}</dd>
-    <dt>Lokalita</dt><dd><select id="popLoc" style="width:100%"><option value="">dle útvaru${(()=>{const l=cur?unitLoc(cur.u):null;return l?' ('+LOC[l].name+')':' (neurčeno)';})()}</option>${LOCATIONS.map(l=>`<option value="${l.id}"${p.loc===l.id?' selected':''}>${l.abbr} · ${l.name}</option>`).join('')}</select></dd></dl>
-    <div class="row">${cur?'<button id="popUn">Uvolnit místo</button>':''}<button id="popDel" style="color:var(--danger)">Smazat osobu</button><button id="popClose" class="primary">Zavřít</button></div>`;
+    <dt>Lokalita</dt><dd>${ROLE.org?`<select id="popLoc" style="width:100%"><option value="">dle útvaru${(()=>{const l=cur?unitLoc(cur.u):null;return l?' ('+LOC[l].name+')':' (neurčeno)';})()}</option>${LOCATIONS.map(l=>`<option value="${l.id}"${p.loc===l.id?' selected':''}>${l.abbr} · ${l.name}</option>`).join('')}</select>`:(()=>{const l=personLoc(p).id;return l?esc(LOC[l].name):'—';})()}</dd></dl>
+    <div class="row">${ROLE.org&&cur?'<button id="popUn">Uvolnit místo</button>':''}${ROLE.org?'<button id="popDel" style="color:var(--danger)">Smazat osobu</button>':''}<button id="popClose" class="primary">Zavřít</button></div>`;
   pop.hidden=false;
   const r=anchor.getBoundingClientRect(); let x=r.left, y=r.bottom+6;
   if(x+330>innerWidth) x=innerWidth-335; if(y+pop.offsetHeight>innerHeight) y=Math.max(8,r.top-pop.offsetHeight-6);
   pop.style.left=x+'px'; pop.style.top=y+'px';
   $('#popClose').onclick=hidePop;
-  $('#popLoc').onchange=()=>{ p.loc=$('#popLoc').value||null; logChange&&logChange('lokalita osoby',p.name+' → '+(p.loc?LOC[p.loc].name:'dle útvaru')); save(); render(); };
+  if($('#popLoc')) $('#popLoc').onchange=()=>{ p.loc=$('#popLoc').value||null; logChange&&logChange('lokalita osoby',p.name+' → '+(p.loc?LOC[p.loc].name:'dle útvaru')); save(); render(); };
   const un=$('#popUn'); if(un) un.onclick=()=>{unassign(p.id);hidePop();};
-  $('#popDel').onclick=()=>{ if(confirm('Smazat '+p.name+' z aplikace?')){unassign(p.id);delete state.people[p.id];logChange('smazání osoby',p.name);save();render();hidePop();} };
+  if($('#popDel')) $('#popDel').onclick=()=>{ if(confirm('Smazat '+p.name+' z aplikace?')){unassign(p.id);delete state.people[p.id];logChange('smazání osoby',p.name);save();render();hidePop();} };
 }
 function hidePop(){$('#pop').hidden=true;}
 document.addEventListener('click',e=>{ if(!$('#pop').contains(e.target)) hidePop(); });
@@ -462,7 +463,7 @@ let chartFresh=true;
 const CRIT_STEPS=[null,25,50,75]; let critLevel=0;
 function isCrit(u){ const v=CRIT_STEPS[critLevel]; if(!v) return false; const c=childrenOf(u.id).length?subtreeCount(u):{total:u.positions.length,filled:u.positions.filter(p=>p.person).length}; if(!c.total) return false; return 100*c.filled/c.total<=v; }
 $('#crit').oninput=()=>{ critLevel=+$('#crit').value; const v=CRIT_STEPS[critLevel]; $('#critVal').textContent=v?`obsazeno 0–${v} %`:'vypnuto'; document.body.classList.toggle('critmode',!!v); render(); };
-function setView(v){ state.view=v; if(v==='chart') chartFresh=true; document.body.classList.toggle('view-chart',v==='chart'); document.body.classList.toggle('view-loc',v==='loc'); document.body.classList.toggle('view-sys',v==='sys'); document.body.classList.toggle('view-it',v==='it');
+function setView(v){ if(!ROLE.org&&!['it','chart','loc'].includes(v)) v='it'; state.view=v; if(v==='chart') chartFresh=true; document.body.classList.toggle('view-chart',v==='chart'); document.body.classList.toggle('view-loc',v==='loc'); document.body.classList.toggle('view-sys',v==='sys'); document.body.classList.toggle('view-it',v==='it');
   $('#vwTree').classList.toggle('on',!['chart','loc','sys','it'].includes(v)); $('#vwSys').classList.toggle('on',v==='sys'); $('#vwIT').classList.toggle('on',v==='it'); $('#vwChart').classList.toggle('on',v==='chart'); $('#vwLoc').classList.toggle('on',v==='loc'); $('#zoomWrap').hidden=v!=='chart'; $('#critWrap').hidden=v!=='chart'; render(); }
 $('#vwTree').onclick=()=>setView('tree'); $('#vwChart').onclick=()=>setView('chart'); $('#vwLoc').onclick=()=>setView('loc'); $('#vwSys').onclick=()=>setView('sys'); $('#vwIT').onclick=()=>setView('it');
 $('#zoom').oninput=()=>{ state.zoom=+$('#zoom').value; $('#zoomVal').textContent=state.zoom+' %'; const oc=$('#chart .oc'); if(oc) oc.style.transform='scale('+state.zoom/100+')'; };
@@ -482,7 +483,7 @@ function boxEl(u){
   bp.appendChild(open); box.appendChild(bp);
   box.addEventListener('dragover',e=>{e.preventDefault();box.classList.add('over');});
   box.addEventListener('dragleave',()=>box.classList.remove('over'));
-  box.addEventListener('drop',e=>{e.preventDefault();e.stopPropagation();box.classList.remove('over');const pid=e.dataTransfer.getData('text/pid');if(pid)placeInUnit(pid,u);});
+  box.addEventListener('drop',e=>{e.preventDefault();e.stopPropagation();box.classList.remove('over');const pid=e.dataTransfer.getData('text/pid');if(pid&&ROLE.org)placeInUnit(pid,u);});
   return box;
 }
 // children of odbor-level (and stacked oddělení under sekce/predseda) render as a vertical stack; sekce and odbory render horizontally
@@ -519,7 +520,7 @@ function renderLoc(){
     if(!people.length){ const e=document.createElement('div'); e.className='hint'; e.style.cssText='color:var(--muted);font-size:12px;padding:12px 4px;text-align:center'; e.textContent=l.id?'Nikdo. Přetáhněte sem osobu, nebo nastavte lokalitu u útvaru.':'Všichni zařazení mají lokalitu.'; lb.appendChild(e); }
     col.appendChild(lb);
     col.addEventListener('dragover',e=>{e.preventDefault();col.classList.add('over');}); col.addEventListener('dragleave',()=>col.classList.remove('over'));
-    col.addEventListener('drop',e=>{e.preventDefault();col.classList.remove('over');const pid=e.dataTransfer.getData('text/pid'); const p=pid&&state.people[pid]; if(!p) return;
+    col.addEventListener('drop',e=>{e.preventDefault();col.classList.remove('over');const pid=e.dataTransfer.getData('text/pid'); const p=pid&&state.people[pid]; if(!p||!ROLE.org) return;
       p.loc=l.id||null; if(!p.loc) delete p.loc; logChange&&logChange('lokalita osoby',p.name+' → '+(l.id?l.name:'dle útvaru')); save(); render(); });
     grid.appendChild(col); });
   c.appendChild(grid); c.scrollTop=st;
@@ -825,12 +826,20 @@ async function boot(){
   const {data:{session}}=await sb.auth.getSession();
   if(session){ currentUser=session.user; await start(); }
 }
+async function loadRole(){
+  try{ const {data,error}=await sb.from('organigram_roles').select('role').eq('email',(currentUser.email||'').toLowerCase()).maybeSingle(); if(error) throw error;
+    const r=(data&&data.role)||'admin'; ROLE.name=r; ROLE.org=r==='admin'; ROLE.it=(r==='admin'||r==='it');
+  }catch(e){ console.warn('role',e); ROLE.name='admin'; ROLE.org=true; ROLE.it=true; }
+  document.body.classList.toggle('role-it',ROLE.name==='it');
+  $('#userMail').textContent=currentUser.email+(ROLE.name==='it'?' · IT':'');
+}
 async function start(){
   $('#userMail').textContent=currentUser.email; $('#btnUndo').onclick=undo; $('#btnRedo').onclick=redo;
+  await loadRole();
   try{ await loadRemote(); }catch(e){ $('#authMsg').className='msg err'; $('#authMsg').textContent='Načtení dat selhalo: '+(e.message||e)+' (zkontrolujte tabulky a RLS)'; return; }
   $('#auth').style.display='none';
   $('#zoom').value=state.zoom; $('#zoomVal').textContent=state.zoom+' %';
-  setView(['chart','loc','sys','it'].includes(state.view)?state.view:'tree'); setDot('','připojeno');
+  setView(ROLE.org?(['chart','loc','sys','it'].includes(state.view)?state.view:'tree'):'it'); setDot('','připojeno');
   sb.channel('organigram').on('postgres_changes',{event:'UPDATE',schema:'public',table:'organigram_state',filter:'id=eq.'+STATE_ID},payload=>{
     if(payload.new&&payload.new.version>version&&!dirty&&!saving){ const v=state.view,z=state.zoom,c=state.collapsed; state=payload.new.data; version=payload.new.version; state.view=v; state.zoom=z; state.collapsed=c; render(); toast('Stav aktualizován z jiného okna.'); } }).subscribe();
   window.addEventListener('beforeunload',e=>{ if(dirty||saving){ flush(); e.preventDefault(); e.returnValue=''; } });

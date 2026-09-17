@@ -120,6 +120,10 @@ body.presenting .gsearch{display:none}
 .box .locsel{max-width:100%}
 /* location view */
 #locview{overflow:auto;padding:16px 18px 60px;display:none}
+/* role IT */
+body.role-it .adm,body.role-it #vwTree,body.role-it #vwSys,body.role-it .box .bopen,body.role-it .addpos,body.role-it .pos .del,body.role-it #btnAddPerson{display:none!important}
+body.role-it .person{cursor:default}
+body.role-it select.locsel{pointer-events:none;opacity:.7;border-color:transparent;background:transparent}
 /* IT view */
 #itview{overflow:auto;padding:0 0 60px;display:none;background:#fff}
 body.view-it #tree{display:none} body.view-it #itview{display:block}
@@ -354,7 +358,7 @@ table.ov td.z{color:#B6BEC9}
 </head>
 <body>
 <header>
-  <h1>Obsazení organigramu ÚRÚ ČR<small>návrh organizační struktury z 10. 9. 2026 · <span id="ver" title="verze app.js se doplní po načtení skriptu">index 2026-09-17.3</span></small></h1>
+  <h1>Obsazení organigramu ÚRÚ ČR<small>návrh organizační struktury z 10. 9. 2026 · <span id="ver" title="verze app.js se doplní po načtení skriptu">index 2026-09-18.1</span></small></h1>
   <div class="stats" id="stats"></div>
   <span class="user" id="user"><span class="dot" id="syncDot"></span><span id="userMail"></span></span>
   <div class="legend" id="legend"></div>
@@ -363,19 +367,19 @@ table.ov td.z{color:#B6BEC9}
   <span class="zoom" id="zoomWrap" hidden>Zvětšení <input type="range" id="zoom" min="50" max="120" value="85"> <span id="zoomVal">85 %</span></span>
   <span class="zoom" id="critWrap" hidden title="Zvýrazní útvary s obsazeností v daném intervalu">Kritické <input type="range" class="crit" id="crit" min="0" max="3" step="1" value="0" list="critTicks"> <span id="critVal">vypnuto</span><datalist id="critTicks"><option value="0"></option><option value="1"></option><option value="2"></option><option value="3"></option></datalist></span>
   <div class="actions">
-    <button id="btnImport" class="primary">Nahrát Excel s lidmi</button>
-    <button id="btnUndo" title="Zpět (Ctrl+Z)" disabled>↶ Zpět</button>
-    <button id="btnRedo" title="Znovu (Ctrl+Y)" disabled>↷</button>
-    <button id="btnExport">Exportovat obsazení (xlsx)</button>
-    <button id="btnVacant" title="Seznam neobsazených míst pro personální oddělení">Volná místa (xlsx)</button>
-    <button id="btnSys" title="Návrh systemizace služebních a pracovních míst ve formuláři MV">Systemizace (xlsx)</button>
-    <button id="btnSave">Uložit stav (json)</button>
-    <button id="btnLoad">Načíst stav (json)</button>
-    <button id="btnOverview">Přehled</button>
+    <button id="btnImport" class="adm primary">Nahrát Excel s lidmi</button>
+    <button id="btnUndo" class="adm" title="Zpět (Ctrl+Z)" disabled>↶ Zpět</button>
+    <button id="btnRedo" class="adm" title="Znovu (Ctrl+Y)" disabled>↷</button>
+    <button id="btnExport" class="adm">Exportovat obsazení (xlsx)</button>
+    <button id="btnVacant" class="adm" title="Seznam neobsazených míst pro personální oddělení">Volná místa (xlsx)</button>
+    <button id="btnSys" class="adm" title="Návrh systemizace služebních a pracovních míst ve formuláři MV">Systemizace (xlsx)</button>
+    <button id="btnSave" class="adm">Uložit stav (json)</button>
+    <button id="btnLoad" class="adm">Načíst stav (json)</button>
+    <button id="btnOverview" class="adm">Přehled</button>
     <button id="btnLog">Historie</button>
     <button id="btnPresent">Prezentace</button>
-    <button id="btnCollapse" title="Sbalit / rozbalit vše">Sbalit vše</button>
-    <button id="btnReset" title="Vrátí prázdný organigram">Vymazat vše</button>
+    <button id="btnCollapse" class="adm" title="Sbalit / rozbalit vše">Sbalit vše</button>
+    <button id="btnReset" class="adm" title="Vrátí prázdný organigram">Vymazat vše</button>
     <button id="btnLogout">Odhlásit</button>
     <input type="file" id="fileXlsx" accept=".xlsx,.xlsm,.xls,.csv" hidden>
     <input type="file" id="fileJson" accept=".json" hidden>
@@ -447,8 +451,8 @@ table.ov td.z{color:#B6BEC9}
 
 <script src="vendor/xlsx.full.min.js"></script>
 <script src="vendor/supabase.js"></script>
-<script src="config.js?v=2026-09-17.3"></script>
-<script src="structure.js?v=2026-09-17.3"></script>
-<script src="app.js?v=2026-09-17.3"></script>
+<script src="config.js?v=2026-09-18.1"></script>
+<script src="structure.js?v=2026-09-18.1"></script>
+<script src="app.js?v=2026-09-18.1"></script>
 </body
 </html>
