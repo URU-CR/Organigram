@@ -124,7 +124,30 @@ body.presenting .gsearch{display:none}
 #itview{overflow:auto;padding:0 0 60px;display:none;background:#fff}
 body.view-it #tree{display:none} body.view-it #itview{display:block}
 body.view-it main{grid-template-columns:1fr}
-body.view-it aside{display:none}
+body.view-it main{grid-template-columns:1fr 330px}
+body.view-it aside .pool-head,body.view-it #pool{display:none}
+#itpool{display:none;flex:1;min-height:0;flex-direction:column}
+body.view-it #itpool{display:flex}
+#itpool .ph{padding:12px 14px 8px;border-bottom:1px solid var(--line)}
+#itpool .ph h2{margin:0 0 6px;font-size:15px;font-weight:600}
+#itpool .ph h2 span{color:var(--muted);font-weight:400}
+#itpool .ph .hint{font-size:11px;color:var(--muted)}
+#itpool .pl{flex:1;overflow:auto;padding:8px 14px}
+.pit{border:1px solid var(--line);border-radius:7px;margin-bottom:6px;background:#fff}
+.pit .t{padding:5px 8px;font-size:12px;font-weight:600;border-bottom:1px solid #EEF0F3;display:flex;justify-content:space-between}
+.pit .t .tot{color:var(--muted);font-weight:400}
+.pit .r{display:flex;align-items:center;gap:6px;padding:3px 8px;font-size:12px}
+.pit .r .chip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:12px;border:1px solid rgba(0,0,0,.14);cursor:grab;font-weight:600;font-size:11px}
+.pit .r .chip:active{cursor:grabbing}
+.pit .r .av{margin-left:auto;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pit .r .av.neg{color:var(--danger);font-weight:600}
+.pit .r .av.zero{color:var(--muted)}
+.pit .r button{padding:0 5px;font-size:12px;line-height:1.3}
+.itp.over,.itu>.h.over{background:#EAF0FF}
+.iti .rd{display:inline-flex;align-items:center;gap:2px;font-size:10px;color:var(--muted);cursor:pointer}
+.iti .rd input{margin:0;width:12px;height:12px}
+.iti.ready{border-color:var(--ok);box-shadow:inset 0 0 0 1px var(--ok)}
+.iti.ready .rd{color:var(--ok);font-weight:700}
 .itbar{position:sticky;top:0;z-index:6;background:#fff;border-bottom:1px solid var(--line);padding:8px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px}
 .itbar .sum{color:var(--muted)}.itbar .sum b{color:var(--ink)}
 .itbar .bulk{display:flex;gap:6px;align-items:center;margin-left:auto;padding:4px 8px;border:1px solid var(--line);border-radius:6px;background:#F7F8FA}
@@ -331,7 +354,7 @@ table.ov td.z{color:#B6BEC9}
 </head>
 <body>
 <header>
-  <h1>Obsazení organigramu ÚRÚ ČR<small>návrh organizační struktury z 10. 9. 2026 · <span id="ver" title="verze app.js se doplní po načtení skriptu">index 2026-09-17.2</span></small></h1>
+  <h1>Obsazení organigramu ÚRÚ ČR<small>návrh organizační struktury z 10. 9. 2026 · <span id="ver" title="verze app.js se doplní po načtení skriptu">index 2026-09-17.3</span></small></h1>
   <div class="stats" id="stats"></div>
   <span class="user" id="user"><span class="dot" id="syncDot"></span><span id="userMail"></span></span>
   <div class="legend" id="legend"></div>
@@ -371,6 +394,7 @@ table.ov td.z{color:#B6BEC9}
       <div style="margin-top:8px;display:flex;gap:6px"><button class="small" id="btnAddPerson">+ přidat osobu ručně</button></div>
     </div>
     <div id="pool"></div>
+    <div id="itpool"><div class="ph"><h2>Nezařazený IT materiál <span id="itpoolCount"></span></h2><div style="display:flex;gap:6px"><button class="small" id="itpoolAdd">+ přidat do zásoby</button></div><div class="hint" style="margin-top:6px">Přetáhněte položku na člověka nebo na hlavičku útvaru (přiřadí všem, kdo ji nemají). Záporné číslo = chybí.</div></div><div class="pl" id="itpoolList"></div></div>
   </aside>
 </main>
 <button id="presExit" class="primary">Ukončit prezentaci (Esc)</button>
@@ -404,6 +428,10 @@ table.ov td.z{color:#B6BEC9}
   <div class="dbody"><table class="itc"><thead><tr><th>Typ</th><th style="width:45%">Název</th><th>Poznámka</th><th>Standard</th><th style="text-align:right">Přiřazeno</th><th></th></tr></thead><tbody id="catBody"></tbody></table>
   <div style="margin-top:10px;display:flex;gap:6px;align-items:center"><select id="catType"><option value="hw">HW</option><option value="sw">SW</option></select><input type="text" id="catName" placeholder="název nové položky" style="flex:1"><input type="text" id="catNote" placeholder="poznámka" style="width:180px"><label><input type="checkbox" id="catStd"> standard</label><button id="catAdd" class="small primary">Přidat</button></div></div>
   <div class="dfoot"><button id="catClose" class="primary">Zavřít</button></div></dialog>
+<dialog id="dlgStock"><div class="dhead"><h2>Přidat do zásoby</h2><p>Např. 60 notebooků delimitovaných z DESÚ, nebo 40 nových monitorů.</p></div>
+  <div class="dbody" style="display:grid;grid-template-columns:140px 1fr;gap:8px 10px;align-items:center">
+    <label>Položka</label><select id="stItem"></select><label>Zdroj</label><select id="stSrc"></select><label>Počet kusů</label><input type="number" id="stQty" min="1" value="1" style="width:120px"><label>Poznámka</label><input type="text" id="stNote" placeholder="např. Dell Latitude 5450, dodávka 11/2026"></div>
+  <div class="dfoot"><button id="stCancel">Zrušit</button><button id="stOk" class="primary">Přidat</button></div></dialog>
 <dialog id="dlgPerson">
   <div class="dhead"><h2>Přidat osobu</h2></div>
   <div class="dbody" style="display:grid;grid-template-columns:140px 1fr;gap:8px 10px;align-items:center">
@@ -419,8 +447,8 @@ table.ov td.z{color:#B6BEC9}
 
 <script src="vendor/xlsx.full.min.js"></script>
 <script src="vendor/supabase.js"></script>
-<script src="config.js?v=2026-09-17.2"></script>
-<script src="structure.js?v=2026-09-17.2"></script>
-<script src="app.js?v=2026-09-17.2"></script>
+<script src="config.js?v=2026-09-17.3"></script>
+<script src="structure.js?v=2026-09-17.3"></script>
+<script src="app.js?v=2026-09-17.3"></script>
 </body
 </html>

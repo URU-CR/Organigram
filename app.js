@@ -1,4 +1,4 @@
-const APP_VERSION='2026-09-17.2';
+const APP_VERSION='2026-09-17.3';
 
 const STRUCTURE = window.STRUCTURE;
 const SOURCES = ['DESÚ','MMR','ÚÚR','MD','MPO','Nové','Jiný'];
@@ -46,13 +46,13 @@ function freshState(){
 function persist(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){} dirty=true; setDot('busy','ukládám…'); clearTimeout(saveTimer); saveTimer=setTimeout(flush,700); }
 // ---------- undo / redo ----------
 const UNDO_MAX=60; let undoStack=[], redoStack=[], baseline=null, restoring=false;
-const snap=()=>JSON.stringify({units:state.units,people:state.people,nextPid:state.nextPid,structureVersion:state.structureVersion,itCatalog:state.itCatalog});
+const snap=()=>JSON.stringify({units:state.units,people:state.people,nextPid:state.nextPid,structureVersion:state.structureVersion,itCatalog:state.itCatalog,itPool:state.itPool});
 function markBaseline(){ baseline=snap(); }
 function save(){
   if(!restoring&&baseline!==null){ const now=snap(); if(now!==baseline){ undoStack.push(baseline); if(undoStack.length>UNDO_MAX) undoStack.shift(); redoStack=[]; } baseline=now; }
   updateUndoBtns(); persist();
 }
-function applySnap(j){ const o=JSON.parse(j); restoring=true; state.units=o.units; state.people=o.people; state.nextPid=o.nextPid; state.structureVersion=o.structureVersion; state.itCatalog=o.itCatalog; baseline=snap(); restoring=false; persist(); render(); }
+function applySnap(j){ const o=JSON.parse(j); restoring=true; state.units=o.units; state.people=o.people; state.nextPid=o.nextPid; state.structureVersion=o.structureVersion; state.itCatalog=o.itCatalog; state.itPool=o.itPool; baseline=snap(); restoring=false; persist(); render(); }
 function undo(){ if(!undoStack.length) return; redoStack.push(snap()); applySnap(undoStack.pop()); logChange&&logChange('zpět','vrácena poslední změna'); toast('Změna vrácena'); updateUndoBtns(); }
 function redo(){ if(!redoStack.length) return; undoStack.push(snap()); applySnap(redoStack.pop()); logChange&&logChange('znovu','obnovena vrácená změna'); updateUndoBtns(); }
 function updateUndoBtns(){ const u=$('#btnUndo'),r=$('#btnRedo'); if(u){u.disabled=!undoStack.length; r.disabled=!redoStack.length;} }
@@ -534,24 +534,51 @@ function personItems(h){ return (h.it||[]).filter(x=>catById()[x.id]); }
 const IT_SRC=['nový','DESÚ','MMR','ÚÚR','MD','MPO'];
 function defaultItemSrc(h){ return IT_SRC.includes(h.src)?h.src:'nový'; }
 function addItem(h,id,src,sn){ h.it=h.it||[]; if(h.it.some(x=>x.id===id)) return false; h.it.push({id,src:src||defaultItemSrc(h),sn:sn||''}); return true; }
-let itSel=new Set(), itFilter={q:'',loc:'',none:false}, itCollapsed={};
+let itSel=new Set(), itFilter={q:'',loc:'',none:false,notready:false}, itCollapsed={};
+function poolRows(){ return (state.itPool||[]); }
+function assignedCount(id,src){ let n=0; Object.values(state.people).forEach(h=>(h.it||[]).forEach(x=>{ if(x.id===id&&(x.src||defaultItemSrc(h))===src) n++; })); return n; }
+function renderItPool(){
+  const cat=catById(); const list=$('#itpoolList'); list.innerHTML='';
+  const keys=new Map(); poolRows().forEach(r=>{ const k=r.id+'|'+r.src; keys.set(k,{id:r.id,src:r.src,qty:(keys.get(k)?.qty||0)+r.qty}); });
+  Object.values(state.people).forEach(h=>(h.it||[]).forEach(x=>{ const src=x.src||defaultItemSrc(h); const k=x.id+'|'+src; if(!keys.has(k)) keys.set(k,{id:x.id,src,qty:0}); }));
+  const byItem=new Map(); [...keys.values()].forEach(r=>{ if(!cat[r.id]) return; if(!byItem.has(r.id)) byItem.set(r.id,[]); byItem.get(r.id).push(r); });
+  let totalAv=0, totalNeg=0;
+  (state.itCatalog||[]).forEach(it=>{ const rs=byItem.get(it.id); if(!rs) return;
+    const box=document.createElement('div'); box.className='pit'; let sumAv=0;
+    const rowsHtml=rs.sort((a,b)=>IT_SRC.indexOf(a.src)-IT_SRC.indexOf(b.src)).map(r=>{ const used=assignedCount(r.id,r.src); const av=r.qty-used; sumAv+=av; if(av<0) totalNeg+=-av; else totalAv+=av;
+      return `<div class="r" data-id="${r.id}" data-src="${r.src}"><span class="chip src-${r.src==='nový'?'Nové':r.src}" draggable="true" style="background:${SRC_COLOR[r.src==='nový'?'Nové':r.src]||'#eee'}">${esc(r.src)}</span><span style="color:var(--muted)">${r.qty} ks · přiděleno ${used}</span><span class="av ${av<0?'neg':(av===0?'zero':'')}" title="k dispozici">${av<0?'chybí '+(-av):av}</span><button class="q" data-d="-1" title="ubrat 1 ks ze zásoby">−</button><button class="q" data-d="1" title="přidat 1 ks">+</button></div>`; }).join('');
+    box.innerHTML=`<div class="t"><span>${esc(it.name)}</span><span class="tot">${it.cat.toUpperCase()}</span></div>`+rowsHtml;
+    box.querySelectorAll('.r').forEach(row=>{ const id=row.dataset.id, src=row.dataset.src;
+      row.querySelector('.chip').addEventListener('dragstart',e=>{ e.dataTransfer.setData('text/it',id+'|'+src); e.dataTransfer.effectAllowed='copy'; });
+      row.querySelectorAll('button.q').forEach(b=>b.onclick=()=>{ addStock(id,src,+b.dataset.d); }); });
+    list.appendChild(box); });
+  if(!list.children.length) list.innerHTML='<div class="hint" style="padding:20px 6px;text-align:center;color:var(--muted);font-size:13px">Zásoba je prázdná. Přidejte materiál tlačítkem výše.</div>';
+  $('#itpoolCount').textContent=`(${totalAv} k dispozici${totalNeg?', chybí '+totalNeg:''})`;
+}
+function addStock(id,src,d,note){ state.itPool=state.itPool||[]; let r=state.itPool.find(x=>x.id===id&&x.src===src); if(!r){ r={id,src,qty:0,note:''}; state.itPool.push(r); } r.qty=Math.max(0,r.qty+d); if(note) r.note=note; if(!r.qty&&!assignedCount(id,src)) state.itPool=state.itPool.filter(x=>x!==r); logChange&&logChange('IT zásoba',`${catById()[id].name} (${src}): ${d>0?'+':''}${d} ks → ${r.qty}`); save(); render(); }
+$('#itpoolAdd').onclick=()=>{ ensureCatalog(); $('#stItem').innerHTML=state.itCatalog.map(x=>`<option value="${x.id}">${x.cat.toUpperCase()} · ${esc(x.name)}</option>`).join(''); $('#stSrc').innerHTML=IT_SRC.map(v=>`<option>${v}</option>`).join(''); $('#stQty').value=1; $('#stNote').value=''; $('#dlgStock').showModal(); };
+$('#stCancel').onclick=()=>$('#dlgStock').close();
+$('#stOk').onclick=()=>{ const q=parseInt($('#stQty').value); if(!q||q<1) return; $('#dlgStock').close(); addStock($('#stItem').value,$('#stSrc').value,q,$('#stNote').value.trim()); };
+function dropIt(e,targets){ const d=e.dataTransfer.getData('text/it'); if(!d) return false; const [id,src]=d.split('|'); let n=0; targets.forEach(h=>{ if(addItem(h,id,src)) n++; }); if(n){ logChange&&logChange('IT',`${catById()[id].name} (${src}) přiděleno ${n}×`); save(); render(); toast(`Přiděleno ${n}×.`); } return true; }
 function itCounts(){ const c={}; Object.values(state.people).forEach(h=>personItems(h).forEach(x=>c[x.id]=(c[x.id]||0)+1)); return c; }
 function renderIT(){
   const c=$('#itview'); const st=c.scrollTop; c.innerHTML='';
   if(ensureCatalog()) save();
+  renderItPool();
   const cat=catById(); const counts=itCounts();
   const assigned=allPositions().filter(x=>x.p.person&&state.people[x.p.person]).map(x=>({h:state.people[x.p.person],u:x.u,p:x.p}));
   const q=itFilter.q.toLowerCase();
-  const rows=assigned.filter(r=>(!q||(r.h.name+' '+unitPath(r.u).join(' ')).toLowerCase().includes(q))&&(!itFilter.loc||personLoc(r.h).id===itFilter.loc)&&(!itFilter.none||!personItems(r.h).length));
+  const rows=assigned.filter(r=>(!q||(r.h.name+' '+unitPath(r.u).join(' ')).toLowerCase().includes(q))&&(!itFilter.loc||personLoc(r.h).id===itFilter.loc)&&(!itFilter.none||!personItems(r.h).length)&&(!itFilter.notready||personItems(r.h).some(x=>!x.ready)));
+  let readyN=0,itemN=0; assigned.forEach(({h})=>personItems(h).forEach(x=>{ itemN++; if(x.ready) readyN++; }));
   const withNone=assigned.filter(r=>!personItems(r.h).length).length;
   const bar=document.createElement('div'); bar.className='itbar';
   const bySrc={}; assigned.forEach(({h})=>personItems(h).forEach(x=>{ const k=x.src||defaultItemSrc(h); bySrc[k]=(bySrc[k]||0)+1; }));
-  bar.innerHTML=`<span class="sum"><b>${assigned.length}</b> rozsazených lidí · <b>${assigned.length-withNone}</b> s vybavením · <b style="${withNone?'color:var(--danger)':''}">${withNone}</b> bez vybavení${Object.keys(bySrc).length?' · položky: '+IT_SRC.filter(k=>bySrc[k]).map(k=>`${k} <b>${bySrc[k]}</b>`).join(', '):''}</span>
+  bar.innerHTML=`<span class="sum"><b>${assigned.length}</b> rozsazených lidí · <b>${assigned.length-withNone}</b> s vybavením · <b style="${withNone?'color:var(--danger)':''}">${withNone}</b> bez vybavení${Object.keys(bySrc).length?' · položky: '+IT_SRC.filter(k=>bySrc[k]).map(k=>`${k} <b>${bySrc[k]}</b>`).join(', '):''}${itemN?` · připraveno <b style="color:${readyN===itemN?'var(--ok)':'inherit'}">${readyN}/${itemN}</b>`:''}</span>
     <input type="search" id="itQ" placeholder="filtr jména / útvaru…" value="${esc(itFilter.q)}" style="width:200px">
     <select id="itLoc"><option value="">všechny lokality</option>${LOCATIONS.map(l=>`<option value="${l.id}" ${itFilter.loc===l.id?'selected':''}>${l.abbr} · ${l.name}</option>`).join('')}</select>
-    <label><input type="checkbox" id="itNone" ${itFilter.none?'checked':''}> jen bez vybavení</label>
+    <label><input type="checkbox" id="itNone" ${itFilter.none?'checked':''}> jen bez vybavení</label><label><input type="checkbox" id="itNotReady" ${itFilter.notready?'checked':''}> jen s nepřipraveným</label>
     <button class="small" id="itCat">Katalog vybavení</button><button class="small" id="itXlsx">Export (xlsx)</button>
-    <div class="bulk" id="itBulk" ${itSel.size?'':'hidden'}><b>${itSel.size} vybraných:</b><select id="itBulkSrc" title="zdroj přiřazovaných položek"><option value="">zdroj dle úřadu zaměstnance</option>${IT_SRC.map(v=>`<option value="${v}">${v}</option>`).join('')}</select><button class="small primary" id="itStd">Přiřadit standardní sadu</button><select id="itBulkItem"><option value="">— položku —</option>${(state.itCatalog||[]).map(x=>`<option value="${x.id}">${x.cat.toUpperCase()} · ${esc(x.name)}</option>`).join('')}</select><button class="small" id="itBulkAdd">Přidat</button><button class="small" id="itBulkDel">Odebrat</button><button class="small" id="itClear">Zrušit výběr</button></div>`;
+    <div class="bulk" id="itBulk" ${itSel.size?'':'hidden'}><b>${itSel.size} vybraných:</b><select id="itBulkSrc" title="zdroj přiřazovaných položek"><option value="">zdroj dle úřadu zaměstnance</option>${IT_SRC.map(v=>`<option value="${v}">${v}</option>`).join('')}</select><button class="small primary" id="itStd">Přiřadit standardní sadu</button><select id="itBulkItem"><option value="">— položku —</option>${(state.itCatalog||[]).map(x=>`<option value="${x.id}">${x.cat.toUpperCase()} · ${esc(x.name)}</option>`).join('')}</select><button class="small" id="itBulkAdd">Přidat</button><button class="small" id="itBulkDel">Odebrat</button><button class="small" id="itReady" title="označí všechny položky vybraných lidí jako připravené">Vše připraveno</button><button class="small" id="itClear">Zrušit výběr</button></div>`;
   c.appendChild(bar);
   // group by unit in structure order
   const byUnit=new Map(); rows.forEach(r=>{ if(!byUnit.has(r.u)) byUnit.set(r.u,[]); byUnit.get(r.u).push(r); });
@@ -563,16 +590,19 @@ function renderIT(){
     h.innerHTML=`<input type="checkbox" ${allSel?'checked':''} title="vybrat celý útvar"><button class="tog">${itCollapsed[u.id]?'▸':'▾'}</button><span class="bar" style="background:${SRC_DARK[u.src]}"></span><span class="nm">${esc(unitPath(u).slice(1).join(' › ')||u.name)}</span><span class="lv">${LEVEL_LBL[u.level]} · ${ids.length} lidí${unitLoc(u)?' · '+LOC[unitLoc(u)].abbr:''}</span>`;
     h.querySelector('input').onchange=e=>{ ids.forEach(i=>e.target.checked?itSel.add(i):itSel.delete(i)); renderIT(); };
     h.querySelector('.tog').onclick=()=>{ itCollapsed[u.id]=!itCollapsed[u.id]; renderIT(); };
+    h.addEventListener('dragover',e=>{ if([...e.dataTransfer.types].includes('text/it')){ e.preventDefault(); h.classList.add('over'); } }); h.addEventListener('dragleave',()=>h.classList.remove('over')); h.addEventListener('drop',e=>{ e.preventDefault(); h.classList.remove('over'); dropIt(e,byUnit.get(u).map(r=>r.h)); });
     box.appendChild(h);
     const rw=document.createElement('div'); rw.className='rows';
     byUnit.get(u).sort((a,b)=>(a.p.kind==='head'?0:1)-(b.p.kind==='head'?0:1)).forEach(r=>{
       const row=document.createElement('div'); row.className='itp'+(itSel.has(r.h.id)?' sel':''); const l=personLoc(r.h).id;
       row.innerHTML=`<input type="checkbox" ${itSel.has(r.h.id)?'checked':''}><div class="who"><span class="n">${esc(r.h.name)}</span><span class="m">${esc(r.p.label)} · ${esc(r.h.src)}${l?' · '+LOC[l].abbr:''}</span></div><div class="items"></div>`;
       row.querySelector('input').onchange=e=>{ e.target.checked?itSel.add(r.h.id):itSel.delete(r.h.id); renderIT(); };
+      row.addEventListener('dragover',e=>{ if([...e.dataTransfer.types].includes('text/it')){ e.preventDefault(); e.stopPropagation(); row.classList.add('over'); } }); row.addEventListener('dragleave',()=>row.classList.remove('over')); row.addEventListener('drop',e=>{ e.preventDefault(); e.stopPropagation(); row.classList.remove('over'); dropIt(e,[r.h]); });
       const items=row.querySelector('.items'); const list=personItems(r.h);
-      list.forEach(x=>{ const it=cat[x.id]; const chip=document.createElement('span'); chip.className='iti '+it.cat;
+      list.forEach(x=>{ const it=cat[x.id]; const chip=document.createElement('span'); chip.className='iti '+it.cat+(x.ready?' ready':'');
         const xs=x.src||defaultItemSrc(r.h);
-        chip.innerHTML=`<span>${esc(it.name)}</span><select class="isrc ${xs==='nový'?'new':''}" title="zdroj: nový nákup, nebo delimitace z úřadu">${IT_SRC.map(v=>`<option ${v===xs?'selected':''}>${v}</option>`).join('')}</select>${it.cat==='hw'?`<span class="sn" contenteditable="true" spellcheck="false" title="inventární / sériové číslo">${esc(x.sn||'')}</span>`:''}<button class="x" title="odebrat">×</button>`;
+        chip.innerHTML=`<span>${esc(it.name)}</span><select class="isrc ${xs==='nový'?'new':''}" title="zdroj: nový nákup, nebo delimitace z úřadu">${IT_SRC.map(v=>`<option ${v===xs?'selected':''}>${v}</option>`).join('')}</select>${it.cat==='hw'?`<span class="sn" contenteditable="true" spellcheck="false" title="inventární / sériové číslo">${esc(x.sn||'')}</span>`:''}<label class="rd" title="připraveno – nainstalováno pro sítě a systémy ÚRÚ"><input type="checkbox" ${x.ready?'checked':''}>${x.ready?'připraveno':'připravit'}</label><button class="x" title="odebrat">×</button>`;
+        chip.querySelector('.rd input').onchange=e=>{ x.ready=e.target.checked; if(!x.ready) delete x.ready; logChange&&logChange('IT',`${r.h.name}: ${it.name} ${x.ready?'připraveno':'zrušeno připraveno'}`); save(); render(); };
         chip.querySelector('.isrc').onchange=e=>{ x.src=e.target.value; logChange&&logChange('IT',`${r.h.name}: ${it.name} zdroj ${x.src}`); save(); render(); };
         chip.querySelector('.x').onclick=()=>{ r.h.it=r.h.it.filter(y=>y!==x); logChange&&logChange('IT',`${r.h.name}: odebráno ${it.name}`); save(); render(); };
         const sn=chip.querySelector('.sn'); if(sn){ sn.onblur=()=>{ const v=sn.textContent.trim(); if(v!==(x.sn||'')){ x.sn=v; logChange&&logChange('IT',`${r.h.name}: ${it.name} inv. č. ${v}`); save(); } }; sn.onkeydown=e=>{ if(e.key==='Enter'){e.preventDefault();sn.blur();} }; }
@@ -586,11 +616,13 @@ function renderIT(){
   $('#itQ').oninput=()=>{ itFilter.q=$('#itQ').value; renderIT(); $('#itQ').focus(); $('#itQ').setSelectionRange(99,99); };
   $('#itLoc').onchange=()=>{ itFilter.loc=$('#itLoc').value; renderIT(); };
   $('#itNone').onchange=()=>{ itFilter.none=$('#itNone').checked; renderIT(); };
+  $('#itNotReady').onchange=()=>{ itFilter.notready=$('#itNotReady').checked; renderIT(); };
   $('#itCat').onclick=openCatalog; $('#itXlsx').onclick=exportIT;
   const selPeople=()=>[...itSel].map(i=>state.people[i]).filter(Boolean);
   const bs=$('#itStd'); if(bs){ bs.onclick=()=>{ let n=0; const bsrc=$('#itBulkSrc').value||null; selPeople().forEach(h=>state.itCatalog.filter(x=>x.std).forEach(x=>{ if(addItem(h,x.id,bsrc)) n++; })); logChange&&logChange('IT',`standardní sada u ${itSel.size} lidí (+${n} položek)`); save(); render(); toast(`Přidáno ${n} položek.`); };
     $('#itBulkAdd').onclick=()=>{ const id=$('#itBulkItem').value; if(!id) return; let n=0; const bsrc=$('#itBulkSrc').value||null; selPeople().forEach(h=>{ if(addItem(h,id,bsrc)) n++; }); logChange&&logChange('IT',`hromadně přidáno ${cat[id].name} u ${n} lidí`); save(); render(); toast(`Přidáno u ${n} lidí.`); };
     $('#itBulkDel').onclick=()=>{ const id=$('#itBulkItem').value; if(!id) return; let n=0; selPeople().forEach(h=>{ const b=(h.it||[]).length; h.it=(h.it||[]).filter(x=>x.id!==id); if(h.it.length<b) n++; }); logChange&&logChange('IT',`hromadně odebráno ${cat[id].name} u ${n} lidí`); save(); render(); toast(`Odebráno u ${n} lidí.`); };
+    $('#itReady').onclick=()=>{ let n=0; selPeople().forEach(h=>(h.it||[]).forEach(x=>{ if(!x.ready){ x.ready=true; n++; } })); logChange&&logChange('IT',`připraveno: ${n} položek u ${itSel.size} lidí`); save(); render(); toast(`Označeno ${n} položek.`); };
     $('#itClear').onclick=()=>{ itSel.clear(); renderIT(); }; }
 }
 function openItMenu(anchor,h){
@@ -617,14 +649,16 @@ $('#catAdd').onclick=()=>{ const name=$('#catName').value.trim(); if(!name) retu
 $('#catClose').onclick=()=>{ $('#dlgCat').close(); render(); };
 function exportIT(){ const cat=catById();
   const assigned=allPositions().filter(x=>x.p.person&&state.people[x.p.person]).map(x=>({h:state.people[x.p.person],u:x.u,p:x.p}));
-  const people=assigned.map(({h,u,p})=>{ const l=personLoc(h).id; const its=personItems(h); return {'Jméno':h.name,'Zdrojový úřad':h.src,'Útvar':u.name,'Místo':p.label,'Lokalita':l?LOC[l].name:'','HW':its.filter(x=>cat[x.id].cat==='hw').map(x=>cat[x.id].name+' ['+(x.src||defaultItemSrc(h))+']'+(x.sn?' ('+x.sn+')':'')).join('; '),'SW':its.filter(x=>cat[x.id].cat==='sw').map(x=>cat[x.id].name+' ['+(x.src||defaultItemSrc(h))+']').join('; '),'Počet položek':its.length,'z toho nových':its.filter(x=>(x.src||defaultItemSrc(h))==='nový').length}; });
-  const lines=[]; assigned.forEach(({h,u})=>personItems(h).forEach(x=>lines.push({'Jméno':h.name,'Útvar':u.name,'Lokalita':(()=>{const l=personLoc(h).id;return l?LOC[l].name:'';})(),'Typ':cat[x.id].cat.toUpperCase(),'Položka':cat[x.id].name,'Zdroj':x.src||defaultItemSrc(h),'Inventární / sériové č.':x.sn||''})));
+  const people=assigned.map(({h,u,p})=>{ const l=personLoc(h).id; const its=personItems(h); return {'Jméno':h.name,'Zdrojový úřad':h.src,'Útvar':u.name,'Místo':p.label,'Lokalita':l?LOC[l].name:'','HW':its.filter(x=>cat[x.id].cat==='hw').map(x=>cat[x.id].name+' ['+(x.src||defaultItemSrc(h))+']'+(x.sn?' ('+x.sn+')':'')).join('; '),'SW':its.filter(x=>cat[x.id].cat==='sw').map(x=>cat[x.id].name+' ['+(x.src||defaultItemSrc(h))+']').join('; '),'Počet položek':its.length,'z toho nových':its.filter(x=>(x.src||defaultItemSrc(h))==='nový').length,'Připraveno':its.filter(x=>x.ready).length+'/'+its.length}; });
+  const lines=[]; assigned.forEach(({h,u})=>personItems(h).forEach(x=>lines.push({'Jméno':h.name,'Útvar':u.name,'Lokalita':(()=>{const l=personLoc(h).id;return l?LOC[l].name:'';})(),'Typ':cat[x.id].cat.toUpperCase(),'Položka':cat[x.id].name,'Zdroj':x.src||defaultItemSrc(h),'Připraveno':x.ready?'ano':'','Inventární / sériové č.':x.sn||''})));
   const locs=[...LOCATIONS,{id:null,name:'Neurčeno'}];
   const totals=(state.itCatalog||[]).map(x=>{ const o={'Typ':x.cat.toUpperCase(),'Položka':x.name,'Standard':x.std?'ano':'','Celkem':0}; IT_SRC.forEach(k=>o[k==='nový'?'nový nákup':'delim. '+k]=0); locs.forEach(l=>o[l.name]=0);
     assigned.forEach(({h})=>{ const y=(h.it||[]).find(y=>y.id===x.id); if(y){ o['Celkem']++; const k=y.src||defaultItemSrc(h); o[k==='nový'?'nový nákup':'delim. '+k]++; const l=personLoc(h).id; o[l?LOC[l].name:'Neurčeno']++; } }); return o; });
   const buy=(state.itCatalog||[]).map(x=>{ const o={'Typ':x.cat.toUpperCase(),'Položka':x.name,'Nových celkem':0}; locs.forEach(l=>o[l.name]=0);
     assigned.forEach(({h})=>{ const y=(h.it||[]).find(y=>y.id===x.id); if(y&&(y.src||defaultItemSrc(h))==='nový'){ o['Nových celkem']++; const l=personLoc(h).id; o[l?LOC[l].name:'Neurčeno']++; } }); return o; }).filter(o=>o['Nových celkem']);
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(people.length?people:[{'Jméno':''}]),'Lidé'); XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(lines.length?lines:[{'Jméno':''}]),'Položky'); XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(totals),'Součty zdroj a lokalita'); XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(buy.length?buy:[{'Položka':'žádné nové položky'}]),'K nákupu');
+  const stock=poolRows().map(r=>({'Typ':cat[r.id]?cat[r.id].cat.toUpperCase():'','Položka':cat[r.id]?cat[r.id].name:r.id,'Zdroj':r.src,'V zásobě celkem':r.qty,'Přiděleno':assignedCount(r.id,r.src),'K dispozici':r.qty-assignedCount(r.id,r.src),'Poznámka':r.note||''}));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(stock.length?stock:[{'Položka':''}]),'Zásoba');
   XLSX.writeFile(wb,`URU_IT_vybaveni_${stamp()}.xlsx`); }
 // ---------- systemizace ----------
 const SYS_TYP={sluz:'služební',prac:'pracovní'};
