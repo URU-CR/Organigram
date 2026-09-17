@@ -1,4 +1,4 @@
-const APP_VERSION='2026-09-15.3';
+const APP_VERSION='2026-09-17.1';
 
 const STRUCTURE = window.STRUCTURE;
 const SOURCES = ['DESÚ','MMR','ÚÚR','MD','MPO','Nové','Jiný'];
@@ -46,13 +46,13 @@ function freshState(){
 function persist(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){} dirty=true; setDot('busy','ukládám…'); clearTimeout(saveTimer); saveTimer=setTimeout(flush,700); }
 // ---------- undo / redo ----------
 const UNDO_MAX=60; let undoStack=[], redoStack=[], baseline=null, restoring=false;
-const snap=()=>JSON.stringify({units:state.units,people:state.people,nextPid:state.nextPid,structureVersion:state.structureVersion,centers:state.centers});
+const snap=()=>JSON.stringify({units:state.units,people:state.people,nextPid:state.nextPid,structureVersion:state.structureVersion,itCatalog:state.itCatalog});
 function markBaseline(){ baseline=snap(); }
 function save(){
   if(!restoring&&baseline!==null){ const now=snap(); if(now!==baseline){ undoStack.push(baseline); if(undoStack.length>UNDO_MAX) undoStack.shift(); redoStack=[]; } baseline=now; }
   updateUndoBtns(); persist();
 }
-function applySnap(j){ const o=JSON.parse(j); restoring=true; state.units=o.units; state.people=o.people; state.nextPid=o.nextPid; state.structureVersion=o.structureVersion; state.centers=o.centers; baseline=snap(); restoring=false; persist(); render(); }
+function applySnap(j){ const o=JSON.parse(j); restoring=true; state.units=o.units; state.people=o.people; state.nextPid=o.nextPid; state.structureVersion=o.structureVersion; state.itCatalog=o.itCatalog; baseline=snap(); restoring=false; persist(); render(); }
 function undo(){ if(!undoStack.length) return; redoStack.push(snap()); applySnap(undoStack.pop()); logChange&&logChange('zpět','vrácena poslední změna'); toast('Změna vrácena'); updateUndoBtns(); }
 function redo(){ if(!redoStack.length) return; undoStack.push(snap()); applySnap(redoStack.pop()); logChange&&logChange('znovu','obnovena vrácená změna'); updateUndoBtns(); }
 function updateUndoBtns(){ const u=$('#btnUndo'),r=$('#btnRedo'); if(u){u.disabled=!undoStack.length; r.disabled=!redoStack.length;} }
@@ -97,7 +97,7 @@ function migrateStructure(st){
   const oldByName={}; st.units.forEach(u=>oldByName[RENAMES[u.name]||u.name]=u);
   let n=1; const usedOld=new Set(); const newUnits=STRUCTURE.map(tpl=>{
     const old=oldByName[tpl.name];
-    if(old){ usedOld.add(old); return {...tpl, loc:old.loc||guessUnitLoc(tpl.name), cc:old.cc, positions:old.positions}; }
+    if(old){ usedOld.add(old); return {...tpl, loc:old.loc||guessUnitLoc(tpl.name), positions:old.positions}; }
     return {...tpl, loc:guessUnitLoc(tpl.name), positions:tpl.positions.map(p=>({id:'p'+Date.now().toString(36)+(n++), ...p, person:null}))};
   });
   const removed=st.units.filter(u=>!usedOld.has(u)); const freed=[];
@@ -188,7 +188,7 @@ function render(){
   tree.scrollTop=scroll;
   if(document.body.classList.contains('view-chart')) renderChart(); else $('#chart').innerHTML='';
   if(document.body.classList.contains('view-loc')) renderLoc(); else $('#locview').innerHTML='';
-  if(document.body.classList.contains('view-cc')){ try{ renderCC(); }catch(e){ console.error(e); $('#ccview').innerHTML='<div style="padding:20px;color:var(--danger)">Pohled Střediska se nepodařilo vykreslit: '+esc(e.message||e)+'</div>'; } } else $('#ccview').innerHTML='';
+  if(document.body.classList.contains('view-it')){ try{ renderIT(); }catch(e){ console.error(e); $('#itview').innerHTML='<div style="padding:20px;color:var(--danger)">Pohled IT se nepodařilo vykreslit: '+esc(e.message||e)+'</div>'; } } else $('#itview').innerHTML='';
   if(document.body.classList.contains('view-sys')){ try{ renderSys(); }catch(e){ console.error(e); $('#sysview').innerHTML='<div style="padding:20px;color:var(--danger)">Pohled Systemizace se nepodařilo vykreslit: '+esc(e.message||e)+'<br><span style="color:var(--muted);font-size:12px">'+esc((e.stack||'').split('\n').slice(0,3).join(' | '))+'</span></div>'; } } else $('#sysview').innerHTML='';
   // pool
   const pool=$('#pool'); pool.innerHTML='';
@@ -267,6 +267,7 @@ function showPop(p,anchor){
     <dt>Úvazek</dt><dd>${esc(p.fte??'—')}</dd>
     ${p.note?`<dt>Poznámka</dt><dd>${esc(p.note)}</dd>`:''}
     <dt>V ÚRÚ</dt><dd>${cur?esc(unitPath(cur.u).slice(-2).join(' › '))+' – '+esc(cur.p.label):'<i>nezařazen/a</i>'}</dd>
+    <dt>IT vybavení</dt><dd>${(()=>{const its=personItems(p);return its.length?esc(its.map(x=>catById()[x.id].name).join(', ')):'<i>nic</i>';})()}</dd>
     <dt>Lokalita</dt><dd><select id="popLoc" style="width:100%"><option value="">dle útvaru${(()=>{const l=cur?unitLoc(cur.u):null;return l?' ('+LOC[l].name+')':' (neurčeno)';})()}</option>${LOCATIONS.map(l=>`<option value="${l.id}"${p.loc===l.id?' selected':''}>${l.abbr} · ${l.name}</option>`).join('')}</select></dd></dl>
     <div class="row">${cur?'<button id="popUn">Uvolnit místo</button>':''}<button id="popDel" style="color:var(--danger)">Smazat osobu</button><button id="popClose" class="primary">Zavřít</button></div>`;
   pop.hidden=false;
@@ -411,7 +412,7 @@ $('#btnExport').onclick=()=>{
     for(const p of u.positions){ const h=p.person?state.people[p.person]:null;
       rows.push({'Sekce':path[1]||'', 'Odbor':u.level==='odbor'?u.name:(m[u.parent]&&m[u.parent].level==='odbor'?m[u.parent].name:''), 'Útvar':u.name,'Úroveň':LEVEL_LBL[u.level],'Zdroj útvaru':u.src,
         'Místo':p.label,'Druh':KIND_LBL[p.kind],'Kategorie místa':p.cat==='nad'?'nadpožadavek':'delimitace',
-        'Lokalita':(()=>{const l=h?personLoc(h).id:unitLoc(u);return l?LOC[l].name:'';})(),'Středisko':(()=>{ensureCenters();const cx=ccById()[unitCC(u)];return cx?cx.code+' '+cx.name:'';})(),'Jméno':h?h.name:'','Zdrojový úřad':h?h.src:'','Současný útvar':h?h.unit:'','Současné označení místa':h?h.role:'','Číslo místa':h?h.posId:'','Kategorie':h?h.cat:'','Obory služby':h?h.fields:'','Platová třída':h?h.cls:'','Úvazek':h?h.fte:'','Poznámka':h?h.note:''}); } }
+        'Lokalita':(()=>{const l=h?personLoc(h).id:unitLoc(u);return l?LOC[l].name:'';})(),'Jméno':h?h.name:'','Zdrojový úřad':h?h.src:'','Současný útvar':h?h.unit:'','Současné označení místa':h?h.role:'','Číslo místa':h?h.posId:'','Kategorie':h?h.cat:'','Obory služby':h?h.fields:'','Platová třída':h?h.cls:'','Úvazek':h?h.fte:'','Poznámka':h?h.note:''}); } }
   const assigned=new Set(allPositions().map(x=>x.p.person).filter(Boolean));
   const un=Object.values(state.people).filter(p=>!assigned.has(p.id)).map(p=>({'Jméno':p.name,'Lokalita':p.loc?LOC[p.loc].name:'','Zdrojový úřad':p.src,'Současný útvar':p.unit,'Označení místa':p.role,'Číslo místa':p.posId,'Kategorie':p.cat,'Obory služby':p.fields,'Platová třída':p.cls,'Úvazek':p.fte,'Poznámka':p.note}));
   const sum=state.units.map(u=>({'Útvar':u.name,'Úroveň':LEVEL_LBL[u.level],'Zdroj':u.src,'Míst':u.positions.length,'Obsazeno':u.positions.filter(p=>p.person).length,'Volných':u.positions.filter(p=>!p.person).length,'z toho nadpožadavek volných':u.positions.filter(p=>!p.person&&p.cat==='nad').length}));
@@ -461,9 +462,9 @@ let chartFresh=true;
 const CRIT_STEPS=[null,25,50,75]; let critLevel=0;
 function isCrit(u){ const v=CRIT_STEPS[critLevel]; if(!v) return false; const c=childrenOf(u.id).length?subtreeCount(u):{total:u.positions.length,filled:u.positions.filter(p=>p.person).length}; if(!c.total) return false; return 100*c.filled/c.total<=v; }
 $('#crit').oninput=()=>{ critLevel=+$('#crit').value; const v=CRIT_STEPS[critLevel]; $('#critVal').textContent=v?`obsazeno 0–${v} %`:'vypnuto'; document.body.classList.toggle('critmode',!!v); render(); };
-function setView(v){ state.view=v; if(v==='chart') chartFresh=true; document.body.classList.toggle('view-chart',v==='chart'); document.body.classList.toggle('view-loc',v==='loc'); document.body.classList.toggle('view-sys',v==='sys'); document.body.classList.toggle('view-cc',v==='cc');
-  $('#vwTree').classList.toggle('on',!['chart','loc','sys','cc'].includes(v)); $('#vwSys').classList.toggle('on',v==='sys'); $('#vwCC').classList.toggle('on',v==='cc'); $('#vwChart').classList.toggle('on',v==='chart'); $('#vwLoc').classList.toggle('on',v==='loc'); $('#zoomWrap').hidden=v!=='chart'; $('#critWrap').hidden=v!=='chart'; render(); }
-$('#vwTree').onclick=()=>setView('tree'); $('#vwChart').onclick=()=>setView('chart'); $('#vwLoc').onclick=()=>setView('loc'); $('#vwSys').onclick=()=>setView('sys'); $('#vwCC').onclick=()=>setView('cc');
+function setView(v){ state.view=v; if(v==='chart') chartFresh=true; document.body.classList.toggle('view-chart',v==='chart'); document.body.classList.toggle('view-loc',v==='loc'); document.body.classList.toggle('view-sys',v==='sys'); document.body.classList.toggle('view-it',v==='it');
+  $('#vwTree').classList.toggle('on',!['chart','loc','sys','it'].includes(v)); $('#vwSys').classList.toggle('on',v==='sys'); $('#vwIT').classList.toggle('on',v==='it'); $('#vwChart').classList.toggle('on',v==='chart'); $('#vwLoc').classList.toggle('on',v==='loc'); $('#zoomWrap').hidden=v!=='chart'; $('#critWrap').hidden=v!=='chart'; render(); }
+$('#vwTree').onclick=()=>setView('tree'); $('#vwChart').onclick=()=>setView('chart'); $('#vwLoc').onclick=()=>setView('loc'); $('#vwSys').onclick=()=>setView('sys'); $('#vwIT').onclick=()=>setView('it');
 $('#zoom').oninput=()=>{ state.zoom=+$('#zoom').value; $('#zoomVal').textContent=state.zoom+' %'; const oc=$('#chart .oc'); if(oc) oc.style.transform='scale('+state.zoom/100+')'; };
 
 function boxEl(u){
@@ -524,85 +525,100 @@ function renderLoc(){
   c.appendChild(grid); c.scrollTop=st;
 }
 
-// ---------- střediska (nákladová) ----------
-function ensureCenters(){ if(state.centers&&state.centers.length) return false; state.centers=[]; state.units.forEach(u=>{delete u.cc;}); generateCenters(); return true; }
-const CC_MERGES=[
-  {test:/^(Samostatné )?[Oo]ddělení (personální|ekonomické)$/, name:'Odd. personální a ekonomické'},
-  {test:/staveb pozemních komunikací/i, name:'Odd. staveb pozemních komunikací'},
-  {test:/vyvlastnění a právních činností/i, name:'Odd. vyvlastnění a právních činností'},
-  {test:/odvolacích řízení/i, name:'Odd. odvolacích řízení'}];
-function generateCenters(){
-  let cid=1; const add=(code,name,unit)=>{ const c={id:'c'+(cid++),code:String(code),name}; state.centers.push(c); if(unit) unit.cc=c.id; return c; };
-  const short=n=>n.replace(/^Samostatné oddělení/,'Odd.').replace(/^Oddělení/,'Odd.');
-  const addGroup=(units,codeOf)=>{ const done=new Map(); units.forEach(u=>{ const mg=CC_MERGES.find(x=>x.test.test(u.name));
-    if(mg){ if(done.has(mg)){ u.cc=done.get(mg).id; return; } const c=add(codeOf(),mg.name,u); done.set(mg,c); return; }
-    add(codeOf(),u.level==='odbor'?u.name:short(u.name),u); }); };
-  const pred=state.units.find(u=>u.level==='predseda'); add(100,'Vedení úřadu',pred);
-  let k=1; addGroup(childrenOf(pred.id).filter(u=>u.level==='odd'),()=>100+10*(k++));
-  childrenOf(pred.id).filter(u=>u.level==='sekce').forEach((sk,i)=>{ const base=(i+2)*100; let j=1;
-    addGroup(childrenOf(sk.id).filter(u=>u.level==='odbor'),()=>base+10*(j++));
-    let m=1; const jj=j; addGroup(childrenOf(sk.id).filter(u=>u.level==='odd'),()=>base+10*jj+(m++)); });
-}
-function unitCC(u){ const m=byId(); let c=u; while(c){ if(c.cc) return c.cc; c=m[c.parent]; } return null; }
-function unitCCSource(u){ const m=byId(); let c=u; while(c){ if(c.cc) return c; c=m[c.parent]; } return null; }
-const ccById=()=>Object.fromEntries((state.centers||[]).map(c=>[c.id,c]));
-function ccLabel(id){ const c=ccById()[id]; return c?c.code+' '+c.name:''; }
-function ccStats(){ const cm=ccById(); const st={}; (state.centers||[]).forEach(c=>st[c.id]={c,units:[],total:0,filled:0,fte:0,src:{},locs:new Set(),own:[]});
-  state.units.forEach(u=>{ const id=unitCC(u); if(!id||!st[id]) return; const S=st[id]; S.units.push(u); if(u.cc===id) S.own.push(u);
-    u.positions.forEach(p=>{ S.total++; if(p.person&&state.people[p.person]){ const h=state.people[p.person]; S.filled++; S.fte+=Number(String(h.fte||'1').replace(',','.'))||1; S.src[h.src]=(S.src[h.src]||0)+1; const l=personLoc(h).id; if(l) S.locs.add(l); } else { const l=unitLoc(u); if(l) S.locs.add(l); } }); });
-  return st; }
-function renderCC(){
-  const c=$('#ccview'); const st=c.scrollTop; c.innerHTML='';
-  if(ensureCenters()) save();
-  const cm=ccById(); const stats=ccStats(); const centers=[...state.centers].sort((a,b)=>a.code.localeCompare(b.code,'cs',{numeric:true}));
-  const unassigned=state.units.filter(u=>!unitCC(u));
-  const bar=document.createElement('div'); bar.className='ccbar';
-  bar.innerHTML=`<span class="sum"><b>${centers.length}</b> středisek · <b>${state.units.length}</b> útvarů${unassigned.length?` · <b style="color:var(--danger)">${unassigned.length}</b> bez střediska`:''} · lokality zvlášť (druhý rozměr)</span>
-    <span class="sp"><button class="small" id="ccAdd">+ středisko</button><button class="small" id="ccReset" title="Znovu vygeneruje výchozí návrh: vedení + odbory + samostatná oddělení">Obnovit výchozí návrh</button><button class="small" id="ccXlsx">Číselník a součty (xlsx)</button></span>`;
+// ---------- IT vybavení ----------
+const IT_DEFAULT=[['hw','Notebook',1],['hw','Dokovací stanice',1],['hw','Monitor 24"',1],['hw','Monitor 27"',0],['hw','Klávesnice a myš',1],['hw','Mobilní telefon',0],['hw','Sluchátka s mikrofonem',0],['hw','Čtečka čipových karet',1],
+  ['sw','Microsoft 365 (Office, Teams)',1],['sw','ESPIS – spisová služba',1],['sw','VITA Stavební úřad',0],['sw','Portál stavebníka / ISSŘ',0],['sw','Ekonomický systém',0],['sw','Personální systém',0],['sw','GIS / CAD prohlížeč',0],['sw','VPN',1]];
+function ensureCatalog(){ if(state.itCatalog&&state.itCatalog.length) return false; state.itCatalog=IT_DEFAULT.map((x,i)=>({id:'it'+(i+1),cat:x[0],name:x[1],std:!!x[2],note:''})); return true; }
+const catById=()=>Object.fromEntries((state.itCatalog||[]).map(c=>[c.id,c]));
+function personItems(h){ return (h.it||[]).filter(x=>catById()[x.id]); }
+function addItem(h,id,sn){ h.it=h.it||[]; if(h.it.some(x=>x.id===id)) return false; h.it.push({id,sn:sn||''}); return true; }
+let itSel=new Set(), itFilter={q:'',loc:'',none:false}, itCollapsed={};
+function itCounts(){ const c={}; Object.values(state.people).forEach(h=>personItems(h).forEach(x=>c[x.id]=(c[x.id]||0)+1)); return c; }
+function renderIT(){
+  const c=$('#itview'); const st=c.scrollTop; c.innerHTML='';
+  if(ensureCatalog()) save();
+  const cat=catById(); const counts=itCounts();
+  const assigned=allPositions().filter(x=>x.p.person&&state.people[x.p.person]).map(x=>({h:state.people[x.p.person],u:x.u,p:x.p}));
+  const q=itFilter.q.toLowerCase();
+  const rows=assigned.filter(r=>(!q||(r.h.name+' '+unitPath(r.u).join(' ')).toLowerCase().includes(q))&&(!itFilter.loc||personLoc(r.h).id===itFilter.loc)&&(!itFilter.none||!personItems(r.h).length));
+  const withNone=assigned.filter(r=>!personItems(r.h).length).length;
+  const bar=document.createElement('div'); bar.className='itbar';
+  bar.innerHTML=`<span class="sum"><b>${assigned.length}</b> rozsazených lidí · <b>${assigned.length-withNone}</b> s vybavením · <b style="${withNone?'color:var(--danger)':''}">${withNone}</b> bez vybavení</span>
+    <input type="search" id="itQ" placeholder="filtr jména / útvaru…" value="${esc(itFilter.q)}" style="width:200px">
+    <select id="itLoc"><option value="">všechny lokality</option>${LOCATIONS.map(l=>`<option value="${l.id}" ${itFilter.loc===l.id?'selected':''}>${l.abbr} · ${l.name}</option>`).join('')}</select>
+    <label><input type="checkbox" id="itNone" ${itFilter.none?'checked':''}> jen bez vybavení</label>
+    <button class="small" id="itCat">Katalog vybavení</button><button class="small" id="itXlsx">Export (xlsx)</button>
+    <div class="bulk" id="itBulk" ${itSel.size?'':'hidden'}><b>${itSel.size} vybraných:</b><button class="small primary" id="itStd">Přiřadit standardní sadu</button><select id="itBulkItem"><option value="">— položku —</option>${(state.itCatalog||[]).map(x=>`<option value="${x.id}">${x.cat.toUpperCase()} · ${esc(x.name)}</option>`).join('')}</select><button class="small" id="itBulkAdd">Přidat</button><button class="small" id="itBulkDel">Odebrat</button><button class="small" id="itClear">Zrušit výběr</button></div>`;
   c.appendChild(bar);
-  const srcs=SOURCES.filter(s=>Object.values(stats).some(S=>S.src[s]));
-  const t=document.createElement('table'); t.className='cc';
-  t.innerHTML=`<thead><tr><th>Kód</th><th class="rs" style="width:${state.ccNameW||340}px" title="Tažením za okraj změníte šířku">Název střediska<span class="grip"></span></th><th>Útvary</th><th style="text-align:right">Míst</th><th style="text-align:right">Obsazeno</th><th style="text-align:right">Úvazky</th>${srcs.map(s=>`<th style="text-align:right">${s}</th>`).join('')}<th>Lokality</th><th></th></tr></thead>`;
-  const tb=document.createElement('tbody'); const T={total:0,filled:0,fte:0,src:{}};
-  centers.forEach(cc=>{ const S=stats[cc.id]; T.total+=S.total; T.filled+=S.filled; T.fte+=S.fte; srcs.forEach(x=>T.src[x]=(T.src[x]||0)+(S.src[x]||0));
-    const tr=document.createElement('tr');
-    tr.innerHTML=`<td><input class="code" value="${esc(cc.code)}"></td><td><input class="name" value="${esc(cc.name)}" title="${esc(cc.name)}"></td>
-      <td>${S.units.map(u=>`<span class="u ${u.cc===cc.id?'':'inh'}" title="${u.cc===cc.id?'přiřazeno přímo':'zděděno z nadřízeného'}">${esc(u.name.replace(/^Místopředseda – /,''))}</span>`).join('')||'<span class="small">žádný útvar</span>'}</td>
-      <td class="n">${S.total}</td><td class="n">${S.filled}</td><td class="n">${S.fte.toLocaleString('cs-CZ',{maximumFractionDigits:2})}</td>${srcs.map(x=>`<td class="n">${S.src[x]||''}</td>`).join('')}
-      <td class="small">${[...S.locs].map(l=>LOC[l].abbr).join(', ')}</td><td>${S.units.length?'':'<button class="small del">×</button>'}</td>`;
-    const [code,name]=tr.querySelectorAll('input');
-    code.onchange=()=>{ cc.code=code.value.trim(); logChange&&logChange('středisko',`${cc.name}: kód ${cc.code}`); save(); render(); };
-    name.onchange=()=>{ cc.name=name.value.trim(); logChange&&logChange('středisko',`${cc.code}: název ${cc.name}`); save(); render(); };
-    const del=tr.querySelector('.del'); if(del) del.onclick=()=>{ state.centers=state.centers.filter(x=>x!==cc); logChange&&logChange('středisko','zrušeno '+cc.code+' '+cc.name); save(); render(); };
-    tb.appendChild(tr); });
-  const tot=document.createElement('tr'); tot.className='tot'; tot.innerHTML=`<td></td><td>Celkem</td><td></td><td class="n">${T.total}</td><td class="n">${T.filled}</td><td class="n">${T.fte.toLocaleString('cs-CZ',{maximumFractionDigits:2})}</td>${srcs.map(x=>`<td class="n">${T.src[x]||''}</td>`).join('')}<td></td><td></td>`; tb.appendChild(tot);
-  t.appendChild(tb); c.appendChild(t);
-  const th=t.querySelector('th.rs'), grip=th.querySelector('.grip');
-  grip.onmousedown=e=>{ e.preventDefault(); const x0=e.clientX, w0=th.getBoundingClientRect().width; th.classList.add('dragging');
-    const mv=ev=>{ const w=Math.max(140,Math.min(700,w0+ev.clientX-x0)); th.style.width=w+'px'; state.ccNameW=Math.round(w); };
-    const up=()=>{ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); th.classList.remove('dragging'); persist&&persist(); };
-    document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up); };
-  grip.ondblclick=()=>{ delete state.ccNameW; render(); };
-  // mapping table
-  const h=document.createElement('div'); h.className='cch'; h.innerHTML='Přiřazení útvarů ke střediskům<span>středisko se dědí z nadřízeného útvaru, dokud u útvaru nezvolíte jiné</span>'; c.appendChild(h);
-  const t2=document.createElement('table'); t2.className='cc'; t2.innerHTML='<thead><tr><th>Útvar</th><th>Středisko</th><th style="text-align:right">Míst</th><th style="text-align:right">Obsazeno</th></tr></thead>';
-  const tb2=document.createElement('tbody');
-  state.units.forEach(u=>{ const m=byId(); const par=m[u.parent]; const tr=document.createElement('tr'); tr.className='lv-'+u.level+(u.level==='odd'&&par&&par.level!=='odbor'?' top':'');
-    const src=unitCCSource(u); const inh=src&&src!==u?src:null;
-    const sel=document.createElement('select'); sel.className='ccsel'+(u.cc?'':' inh');
-    sel.innerHTML=`<option value="">${inh?'dle nadřízeného: '+esc(ccLabel(inh.cc)):'— bez střediska —'}</option>`+centers.map(x=>`<option value="${x.id}">${esc(x.code+' '+x.name)}</option>`).join('');
-    sel.value=u.cc||''; sel.onchange=()=>{ if(sel.value) u.cc=sel.value; else delete u.cc; logChange&&logChange('středisko útvaru',u.name+' → '+(u.cc?ccLabel(u.cc):'dle nadřízeného')); save(); render(); };
-    tr.innerHTML=`<td>${esc(u.name)}</td><td></td><td class="n">${u.positions.length}</td><td class="n">${u.positions.filter(p=>p.person).length}</td>`; tr.children[1].appendChild(sel); tb2.appendChild(tr); });
-  t2.appendChild(tb2); c.appendChild(t2); c.scrollTop=st;
-  $('#ccAdd').onclick=()=>{ const code=prompt('Kód nového střediska:',''); if(code===null) return; const name=prompt('Název střediska:',''); if(name===null) return; state.centers.push({id:'c'+Date.now().toString(36),code:code.trim(),name:name.trim()}); logChange&&logChange('středisko','založeno '+code+' '+name); save(); render(); };
-  $('#ccReset').onclick=()=>{ if(!confirm('Zahodit současný číselník středisek a znovu vygenerovat výchozí návrh (vedení úřadu + odbory + samostatná oddělení)?')) return; state.centers=[]; state.units.forEach(u=>{delete u.cc;}); generateCenters(); logChange&&logChange('středisko','číselník obnoven na výchozí návrh'); save(); render(); };
-  $('#ccXlsx').onclick=()=>{ const stats=ccStats();
-    const list=centers.map(cc=>{const S=stats[cc.id]; const o={'Kód':cc.code,'Název':cc.name,'Útvary':S.units.map(u=>u.name).join('; '),'Míst':S.total,'Obsazeno':S.filled,'Úvazky':+S.fte.toFixed(2),'Lokality':[...S.locs].map(l=>LOC[l].name).join(', ')}; SOURCES.forEach(x=>{ if(S.src[x]) o['z '+x]=S.src[x]; }); return o;});
-    const map=state.units.map(u=>({'Útvar':u.name,'Úroveň':LEVEL_LBL[u.level],'Nadřízený':(byId()[u.parent]||{}).name||'','Středisko – kód':(cm[unitCC(u)]||{}).code||'','Středisko – název':(cm[unitCC(u)]||{}).name||'','Přiřazení':u.cc?'přímo':'zděděno','Lokalita útvaru':unitLoc(u)?LOC[unitLoc(u)].name:''}));
-    const ppl=allPositions().filter(x=>x.p.person&&state.people[x.p.person]).map(({u,p})=>{const h=state.people[p.person]; const ccx=cm[unitCC(u)]||{}; const l=personLoc(h).id; return {'Jméno':h.name,'Zdrojový úřad':h.src,'Útvar':u.name,'Místo':p.label,'Středisko – kód':ccx.code||'','Středisko – název':ccx.name||'','Lokalita':l?LOC[l].name:'','Úvazek':h.fte||'1','Platová třída':h.cls||''};});
-    const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(list),'Číselník středisek'); XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(map),'Útvary → střediska'); XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(ppl.length?ppl:[{'Jméno':''}]),'Lidé → střediska');
-    XLSX.writeFile(wb,`URU_strediska_${stamp()}.xlsx`); };
+  // group by unit in structure order
+  const byUnit=new Map(); rows.forEach(r=>{ if(!byUnit.has(r.u)) byUnit.set(r.u,[]); byUnit.get(r.u).push(r); });
+  const units=state.units.filter(u=>byUnit.has(u));
+  if(!units.length){ const e=document.createElement('div'); e.style.cssText='padding:24px;color:var(--muted)'; e.textContent=assigned.length?'Nikdo neodpovídá filtru.':'Zatím nikdo není rozsazen na místa – vybavení se přiřazuje rozsazeným lidem.'; c.appendChild(e); }
+  units.forEach(u=>{
+    const box=document.createElement('div'); box.className='itu'+(itCollapsed[u.id]?' collapsed':''); const ids=byUnit.get(u).map(r=>r.h.id); const allSel=ids.every(i=>itSel.has(i));
+    const h=document.createElement('div'); h.className='h';
+    h.innerHTML=`<input type="checkbox" ${allSel?'checked':''} title="vybrat celý útvar"><button class="tog">${itCollapsed[u.id]?'▸':'▾'}</button><span class="bar" style="background:${SRC_DARK[u.src]}"></span><span class="nm">${esc(unitPath(u).slice(1).join(' › ')||u.name)}</span><span class="lv">${LEVEL_LBL[u.level]} · ${ids.length} lidí${unitLoc(u)?' · '+LOC[unitLoc(u)].abbr:''}</span>`;
+    h.querySelector('input').onchange=e=>{ ids.forEach(i=>e.target.checked?itSel.add(i):itSel.delete(i)); renderIT(); };
+    h.querySelector('.tog').onclick=()=>{ itCollapsed[u.id]=!itCollapsed[u.id]; renderIT(); };
+    box.appendChild(h);
+    const rw=document.createElement('div'); rw.className='rows';
+    byUnit.get(u).sort((a,b)=>(a.p.kind==='head'?0:1)-(b.p.kind==='head'?0:1)).forEach(r=>{
+      const row=document.createElement('div'); row.className='itp'+(itSel.has(r.h.id)?' sel':''); const l=personLoc(r.h).id;
+      row.innerHTML=`<input type="checkbox" ${itSel.has(r.h.id)?'checked':''}><div class="who"><span class="n">${esc(r.h.name)}</span><span class="m">${esc(r.p.label)} · ${esc(r.h.src)}${l?' · '+LOC[l].abbr:''}</span></div><div class="items"></div>`;
+      row.querySelector('input').onchange=e=>{ e.target.checked?itSel.add(r.h.id):itSel.delete(r.h.id); renderIT(); };
+      const items=row.querySelector('.items'); const list=personItems(r.h);
+      list.forEach(x=>{ const it=cat[x.id]; const chip=document.createElement('span'); chip.className='iti '+it.cat;
+        chip.innerHTML=`<span>${esc(it.name)}</span>${it.cat==='hw'?`<span class="sn" contenteditable="true" spellcheck="false" title="inventární / sériové číslo">${esc(x.sn||'')}</span>`:''}<button class="x" title="odebrat">×</button>`;
+        chip.querySelector('.x').onclick=()=>{ r.h.it=r.h.it.filter(y=>y!==x); logChange&&logChange('IT',`${r.h.name}: odebráno ${it.name}`); save(); render(); };
+        const sn=chip.querySelector('.sn'); if(sn){ sn.onblur=()=>{ const v=sn.textContent.trim(); if(v!==(x.sn||'')){ x.sn=v; logChange&&logChange('IT',`${r.h.name}: ${it.name} inv. č. ${v}`); save(); } }; sn.onkeydown=e=>{ if(e.key==='Enter'){e.preventDefault();sn.blur();} }; }
+        items.appendChild(chip); });
+      if(!list.length){ const n=document.createElement('span'); n.className='no'; n.textContent='bez vybavení'; items.appendChild(n); }
+      const add=document.createElement('span'); add.className='itadd'; add.innerHTML='<button>+ přidat</button>';
+      add.querySelector('button').onclick=e=>{ e.stopPropagation(); openItMenu(add,r.h); };
+      items.appendChild(add); rw.appendChild(row); });
+    box.appendChild(rw); c.appendChild(box); });
+  c.scrollTop=st;
+  $('#itQ').oninput=()=>{ itFilter.q=$('#itQ').value; renderIT(); $('#itQ').focus(); $('#itQ').setSelectionRange(99,99); };
+  $('#itLoc').onchange=()=>{ itFilter.loc=$('#itLoc').value; renderIT(); };
+  $('#itNone').onchange=()=>{ itFilter.none=$('#itNone').checked; renderIT(); };
+  $('#itCat').onclick=openCatalog; $('#itXlsx').onclick=exportIT;
+  const selPeople=()=>[...itSel].map(i=>state.people[i]).filter(Boolean);
+  const bs=$('#itStd'); if(bs){ bs.onclick=()=>{ let n=0; selPeople().forEach(h=>state.itCatalog.filter(x=>x.std).forEach(x=>{ if(addItem(h,x.id)) n++; })); logChange&&logChange('IT',`standardní sada u ${itSel.size} lidí (+${n} položek)`); save(); render(); toast(`Přidáno ${n} položek.`); };
+    $('#itBulkAdd').onclick=()=>{ const id=$('#itBulkItem').value; if(!id) return; let n=0; selPeople().forEach(h=>{ if(addItem(h,id)) n++; }); logChange&&logChange('IT',`hromadně přidáno ${cat[id].name} u ${n} lidí`); save(); render(); toast(`Přidáno u ${n} lidí.`); };
+    $('#itBulkDel').onclick=()=>{ const id=$('#itBulkItem').value; if(!id) return; let n=0; selPeople().forEach(h=>{ const b=(h.it||[]).length; h.it=(h.it||[]).filter(x=>x.id!==id); if(h.it.length<b) n++; }); logChange&&logChange('IT',`hromadně odebráno ${cat[id].name} u ${n} lidí`); save(); render(); toast(`Odebráno u ${n} lidí.`); };
+    $('#itClear').onclick=()=>{ itSel.clear(); renderIT(); }; }
 }
+function openItMenu(anchor,h){
+  document.querySelectorAll('.itmenu').forEach(m=>m.remove());
+  const m=document.createElement('div'); m.className='itmenu'; const have=new Set((h.it||[]).map(x=>x.id));
+  const draw=q=>{ const items=(state.itCatalog||[]).filter(x=>!q||x.name.toLowerCase().includes(q)); let html='';
+    ['hw','sw'].forEach(cat=>{ const xs=items.filter(x=>x.cat===cat); if(!xs.length) return; html+=`<div class="g">${cat==='hw'?'Hardware':'Software'}</div>`+xs.map(x=>`<div class="o ${have.has(x.id)?'have':''}" data-id="${x.id}"><span>${esc(x.name)}</span><span class="st">${have.has(x.id)?'má':(x.std?'standard':'')}</span></div>`).join(''); });
+    html+=`<div class="o" data-id="__std"><b>Celá standardní sada</b></div>`; return html; };
+  m.innerHTML=`<input type="search" placeholder="hledat…">`+`<div class="list">${draw('')}</div>`;
+  const inp=m.querySelector('input'); inp.oninput=()=>{ m.querySelector('.list').innerHTML=draw(inp.value.trim().toLowerCase()); bindOpts(); };
+  const bindOpts=()=>m.querySelectorAll('.o').forEach(o=>o.onclick=()=>{ const id=o.dataset.id; let n=0;
+    if(id==='__std') state.itCatalog.filter(x=>x.std).forEach(x=>{ if(addItem(h,x.id)) n++; }); else if(addItem(h,id)) n++;
+    if(n){ logChange&&logChange('IT',`${h.name}: přidáno ${id==='__std'?'standardní sada':catById()[id].name}`); save(); render(); } else m.remove(); });
+  bindOpts(); anchor.appendChild(m); inp.focus();
+  setTimeout(()=>document.addEventListener('click',function off(e){ if(!m.contains(e.target)){ m.remove(); document.removeEventListener('click',off); } }),0);
+}
+function openCatalog(){ ensureCatalog(); const counts=itCounts();
+  $('#catBody').innerHTML=(state.itCatalog).map(x=>`<tr data-id="${x.id}"><td>${x.cat.toUpperCase()}</td><td><input type="text" value="${esc(x.name)}"></td><td><input type="text" value="${esc(x.note||'')}"></td><td><input type="checkbox" ${x.std?'checked':''}></td><td class="n">${counts[x.id]||0}</td><td>${counts[x.id]?'':'<button class="small del">×</button>'}</td></tr>`).join('');
+  $('#catBody').querySelectorAll('tr').forEach(tr=>{ const x=state.itCatalog.find(y=>y.id===tr.dataset.id); const [nm,nt,std]=tr.querySelectorAll('input');
+    nm.onchange=()=>{ x.name=nm.value.trim(); save(); }; nt.onchange=()=>{ x.note=nt.value.trim(); save(); }; std.onchange=()=>{ x.std=std.checked; save(); };
+    const d=tr.querySelector('.del'); if(d) d.onclick=()=>{ state.itCatalog=state.itCatalog.filter(y=>y!==x); save(); openCatalog(); }; });
+  $('#dlgCat').showModal(); }
+$('#catAdd').onclick=()=>{ const name=$('#catName').value.trim(); if(!name) return; state.itCatalog.push({id:'it'+Date.now().toString(36),cat:$('#catType').value,name,note:$('#catNote').value.trim(),std:$('#catStd').checked}); $('#catName').value=''; $('#catNote').value=''; $('#catStd').checked=false; logChange&&logChange('IT','katalog: přidáno '+name); save(); openCatalog(); };
+$('#catClose').onclick=()=>{ $('#dlgCat').close(); render(); };
+function exportIT(){ const cat=catById();
+  const assigned=allPositions().filter(x=>x.p.person&&state.people[x.p.person]).map(x=>({h:state.people[x.p.person],u:x.u,p:x.p}));
+  const people=assigned.map(({h,u,p})=>{ const l=personLoc(h).id; const its=personItems(h); return {'Jméno':h.name,'Zdrojový úřad':h.src,'Útvar':u.name,'Místo':p.label,'Lokalita':l?LOC[l].name:'','HW':its.filter(x=>cat[x.id].cat==='hw').map(x=>cat[x.id].name+(x.sn?' ('+x.sn+')':'')).join('; '),'SW':its.filter(x=>cat[x.id].cat==='sw').map(x=>cat[x.id].name).join('; '),'Počet položek':its.length}; });
+  const lines=[]; assigned.forEach(({h,u})=>personItems(h).forEach(x=>lines.push({'Jméno':h.name,'Útvar':u.name,'Lokalita':(()=>{const l=personLoc(h).id;return l?LOC[l].name:'';})(),'Typ':cat[x.id].cat.toUpperCase(),'Položka':cat[x.id].name,'Inventární / sériové č.':x.sn||''})));
+  const locs=[...LOCATIONS,{id:null,name:'Neurčeno'}];
+  const totals=(state.itCatalog||[]).map(x=>{ const o={'Typ':x.cat.toUpperCase(),'Položka':x.name,'Standard':x.std?'ano':'','Celkem':0}; locs.forEach(l=>o[l.name]=0);
+    assigned.forEach(({h})=>{ if((h.it||[]).some(y=>y.id===x.id)){ o['Celkem']++; const l=personLoc(h).id; o[l?LOC[l].name:'Neurčeno']++; } }); return o; });
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(people.length?people:[{'Jméno':''}]),'Lidé'); XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(lines.length?lines:[{'Jméno':''}]),'Položky'); XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(totals),'Součty dle lokalit');
+  XLSX.writeFile(wb,`URU_IT_vybaveni_${stamp()}.xlsx`); }
 // ---------- systemizace ----------
 const SYS_TYP={sluz:'služební',prac:'pracovní'};
 function stupen(u,p){ if(p.kind!=='head') return 0; return {predseda:4,sekce:3,odbor:2,odd:1}[u.level]||0; }
@@ -697,7 +713,7 @@ $('#btnSys').onclick=()=>{
   ws['!cols']=[4.3,5.7,5.7,5.7,5.7,5.5,46,5.2,4.7,6.2,8,7.7,12.7,6.5,5.8,6,6.5,3.8,6,5.8,10].map(w=>({wch:w}));
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Systemizace');
   // second sheet: same data with unit names, for work
-  const flat=sysRows().map(r=>{const h=r.p.person?state.people[r.p.person]:null; return {'Pořad. č.':r.n,'Sekce':unitPath(r.u)[1]||'','Útvar':r.u.name,'Stupeň řízení':stupen(r.u,r.p)||'','Typ':SYS_TYP[r.sys.typ],'Funkční označení':r.sys.ozn,'Úvazek':+r.sys.fte,'Obor služby':r.sys.obor,'Kód činností':r.sys.kod,'Odb. požadavky':r.sys.odb,'Platová třída':r.sys.cls,'Občanství ČR':r.sys.obc?'ano':'','Zákaz konkurence':r.sys.zk?'ano':'','Datum zániku':r.sys.zanik,'Kategorie':r.p.cat==='nad'?'nadpožadavek':'delimitace','Lokalita':(()=>{const l=h?personLoc(h).id:unitLoc(r.u);return l?LOC[l].name:'';})(),'Středisko':(()=>{ensureCenters();const cx=ccById()[unitCC(r.u)];return cx?cx.code+' '+cx.name:'';})(),'Obsazeno':h?h.name:'','Zdrojový úřad':h?h.src:'','Třída zaměstnance':h?h.cls:''};});
+  const flat=sysRows().map(r=>{const h=r.p.person?state.people[r.p.person]:null; return {'Pořad. č.':r.n,'Sekce':unitPath(r.u)[1]||'','Útvar':r.u.name,'Stupeň řízení':stupen(r.u,r.p)||'','Typ':SYS_TYP[r.sys.typ],'Funkční označení':r.sys.ozn,'Úvazek':+r.sys.fte,'Obor služby':r.sys.obor,'Kód činností':r.sys.kod,'Odb. požadavky':r.sys.odb,'Platová třída':r.sys.cls,'Občanství ČR':r.sys.obc?'ano':'','Zákaz konkurence':r.sys.zk?'ano':'','Datum zániku':r.sys.zanik,'Kategorie':r.p.cat==='nad'?'nadpožadavek':'delimitace','Lokalita':(()=>{const l=h?personLoc(h).id:unitLoc(r.u);return l?LOC[l].name:'';})(),'Obsazeno':h?h.name:'','Zdrojový úřad':h?h.src:'','Třída zaměstnance':h?h.cls:''};});
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(flat),'Podle útvarů');
   XLSX.writeFile(wb,`URU_systemizace_${stamp()}.xlsx`);
 };
@@ -773,7 +789,7 @@ async function start(){
   try{ await loadRemote(); }catch(e){ $('#authMsg').className='msg err'; $('#authMsg').textContent='Načtení dat selhalo: '+(e.message||e)+' (zkontrolujte tabulky a RLS)'; return; }
   $('#auth').style.display='none';
   $('#zoom').value=state.zoom; $('#zoomVal').textContent=state.zoom+' %';
-  setView(['chart','loc','sys','cc'].includes(state.view)?state.view:'tree'); setDot('','připojeno');
+  setView(['chart','loc','sys','it'].includes(state.view)?state.view:'tree'); setDot('','připojeno');
   sb.channel('organigram').on('postgres_changes',{event:'UPDATE',schema:'public',table:'organigram_state',filter:'id=eq.'+STATE_ID},payload=>{
     if(payload.new&&payload.new.version>version&&!dirty&&!saving){ const v=state.view,z=state.zoom,c=state.collapsed; state=payload.new.data; version=payload.new.version; state.view=v; state.zoom=z; state.collapsed=c; render(); toast('Stav aktualizován z jiného okna.'); } }).subscribe();
   window.addEventListener('beforeunload',e=>{ if(dirty||saving){ flush(); e.preventDefault(); e.returnValue=''; } });

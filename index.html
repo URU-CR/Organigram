@@ -120,39 +120,50 @@ body.presenting .gsearch{display:none}
 .box .locsel{max-width:100%}
 /* location view */
 #locview{overflow:auto;padding:16px 18px 60px;display:none}
-/* střediska view */
-#ccview{overflow:auto;padding:14px 18px 60px;display:none}
-body.view-cc #tree{display:none} body.view-cc #ccview{display:block}
-body.view-cc main{grid-template-columns:1fr}
-body.view-cc aside{display:none}
-.ccbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;font-size:13px}
-.ccbar .sum{color:var(--muted)}.ccbar .sum b{color:var(--ink)}
-.ccbar .sp{margin-left:auto;display:flex;gap:6px}
-table.cc{border-collapse:collapse;width:100%;font-size:13px;background:#fff;border:1px solid var(--line);border-radius:8px;overflow:hidden}
-table.cc th{text-align:left;font-weight:600;color:var(--muted);padding:6px 8px;border-bottom:1px solid var(--line);background:#F3F5F8;white-space:nowrap}
-table.cc td{padding:5px 8px;border-bottom:1px solid #EEF0F3;vertical-align:top}
-table.cc td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
-table.cc input.code{width:64px;font-weight:700;font-variant-numeric:tabular-nums}
-table.cc input.name{width:100%;min-width:120px;text-overflow:ellipsis}
-table.cc th.rs{position:relative}
-table.cc th.rs .grip{position:absolute;top:0;right:-4px;width:9px;height:100%;cursor:col-resize;user-select:none}
-table.cc th.rs .grip::after{content:"";position:absolute;left:4px;top:6px;bottom:6px;border-left:2px solid var(--line)}
-table.cc th.rs .grip:hover::after,table.cc th.rs.dragging .grip::after{border-color:var(--accent)}
-table.cc input{font:inherit;padding:3px 6px;border:1px solid transparent;border-radius:4px;background:transparent}
-table.cc input:hover{border-color:var(--line);background:#fff}table.cc input:focus{border-color:var(--accent);background:#fff;outline:0}
-table.cc .u{display:inline-block;font-size:11px;padding:1px 6px;border-radius:9px;background:#EEF0F3;margin:1px 2px 1px 0;white-space:nowrap}
-table.cc .u.inh{background:#fff;border:1px dashed var(--line);color:var(--muted)}
-table.cc tr.tot td{font-weight:600;background:#F7F8FA}
-table.cc td.small{font-size:11px;color:var(--muted);white-space:nowrap}
-.cch{font-size:14px;font-weight:600;margin:18px 0 6px}
-.cch span{font-weight:400;color:var(--muted);font-size:12px;margin-left:8px}
-table.cc tr.lv-sekce td:first-child{font-weight:600}
-table.cc tr.lv-odbor td:first-child{padding-left:24px}
-table.cc tr.lv-odd td:first-child{padding-left:44px;color:var(--muted)}
-table.cc tr.lv-odd.top td:first-child{padding-left:24px;color:var(--ink)}
-table.cc select.ccsel{font:inherit;font-size:12px;padding:2px 5px;border:1px solid var(--line);border-radius:5px;background:#fff;max-width:320px}
-table.cc select.ccsel.inh{color:var(--muted)}
-body.presenting #ccview input,body.presenting #ccview select{pointer-events:none}
+/* IT view */
+#itview{overflow:auto;padding:0 0 60px;display:none;background:#fff}
+body.view-it #tree{display:none} body.view-it #itview{display:block}
+body.view-it main{grid-template-columns:1fr}
+body.view-it aside{display:none}
+.itbar{position:sticky;top:0;z-index:6;background:#fff;border-bottom:1px solid var(--line);padding:8px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px}
+.itbar .sum{color:var(--muted)}.itbar .sum b{color:var(--ink)}
+.itbar .bulk{display:flex;gap:6px;align-items:center;margin-left:auto;padding:4px 8px;border:1px solid var(--line);border-radius:6px;background:#F7F8FA}
+.itbar .bulk[hidden]{display:none}
+.itu{border-bottom:1px solid var(--line)}
+.itu>.h{display:flex;align-items:center;gap:10px;padding:8px 14px;background:#F7F8FA;cursor:default}
+.itu>.h .bar{width:5px;height:18px;border-radius:2px}
+.itu>.h .nm{font-weight:600}
+.itu>.h .lv{color:var(--muted);font-size:12px}
+.itu>.h .tog{border:0;background:none;padding:0;color:var(--muted);width:20px}
+.itu.collapsed>.rows{display:none}
+.itp{display:grid;grid-template-columns:28px 260px 1fr;align-items:start;gap:8px;padding:5px 14px;border-top:1px solid #EEF0F3}
+.itp.sel{background:#EAF0FF}
+.itp .who{display:flex;flex-direction:column;gap:2px;min-width:0}
+.itp .who .n{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.itp .who .m{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.itp .items{display:flex;flex-wrap:wrap;gap:4px;align-items:center;min-height:26px}
+.iti{display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:2px 4px 2px 8px;border-radius:12px;border:1px solid rgba(0,0,0,.12);background:#E8F1FF}
+.iti.sw{background:#EAF7EA}
+.iti .sn{font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums;cursor:text}
+.iti .sn:empty::before{content:"inv. č.";opacity:.5}
+.iti .x{border:0;background:none;padding:0 3px;color:var(--muted);cursor:pointer;font-size:13px;line-height:1}
+.iti .x:hover{color:var(--danger)}
+.itadd{position:relative}
+.itadd button{padding:2px 8px;font-size:12px;border-radius:12px;border-style:dashed;color:var(--muted)}
+.itmenu{position:absolute;z-index:20;top:100%;left:0;margin-top:3px;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(27,36,48,.16);width:300px;max-height:320px;overflow:auto;padding:4px}
+.itmenu input{width:100%;margin-bottom:4px;padding:4px 8px}
+.itmenu .g{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);padding:6px 8px 2px}
+.itmenu .o{padding:5px 8px;border-radius:5px;cursor:pointer;font-size:13px;display:flex;justify-content:space-between}
+.itmenu .o:hover{background:#F3F5F8}
+.itmenu .o .st{font-size:10px;color:var(--muted)}
+.itmenu .o.have{opacity:.45}
+.itp .no{font-size:12px;color:var(--danger)}
+body.presenting #itview .iti .x,body.presenting #itview .itadd,body.presenting #itview input[type=checkbox]{display:none}
+table.itc{border-collapse:collapse;width:100%;font-size:13px}
+table.itc th,table.itc td{padding:5px 8px;border-bottom:1px solid #EEF0F3;text-align:left;vertical-align:middle}
+table.itc th{color:var(--muted);font-weight:600;position:sticky;top:0;background:#fff}
+table.itc input[type=text]{width:100%;padding:3px 6px}
+table.itc td.n{text-align:right;font-variant-numeric:tabular-nums}
 /* systemizace view */
 #sysview{overflow:auto;padding:0 0 60px;display:none;background:#fff}
 body.view-sys #tree{display:none} body.view-sys #sysview{display:block}
@@ -318,12 +329,12 @@ table.ov td.z{color:#B6BEC9}
 </head>
 <body>
 <header>
-  <h1>Obsazení organigramu ÚRÚ ČR<small>návrh organizační struktury z 10. 9. 2026 · <span id="ver" title="verze app.js se doplní po načtení skriptu">index 2026-09-15.3</span></small></h1>
+  <h1>Obsazení organigramu ÚRÚ ČR<small>návrh organizační struktury z 10. 9. 2026 · <span id="ver" title="verze app.js se doplní po načtení skriptu">index 2026-09-17.1</span></small></h1>
   <div class="stats" id="stats"></div>
   <span class="user" id="user"><span class="dot" id="syncDot"></span><span id="userMail"></span></span>
   <div class="legend" id="legend"></div>
   <div class="gsearch"><input type="search" id="search" placeholder="Hledat všude – jméno, útvar, číslo místa…" autocomplete="off"><span class="cnt" id="scnt"></span><div id="sres"></div></div>
-  <div class="viewsw" role="group" aria-label="Pohled"><button id="vwTree" class="on">Strom</button><button id="vwChart">Diagram</button><button id="vwLoc">Lokality</button><button id="vwSys">Systemizace</button><button id="vwCC">Střediska</button></div>
+  <div class="viewsw" role="group" aria-label="Pohled"><button id="vwTree" class="on">Strom</button><button id="vwChart">Diagram</button><button id="vwLoc">Lokality</button><button id="vwSys">Systemizace</button><button id="vwIT">IT</button></div>
   <span class="zoom" id="zoomWrap" hidden>Zvětšení <input type="range" id="zoom" min="50" max="120" value="85"> <span id="zoomVal">85 %</span></span>
   <span class="zoom" id="critWrap" hidden title="Zvýrazní útvary s obsazeností v daném intervalu">Kritické <input type="range" class="crit" id="crit" min="0" max="3" step="1" value="0" list="critTicks"> <span id="critVal">vypnuto</span><datalist id="critTicks"><option value="0"></option><option value="1"></option><option value="2"></option><option value="3"></option></datalist></span>
   <div class="actions">
@@ -349,7 +360,7 @@ table.ov td.z{color:#B6BEC9}
   <div id="tree"></div>
   <div id="locview"></div>
   <div id="sysview"></div>
-  <div id="ccview"></div>
+  <div id="itview"></div>
   <div id="chart"></div>
   <aside>
     <div class="pool-head">
@@ -387,6 +398,10 @@ table.ov td.z{color:#B6BEC9}
   </div>
 </dialog>
 
+<dialog id="dlgCat"><div class="dhead"><h2>Katalog IT vybavení a SW</h2><p>Položky, které lze lidem přiřazovat. „Standard“ = součást standardní sady, kterou lze vybraným lidem přiřadit jedním kliknutím.</p></div>
+  <div class="dbody"><table class="itc"><thead><tr><th>Typ</th><th style="width:45%">Název</th><th>Poznámka</th><th>Standard</th><th style="text-align:right">Přiřazeno</th><th></th></tr></thead><tbody id="catBody"></tbody></table>
+  <div style="margin-top:10px;display:flex;gap:6px;align-items:center"><select id="catType"><option value="hw">HW</option><option value="sw">SW</option></select><input type="text" id="catName" placeholder="název nové položky" style="flex:1"><input type="text" id="catNote" placeholder="poznámka" style="width:180px"><label><input type="checkbox" id="catStd"> standard</label><button id="catAdd" class="small primary">Přidat</button></div></div>
+  <div class="dfoot"><button id="catClose" class="primary">Zavřít</button></div></dialog>
 <dialog id="dlgPerson">
   <div class="dhead"><h2>Přidat osobu</h2></div>
   <div class="dbody" style="display:grid;grid-template-columns:140px 1fr;gap:8px 10px;align-items:center">
@@ -402,8 +417,8 @@ table.ov td.z{color:#B6BEC9}
 
 <script src="vendor/xlsx.full.min.js"></script>
 <script src="vendor/supabase.js"></script>
-<script src="config.js?v=2026-09-15.3"></script>
-<script src="structure.js?v=2026-09-15.3"></script>
-<script src="app.js?v=2026-09-15.3"></script>
+<script src="config.js?v=2026-09-17.1"></script>
+<script src="structure.js?v=2026-09-17.1"></script>
+<script src="app.js?v=2026-09-17.1"></script>
 </body
 </html>
