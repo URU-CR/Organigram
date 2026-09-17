@@ -147,6 +147,8 @@ body.view-it aside{display:none}
 .iti .sn{font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums;cursor:text}
 .iti .sn:empty::before{content:"inv. č.";opacity:.5}
 .iti .x{border:0;background:none;padding:0 3px;color:var(--muted);cursor:pointer;font-size:13px;line-height:1}
+.iti select.isrc{font:inherit;font-size:10px;font-weight:700;padding:0 2px;border:1px solid rgba(0,0,0,.15);border-radius:4px;background:#fff;color:#1B2430;max-width:64px}
+.iti select.isrc.new{background:var(--c-nove)}
 .iti .x:hover{color:var(--danger)}
 .itadd{position:relative}
 .itadd button{padding:2px 8px;font-size:12px;border-radius:12px;border-style:dashed;color:var(--muted)}
@@ -329,7 +331,7 @@ table.ov td.z{color:#B6BEC9}
 </head>
 <body>
 <header>
-  <h1>Obsazení organigramu ÚRÚ ČR<small>návrh organizační struktury z 10. 9. 2026 · <span id="ver" title="verze app.js se doplní po načtení skriptu">index 2026-09-17.1</span></small></h1>
+  <h1>Obsazení organigramu ÚRÚ ČR<small>návrh organizační struktury z 10. 9. 2026 · <span id="ver" title="verze app.js se doplní po načtení skriptu">index 2026-09-17.2</span></small></h1>
   <div class="stats" id="stats"></div>
   <span class="user" id="user"><span class="dot" id="syncDot"></span><span id="userMail"></span></span>
   <div class="legend" id="legend"></div>
@@ -417,8 +419,8 @@ table.ov td.z{color:#B6BEC9}
 
 <script src="vendor/xlsx.full.min.js"></script>
 <script src="vendor/supabase.js"></script>
-<script src="config.js?v=2026-09-17.1"></script>
-<script src="structure.js?v=2026-09-17.1"></script>
-<script src="app.js?v=2026-09-17.1"></script>
+<script src="config.js?v=2026-09-17.2"></script>
+<script src="structure.js?v=2026-09-17.2"></script>
+<script src="app.js?v=2026-09-17.2"></script>
 </body
 </html>
