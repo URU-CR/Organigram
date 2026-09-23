@@ -1,4 +1,4 @@
-const APP_VERSION='2026-09-18.1';
+const APP_VERSION='2026-09-23.1';
 
 const STRUCTURE = window.STRUCTURE;
 const SOURCES = ['DESÚ','MMR','ÚÚR','MD','MPO','Nové','Jiný'];
@@ -91,28 +91,47 @@ function unitPath(u){ const m=byId(); const out=[]; let c=u; while(c){ out.unshi
 
 
 // ---------- structure versioning / migration ----------
-const STRUCTURE_VERSION = 2; // 2 = organigram MMR z 10. 9. 2026
-const RENAMES = {'Odbor stavebně správní':'Odbor odvolací a přezkumné agendy','Oddělení územně a stavebně správní I':'Oddělení odvolací a přezkumné agendy I','Oddělení územně a stavebně správní II':'Oddělení odvolací a přezkumné agendy II','Oddělení územně a stavebně správní III':'Oddělení odvolací a přezkumné agendy III'};
+const STRUCTURE_VERSION = 3; // 3 = organigram ÚRÚ z 23. 9. 2026 (tři sekce)
+const RENAMES = {
+  'Odbor stavebně správní':'Odbor odvolací a přezkumné agendy I','Odbor odvolací a přezkumné agendy':'Odbor odvolací a přezkumné agendy I',
+  'Oddělení územně a stavebně správní I':'Oddělení odvolací a přezkumné agendy I','Oddělení územně a stavebně správní II':'Oddělení odvolací a přezkumné agendy II','Oddělení územně a stavebně správní III':'Oddělení odvolací a přezkumné agendy III',
+  'Místopředseda – sekce legislativní, metodická a ochrany veřejných zájmů':'Vrchní ředitel sekce – sekce metodická, legislativní a ochrany veřejných zájmů',
+  'Místopředseda – sekce vyhrazených staveb':'Vrchní ředitel sekce – sekce vyhrazených staveb',
+  'Odbor pořizování územně plánovací dokumentace':'Odbor zpracování územně plánovací dokumentace',
+  'Odbor metodiky územního plánování a rozvoje':'Odbor plánování a správy NGÚP',
+  'Oddělení koncepční a metodické':'Samostatné oddělení koncepční a metodické',
+  'Odbor legislativní a právní':'Odbor legislativní','Oddělení legislativní':'Oddělení národní legislativy','Oddělení právní (zastupování před soudy)':'Samostatné oddělení právní',
+  'Oddělení staveb pro bydlení ???Plzeň/ČB':'Oddělení staveb pro bydlení Plzeň/ČB','Samostatné oddělení odvolacích řízení - dopravní stavby':'Samostatné oddělení odvolacích řízení – dopravní stavby','Samostatné oddělení odvolacích řízení - energetické stavby':'Samostatné oddělení odvolacích řízení – energetické stavby'};
+function reconcilePositions(oldPos,tplPos,newId){
+  const out=[...oldPos]; const kinds=['head','asst','ref'];
+  kinds.forEach(k=>{ const target=tplPos.filter(p=>p.kind===k).length; let cur=out.filter(p=>p.kind===k).length;
+    for(let i=out.length-1;i>=0&&cur>target;i--){ if(out[i].kind===k&&!out[i].person){ out.splice(i,1); cur--; } }
+    const tplK=tplPos.filter(p=>p.kind===k); while(cur<target){ const t=tplK[Math.min(cur,tplK.length-1)]; out.push({id:newId(),...t,person:null}); cur++; } });
+  return out;
+}
 function migrateStructure(st){
   if((st.structureVersion||1)>=STRUCTURE_VERSION) return null;
   const oldByName={}; st.units.forEach(u=>oldByName[RENAMES[u.name]||u.name]=u);
   let n=1; const usedOld=new Set(); const newUnits=STRUCTURE.map(tpl=>{
     const old=oldByName[tpl.name];
-    if(old){ usedOld.add(old); return {...tpl, loc:old.loc||guessUnitLoc(tpl.name), positions:old.positions}; }
+    if(old){ usedOld.add(old); const pos=reconcilePositions(old.positions,tpl.positions,()=>'p'+Date.now().toString(36)+(n++)); return {...tpl, loc:old.loc||guessUnitLoc(tpl.name), positions:pos}; }
     return {...tpl, loc:guessUnitLoc(tpl.name), positions:tpl.positions.map(p=>({id:'p'+Date.now().toString(36)+(n++), ...p, person:null}))};
   });
   const removed=st.units.filter(u=>!usedOld.has(u)); const freed=[];
   removed.forEach(u=>u.positions.forEach(p=>{ if(p.person&&st.people[p.person]) freed.push(st.people[p.person].name); }));
   const added=STRUCTURE.filter(t=>!oldByName[t.name]).map(t=>t.name);
   const renamed=st.units.filter(u=>RENAMES[u.name]).map(u=>u.name+' → '+RENAMES[u.name]);
+  const oldTotal=st.units.reduce((a,u)=>a+u.positions.length,0);
   st.units=newUnits; st.collapsed={}; st.structureVersion=STRUCTURE_VERSION;
-  return {removed:removed.map(u=>u.name),added,renamed,freed};
+  const newTotal=newUnits.reduce((a,u)=>a+u.positions.length,0);
+  return {removed:removed.map(u=>u.name),added,renamed,freed,oldTotal,newTotal};
 }
 function reportMigration(m){ if(!m) return; const parts=[];
   if(m.renamed.length) parts.push('Přejmenováno: '+m.renamed.join('; '));
   if(m.removed.length) parts.push('Zrušeno: '+m.removed.join('; ')+(m.freed.length?' (do nezařazených: '+m.freed.join(', ')+')':''));
   if(m.added.length) parts.push('Nově: '+m.added.join('; '));
-  alert('Organigram byl aktualizován na verzi z 10. 9. 2026. Obsazení míst zůstalo zachováno.\n\n'+parts.join('\n')); }
+  if(m.oldTotal!==undefined) parts.push(`Počet míst: ${m.oldTotal} → ${m.newTotal} (obsazená místa zůstala, volná se dorovnala na nové počty)`);
+  alert('Organigram byl aktualizován na verzi z 23. 9. 2026 (tři sekce). Obsazení míst zůstalo zachováno.\n\n'+parts.join('\n')); }
 
 // ---------- rendering ----------
 const $ = s=>document.querySelector(s);
@@ -141,7 +160,7 @@ function renderUnit(u){
   const head=document.createElement('div'); head.className='uhead';
   head.innerHTML=`<span class="bar" style="background:${SRC_DARK[u.src]||'#999'}"></span>
     <button class="tog" aria-label="Sbalit/rozbalit">${state.collapsed[u.id]?'▸':'▾'}</button>
-    <span class="uname">${esc(u.name)}<span class="lvl">${LEVEL_LBL[u.level]||''}</span></span>
+    <span class="uname" title="${u.head?'v organigramu uveden/a: '+esc(u.head):''}">${esc(u.name)}<span class="lvl">${LEVEL_LBL[u.level]||''}</span>${u.head?`<span class="lvl" style="font-style:italic">${esc(u.head)}</span>`:''}</span>
     <span class="srcbadge" style="background:${SRC_COLOR[u.src]}">${esc(u.src)}</span>
     <span class="fill ${filled===total&&total?'full':''}" title="obsazeno / míst (včetně podřízených útvarů)">${filled}/${total}${sub.total!==total?` <span style="opacity:.7">(${sub.filled}/${sub.total})</span>`:''}</span>`;
   head.querySelector('.fill').before(locSelect(u));
@@ -472,7 +491,7 @@ function boxEl(u){
   const box=document.createElement('div'); box.className='box '+u.level; box.dataset.uid=u.id;
   const filled=u.positions.filter(p=>p.person).length,total=u.positions.length,free=total-filled;
   const sub=subtreeCount(u); const crit=isCrit(u); if(crit) box.classList.add('crit'); const cs=childrenOf(u.id).length?sub:{total,filled}; const pctTxt=cs.total?Math.round(100*cs.filled/cs.total)+' %':'';
-  box.innerHTML=`<div class="bh" style="border-top-color:${SRC_DARK[u.src]||'#999'}"><div class="bn">${esc(u.name)}</div>
+  box.innerHTML=`<div class="bh" style="border-top-color:${SRC_DARK[u.src]||'#999'}"><div class="bn" title="${u.head?'v organigramu uveden/a: '+esc(u.head):''}">${esc(u.name)}${u.head?`<div style="font-weight:400;font-size:11px;color:var(--muted);font-style:italic">${esc(u.head)}</div>`:''}</div>
     <div class="bm"><span class="srcbadge" style="background:${SRC_COLOR[u.src]}">${esc(u.src)}</span><span class="pct">${pctTxt}</span><span class="fill ${filled===total&&total?'full':''}" title="obsazeno / míst${sub.total!==total?' (v závorce včetně podřízených)':''}">${filled}/${total}${sub.total!==total?` <span style="opacity:.7">(${sub.filled}/${sub.total})</span>`:''}</span></div></div>`;
   box.querySelector('.bm').insertBefore(locSelect(u),box.querySelector('.bm .fill'));
   const bp=document.createElement('div'); bp.className='bp';
@@ -665,7 +684,7 @@ function exportIT(){ const cat=catById();
 const SYS_TYP={sluz:'služební',prac:'pracovní'};
 function stupen(u,p){ if(p.kind!=='head') return 0; return {predseda:4,sekce:3,odbor:2,odd:1}[u.level]||0; }
 function defaultOzn(u,p){ if(p.kind==='asst') return 'ORef/VRef'; if(p.kind==='ref') return 'ORa';
-  return {predseda:'vedoucí služebního úřadu',sekce:'VRa/místopředseda/'+u.name.replace(/^Místopředseda – /,''),odbor:'VRa/ředitel odboru/'+u.name.replace(/^Odbor /,'odbor '),odd:'ORa/vedoucí oddělení/'+u.name.replace(/^(Samostatné )?[Oo]ddělení /,m=>m.toLowerCase())}[u.level]||p.label; }
+  return {predseda:'vedoucí služebního úřadu',sekce:'VRa/'+p.label+'/'+u.name.replace(/^(Místopředseda|Vrchní ředitel sekce) – /,''),odbor:'VRa/ředitel odboru/'+u.name.replace(/^Odbor /,'odbor '),odd:'ORa/vedoucí oddělení/'+u.name.replace(/^(Samostatné )?[Oo]ddělení /,m=>m.toLowerCase())}[u.level]||p.label; }
 function defaultCls(u,p){ if(p.kind==='asst') return 9; if(p.kind==='ref') return 13; return {predseda:16,sekce:15,odbor:14,odd:13}[u.level]||13; }
 function sysOf(u,p){ const typ=p.typ||(p.kind==='asst'?'prac':'sluz');
   return {typ, fte:p.fte??1, ozn:p.ozn??defaultOzn(u,p), obor:p.obor||'', kod:p.kod||'', odb:p.odb||'', cls:p.cls??defaultCls(u,p), obc:p.obc??(typ==='sluz'), zk:!!p.zk, zanik:p.zanik||''}; }
