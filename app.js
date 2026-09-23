@@ -1,4 +1,4 @@
-const APP_VERSION='2026-09-23.1';
+const APP_VERSION='2026-09-23.2';
 
 const STRUCTURE = window.STRUCTURE;
 const SOURCES = ['DESÚ','MMR','ÚÚR','MD','MPO','Nové','Jiný'];
@@ -778,12 +778,30 @@ $('#btnSys').onclick=()=>{
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(flat),'Podle útvarů');
   XLSX.writeFile(wb,`URU_systemizace_${stamp()}.xlsx`);
 };
+function drawConnectors(oc){
+  const rel=el=>{ let x=0,y=0,e=el; while(e&&e!==oc){ x+=e.offsetLeft; y+=e.offsetTop; e=e.offsetParent; } return {x,y,w:el.offsetWidth,h:el.offsetHeight}; };
+  const boxes={}; oc.querySelectorAll('.box').forEach(b=>boxes[b.dataset.uid]=b);
+  let d='';
+  const line=(x1,y1,x2,y2)=>{ d+=`M${x1.toFixed(1)} ${y1.toFixed(1)}L${x2.toFixed(1)} ${y2.toFixed(1)}`; };
+  state.units.filter(u=>!u.parent).forEach(function walk(u){
+    const pb=boxes[u.id]; if(!pb) return; const P=rel(pb); const kids=childrenOf(u.id).filter(k=>boxes[k.id]);
+    const horiz=kids.filter(k=>!boxes[k.id].closest('.oc-stack')), stack=kids.filter(k=>boxes[k.id].closest('.oc-stack'));
+    const busY=P.y+P.h+11; let xs=[];
+    horiz.forEach(k=>{ const B=rel(boxes[k.id]); const cx=B.x+B.w/2; xs.push(cx); line(cx,busY,cx,B.y); });
+    if(stack.length){ const ul=boxes[stack[0].id].closest('.oc-stack'); const U=rel(ul); const bx=U.x+6; xs.push(bx);
+      let lastY=busY; stack.forEach(k=>{ const B=rel(boxes[k.id]); const my=B.y+Math.min(30,B.h/2); line(bx,my,B.x,my); lastY=Math.max(lastY,my); }); line(bx,busY,bx,lastY); }
+    if(xs.length){ const cx=P.x+P.w/2; line(cx,P.y+P.h,cx,busY); const lo=Math.min(cx,...xs), hi=Math.max(cx,...xs); if(hi-lo>0.5) line(lo,busY,hi,busY); }
+    kids.forEach(walk); });
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg'); svg.setAttribute('class','conn'); svg.setAttribute('width',oc.scrollWidth); svg.setAttribute('height',oc.scrollHeight);
+  const path=document.createElementNS('http://www.w3.org/2000/svg','path'); path.setAttribute('d',d); path.setAttribute('fill','none'); path.setAttribute('stroke','#D5DAE1'); path.setAttribute('stroke-width','2'); path.setAttribute('stroke-linecap','square');
+  svg.appendChild(path); oc.appendChild(svg);
+}
 function renderChart(){
   const c=$('#chart'); const sl=c.scrollLeft, st=c.scrollTop; c.innerHTML='';
   const oc=document.createElement('div'); oc.className='oc'; oc.style.transform='scale('+(state.zoom||85)/100+')';
   const root=document.createElement('ul'); root.className='oc-row oc-root';
   state.units.filter(u=>!u.parent).forEach(u=>root.appendChild(chartNode(u)));
-  oc.appendChild(root); c.appendChild(oc);
+  oc.appendChild(root); c.appendChild(oc); drawConnectors(oc);
   if(chartFresh){const pb=c.querySelector('.box.predseda'); const sc=(state.zoom||85)/100; c.scrollLeft=Math.max(0,pb.offsetLeft*sc+pb.offsetWidth*sc/2-c.clientWidth/2); c.scrollTop=0; chartFresh=false;} else {c.scrollLeft=sl; c.scrollTop=st;}
 }
 
