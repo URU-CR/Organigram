@@ -1,4 +1,4 @@
-const APP_VERSION='2026-09-30.1';
+const APP_VERSION='2026-10-01.1';
 
 const STRUCTURE = window.STRUCTURE;
 const SOURCES = ['DESÚ','MMR','ÚÚR','MD','MPO','Nové','Jiný'];
@@ -25,7 +25,24 @@ function locSelect(u,cls){ const sel=document.createElement('select'); sel.class
   sel.disabled=!ROLE.org; sel.onclick=e=>e.stopPropagation(); sel.onchange=()=>{ u.loc=sel.value||null; logChange&&logChange('lokalita útvaru',u.name+' → '+(u.loc?LOC[u.loc].name:'dle nadřízeného')); save(); render(); }; return sel; }
 const SRC_COLOR = {'DESÚ':'var(--c-desu)','MMR':'var(--c-mmr)','ÚÚR':'var(--c-uur)','MD':'var(--c-md)','MPO':'var(--c-mpo)','Nové':'var(--c-nove)','Jiný':'#E5E7EB'};
 const SRC_DARK  = {'DESÚ':'var(--c-desu-d)','MMR':'var(--c-mmr-d)','ÚÚR':'var(--c-uur-d)','MD':'var(--c-md-d)','MPO':'var(--c-mpo-d)','Nové':'var(--c-nove-d)','Jiný':'#6B7280'};
-const LEVEL_LBL = {predseda:'úřad',sekce:'sekce',odbor:'odbor',odd:'oddělení'};
+const LEVEL_LBL = {predseda:'úřad',sekce:'sekce',odbor:'odbor',odd:'oddělení',up:'územní pracoviště'};
+const HEAD_LBL = {predseda:'předseda/předsedkyně',sekce:'místopředseda',odbor:'ředitel odboru',odd:'vedoucí oddělení',up:'vedoucí územního pracoviště'};
+const KRAJE=['Hlavní město Praha','Středočeský kraj','Jihočeský kraj','Plzeňský kraj','Karlovarský kraj','Ústecký kraj','Liberecký kraj','Královéhradecký kraj','Pardubický kraj','Kraj Vysočina','Jihomoravský kraj','Olomoucký kraj','Zlínský kraj','Moravskoslezský kraj'];
+// vzorová struktura krajského ÚRÚ (podle TOM: centrála = řízení, integrované DO, 1. stupeň složitějších staveb; územní pracoviště = 1. stupeň běžných staveb)
+const KRAJ_TEMPLATE=[
+  {id:'k1',parent:null,name:'Ředitel krajského ÚRÚ – {kraj}',level:'predseda',src:'Nové',head_lbl:'ředitel krajského ÚRÚ',counts:[1,1,0],vzor:true},
+  {id:'k2',parent:'k1',name:'Samostatné oddělení kanceláře ředitele',level:'odd',src:'Nové',counts:[1,0,3]},
+  {id:'k3',parent:'k1',name:'Odbor stavebně správní',level:'odbor',src:'Nové',counts:[1,1,0]},
+  {id:'k4',parent:'k3',name:'Oddělení stavebně správní I',level:'odd',src:'Nové',counts:[1,0,8]},
+  {id:'k5',parent:'k3',name:'Oddělení stavebně správní II',level:'odd',src:'Nové',counts:[1,0,8]},
+  {id:'k6',parent:'k1',name:'Odbor integrovaných dotčených orgánů',level:'odbor',src:'Nové',counts:[1,1,0]},
+  {id:'k7',parent:'k6',name:'Oddělení ochrany životního prostředí',level:'odd',src:'Nové',counts:[1,0,8]},
+  {id:'k8',parent:'k6',name:'Oddělení ochrany ostatních veřejných zájmů',level:'odd',src:'Nové',counts:[1,0,6]},
+  {id:'k9',parent:'k1',name:'Odbor územního plánování',level:'odbor',src:'Nové',counts:[1,1,0]},
+  {id:'k10',parent:'k9',name:'Oddělení územně plánovací',level:'odd',src:'Nové',counts:[1,0,6]},
+  {id:'k11',parent:'k1',name:'Územní pracoviště A',level:'up',src:'Nové',counts:[1,0,12]},
+  {id:'k12',parent:'k1',name:'Územní pracoviště B',level:'up',src:'Nové',counts:[1,0,12]},
+  {id:'k13',parent:'k1',name:'Územní pracoviště C',level:'up',src:'Nové',counts:[1,0,12]}];
 const KIND_LBL = {head:'vedoucí',asst:'asistent/ka',ref:'referent'};
 const LS_KEY = 'uru-organigram-v1';
 const STATE_ID = 'main';
@@ -39,7 +56,7 @@ let pidCounter = 1;
 
 function freshState(){
   let n=1;
-  return { structureVersion:STRUCTURE_VERSION,
+  return { structureVersion:STRUCTURE_VERSION, ws:'cr', krUnits:[],
     units: STRUCTURE.map(u=>({...u, loc:guessUnitLoc(u.name), positions:u.positions.map(p=>({id:'p'+(n++), ...p, person:null}))})),
     people:{}, collapsed:{}, nextPid:1
   };
@@ -47,13 +64,13 @@ function freshState(){
 function persist(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){} dirty=true; setDot('busy','ukládám…'); clearTimeout(saveTimer); saveTimer=setTimeout(flush,700); }
 // ---------- undo / redo ----------
 const UNDO_MAX=60; let undoStack=[], redoStack=[], baseline=null, restoring=false;
-const snap=()=>JSON.stringify({units:state.units,people:state.people,nextPid:state.nextPid,structureVersion:state.structureVersion,itCatalog:state.itCatalog,itPool:state.itPool});
+const snap=()=>JSON.stringify({cr:isKraj()?state.krUnits:state.units,kr:isKraj()?state.units:state.krUnits,people:state.people,nextPid:state.nextPid,structureVersion:state.structureVersion,itCatalog:state.itCatalog,itPool:state.itPool});
 function markBaseline(){ baseline=snap(); }
 function save(){
   if(!restoring&&baseline!==null){ const now=snap(); if(now!==baseline){ undoStack.push(baseline); if(undoStack.length>UNDO_MAX) undoStack.shift(); redoStack=[]; } baseline=now; }
   updateUndoBtns(); persist();
 }
-function applySnap(j){ const o=JSON.parse(j); restoring=true; state.units=o.units; state.people=o.people; state.nextPid=o.nextPid; state.structureVersion=o.structureVersion; state.itCatalog=o.itCatalog; state.itPool=o.itPool; baseline=snap(); restoring=false; persist(); render(); }
+function applySnap(j){ const o=JSON.parse(j); restoring=true; if(isKraj()){ state.units=o.kr||[]; state.krUnits=o.cr||[]; } else { state.units=o.cr||o.units||[]; state.krUnits=o.kr||[]; } state.people=o.people; state.nextPid=o.nextPid; state.structureVersion=o.structureVersion; state.itCatalog=o.itCatalog; state.itPool=o.itPool; baseline=snap(); restoring=false; persist(); render(); }
 function undo(){ if(!undoStack.length) return; redoStack.push(snap()); applySnap(undoStack.pop()); logChange&&logChange('zpět','vrácena poslední změna'); toast('Změna vrácena'); updateUndoBtns(); }
 function redo(){ if(!redoStack.length) return; undoStack.push(snap()); applySnap(redoStack.pop()); logChange&&logChange('znovu','obnovena vrácená změna'); updateUndoBtns(); }
 function updateUndoBtns(){ const u=$('#btnUndo'),r=$('#btnRedo'); if(u){u.disabled=!undoStack.length; r.disabled=!redoStack.length;} }
@@ -80,14 +97,14 @@ async function loadRemote(){
   if(data&&data.data&&data.data.units){ state=data.data; version=data.version||0; }
   else { state=freshState(); version=0; const r=await sb.from('organigram_state').upsert({id:STATE_ID,data:state,version:0,updated_by:currentUser.email}); if(r.error) throw r.error; }
   state.view=state.view||'tree'; if(!state.zoom) state.zoom=85;
-  const mg=migrateStructure(state); markBaseline(); if(mg){ logChange('aktualizace struktury','organigram v'+STRUCTURE_VERSION); persist(); setTimeout(()=>reportMigration(mg),300); }
+  const mg=migrateActive(state); markBaseline(); if(mg){ logChange('aktualizace struktury','organigram v'+STRUCTURE_VERSION); persist(); setTimeout(()=>reportMigration(mg),300); }
   try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){}
 }
 function load(){ state=freshState(); }
 const byId = ()=>Object.fromEntries(state.units.map(u=>[u.id,u]));
 const childrenOf = id => state.units.filter(u=>u.parent===id);
 function allPositions(){ normalizePositions(); return state.units.flatMap(u=>u.positions.map(p=>({u,p}))); }
-function unitPath(u){ const m=byId(); const out=[]; let c=u; while(c){ out.unshift(c.name); c=m[c.parent]; } return out; }
+function unitPath(u){ const m=Object.fromEntries(allUnitsBoth().map(x=>[x.id,x])); const out=[]; let c=u; while(c){ out.unshift(c.name); c=m[c.parent]; } return out; }
 
 
 // ---------- structure versioning / migration ----------
@@ -170,7 +187,7 @@ function renderUnit(u){
   head.addEventListener('dragover',e=>{e.preventDefault();head.classList.add('over');});
   head.addEventListener('dragleave',()=>head.classList.remove('over'));
   head.addEventListener('drop',e=>{e.preventDefault();head.classList.remove('over');const pid=e.dataTransfer.getData('text/pid');if(!pid||!ROLE.org)return;placeInUnit(pid,u);});
-  div.appendChild(head);
+  div.appendChild(head); if(editing&&ROLE.org) structEditor(u,div,head);
 
   const body=document.createElement('div'); body.className='ubody';
   u.positions.forEach(p=>{
@@ -193,7 +210,7 @@ function renderUnit(u){
   const add=document.createElement('div'); add.className='addpos';
   add.innerHTML=`<button class="small">+ místo</button><select><option value="ref">referent</option><option value="head">vedoucí</option><option value="asst">asistent/ka</option></select><select><option value="delim">delimitace</option><option value="nad">nadpožadavek</option></select>`;
   add.querySelector('button').onclick=()=>{const [k,c]=[...add.querySelectorAll('select')].map(s=>s.value);
-    const lbl=k==='head'?({odd:'vedoucí oddělení',odbor:'ředitel odboru',sekce:'místopředseda'}[u.level]||'vedoucí'):KIND_LBL[k];
+    const lbl=k==='head'?(u.head_lbl||HEAD_LBL[u.level]||'vedoucí'):KIND_LBL[k];
     u.positions.push({id:'p'+Date.now()+Math.random().toString(36).slice(2,6),kind:k,label:lbl,cat:c,person:null});save();render();};
   body.appendChild(add);
   div.appendChild(body);
@@ -216,7 +233,7 @@ function render(){
   if(document.body.classList.contains('view-sys')){ try{ renderSys(); }catch(e){ console.error(e); $('#sysview').innerHTML='<div style="padding:20px;color:var(--danger)">Pohled Systemizace se nepodařilo vykreslit: '+esc(e.message||e)+'<br><span style="color:var(--muted);font-size:12px">'+esc((e.stack||'').split('\n').slice(0,3).join(' | '))+'</span></div>'; } } else $('#sysview').innerHTML='';
   // pool
   const pool=$('#pool'); pool.innerHTML='';
-  const assigned=new Set(allPositions().flatMap(x=>x.p.persons));
+  const assigned=new Set(allUnitsBoth().flatMap(u=>u.positions.flatMap(p=>p.persons||[])));
   const q=$('#search').value.trim().toLowerCase();
   let list=Object.values(state.people).filter(p=>!assigned.has(p.id));
   const totalUn=list.length;
@@ -235,7 +252,7 @@ function render(){
 function renderStats(){
   const ps=allPositions(); const total=ps.length, filled=ps.filter(x=>x.p.persons.length).length;
   const delim=ps.filter(x=>x.p.cat==='delim'), nad=ps.filter(x=>x.p.cat==='nad');
-  const assignedIds=new Set(ps.flatMap(x=>x.p.persons)); const un=Object.values(state.people).filter(h=>!assignedIds.has(h.id)).length;
+  const assignedIds=new Set(allUnitsBoth().flatMap(u=>u.positions.flatMap(p=>p.persons||[]))); const un=Object.values(state.people).filter(h=>!assignedIds.has(h.id)).length;
   let occ=0,cap=0; ps.forEach(({u,p})=>{ occ+=posOcc(p); cap+=posCap(u,p); });
   $('#stats').innerHTML=`<div class="stat"><b>${filled}</b><span>obsazeno z ${total} míst</span></div>
     <div class="stat"><b>${fmtF(occ)}</b><span>FTE z ${fmtF(cap)}</span></div>
@@ -250,6 +267,75 @@ function renderLegend(){
   [$('#impSrc'),$('#npSrc')].forEach(sel=>sel.innerHTML=SOURCES.map(s=>`<option>${s}</option>`).join(''));
 }
 
+// ---------- pracovní prostory: ÚRÚ ČR / krajské ÚRÚ ----------
+function isKraj(){ return state.ws==='kr'; }
+function allUnitsBoth(){ return [...state.units,...(state.krUnits||[])]; }
+function newUid(){ return 'u'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function newPid(){ return 'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function makePositions(u,counts,cat){ const [h,a,r]=counts; const out=[]; const hl=u.head_lbl||HEAD_LBL[u.level]||'vedoucí';
+  for(let i=0;i<h;i++) out.push({id:newPid(),kind:'head',label:hl,cat:cat||'delim',persons:[]});
+  for(let i=0;i<a;i++) out.push({id:newPid(),kind:'asst',label:'asistent/ka',cat:cat||'delim',persons:[]});
+  for(let i=0;i<r;i++) out.push({id:newPid(),kind:'ref',label:'referent',cat:cat||'delim',persons:[]}); return out; }
+function buildFromTemplate(tpl,krajName){ const idmap={}; tpl.forEach(t=>idmap[t.id]=newUid());
+  return tpl.map(t=>{ const u={id:idmap[t.id],parent:t.parent?idmap[t.parent]:null,name:t.name.replace('{kraj}',krajName||'vzor'),level:t.level,src:t.src||'Nové',positions:[]}; if(t.head_lbl) u.head_lbl=t.head_lbl; if(t.vzor&&!krajName) u.vzor=true; if(krajName) u.kraj=krajName; u.positions=makePositions(u,t.counts||[1,0,0]); return u; }); }
+function ensureKraj(){ if(!state.krUnits) state.krUnits=[]; if(!state.krUnits.length){ state.krUnits=buildFromTemplate(KRAJ_TEMPLATE,null); return true; } return false; }
+function setWorkspace(ws){ if(ws===state.ws) return; state.units=state.units||[]; state.krUnits=state.krUnits||[];
+  [state.units,state.krUnits]=[state.krUnits,state.units]; state.ws=ws; if(ws==='kr'&&!state.units.length){ state.units=buildFromTemplate(KRAJ_TEMPLATE,null); }
+  state.collapsed={}; chartFresh=true; delete state.chartRoot; save();
+  document.body.classList.toggle('ws-kr',ws==='kr'); $('#wsCr').classList.toggle('on',ws!=='kr'); $('#wsKr').classList.toggle('on',ws==='kr');
+  if(ws==='kr'&&state.view==='loc') state.view='tree'; setView(state.view||'tree'); }
+function migrateActive(st){ const sw=st.ws==='kr'; if(sw){ [st.units,st.krUnits]=[st.krUnits||[],st.units]; } const mg=migrateStructure(st); if(sw){ [st.units,st.krUnits]=[st.krUnits,st.units]; } return mg; }
+// --- klonování vzoru do krajů ---
+function cloneSubtree(rootId,fromUnits,krajName){ const m={}; fromUnits.forEach(u=>m[u.id]=u); const out=[]; const idmap={};
+  const walk=id=>{ const u=m[id]; const nid=newUid(); idmap[id]=nid; const c={...u,id:nid,parent:u.parent&&idmap[u.parent]?idmap[u.parent]:null,name:u.name.replace(/\s*–?\s*vzor$/i,'').replace('{kraj}',krajName),kraj:krajName,positions:u.positions.map(p=>({id:newPid(),kind:p.kind,label:p.label,cat:p.cat,persons:[]}))}; delete c.vzor; delete c.head; out.push(c); fromUnits.filter(x=>x.parent===id).forEach(x=>walk(x.id)); };
+  walk(rootId); if(out[0]&&!/{kraj}/.test(m[rootId].name)&&!out[0].name.includes(krajName)) out[0].name=out[0].name+' – '+krajName; return out; }
+function kraje(){ return state.units.filter(u=>!u.parent); }
+// ---------- editor struktury ----------
+let editing=false;
+function structEditor(u,div,head){
+  const m=byId(); const par=m[u.parent]; const sibs=state.units.filter(x=>x.parent===u.parent); const idx=sibs.indexOf(u);
+  const bar=document.createElement('div'); bar.className='sedit';
+  const cnt=k=>u.positions.filter(p=>p.kind===k).length;
+  bar.innerHTML=`<button class="small" data-a="ren" title="přejmenovat">✎ název</button>
+    <select data-a="lvl" title="úroveň útvaru">${Object.entries(LEVEL_LBL).map(([k,v])=>`<option value="${k}" ${u.level===k?'selected':''}>${v}</option>`).join('')}</select>
+    <select data-a="src" title="zdrojový úřad / barva">${SOURCES.filter(s=>s!=='Jiný').map(s=>`<option ${u.src===s?'selected':''}>${s}</option>`).join('')}</select>
+    <span class="cnts" title="počet míst: vedoucí + asistenti + referenti (obsazená místa se neodebírají)">místa <input type="number" min="0" max="9" data-k="head" value="${cnt('head')}"> + <input type="number" min="0" max="9" data-k="asst" value="${cnt('asst')}"> + <input type="number" min="0" max="99" data-k="ref" value="${cnt('ref')}"></span>
+    <button class="small" data-a="add" title="přidat podřízený útvar">+ útvar</button>
+    <button class="small" data-a="up" title="posunout výš" ${idx<=0?'disabled':''}>↑</button><button class="small" data-a="down" title="posunout níž" ${idx>=sibs.length-1?'disabled':''}>↓</button>
+    <select data-a="mv" title="přesunout pod jiný útvar"><option value="">⇄ přesunout pod…</option>${state.units.filter(x=>x!==u&&!isDesc(u,x)&&x.level!=='odd'&&x.level!=='up').map(x=>`<option value="${x.id}" ${x.id===u.parent?'disabled':''}>${esc(unitPath(x).slice(-1)[0])}</option>`).join('')}</select>
+    ${!u.parent?`<button class="small" data-a="clone" title="vytvořit kopie tohoto organigramu pro vybrané kraje">⧉ do krajů…</button>`:''}
+    <button class="small" data-a="del" style="color:var(--danger)" title="zrušit útvar včetně podřízených">× zrušit</button>`;
+  const chg=(action,detail)=>{ logChange&&logChange('struktura',detail); save(); render(); };
+  bar.querySelector('[data-a=ren]').onclick=()=>{ const n=prompt('Název útvaru:',u.name); if(n!==null&&n.trim()){ const o=u.name; u.name=n.trim(); chg('ren',`${o} → ${u.name}`); } };
+  bar.querySelector('[data-a=lvl]').onchange=e=>{ u.level=e.target.value; u.positions.filter(p=>p.kind==='head').forEach(p=>p.label=u.head_lbl||HEAD_LBL[u.level]); chg('lvl',`${u.name}: úroveň ${LEVEL_LBL[u.level]}`); };
+  bar.querySelector('[data-a=src]').onchange=e=>{ u.src=e.target.value; chg('src',`${u.name}: zdroj ${u.src}`); };
+  bar.querySelectorAll('.cnts input').forEach(inp=>inp.onchange=()=>{ const counts=['head','asst','ref'].map(k=>+bar.querySelector(`.cnts input[data-k=${k}]`).value||0);
+    const tpl=makePositions(u,counts); u.positions=reconcilePositions(u.positions,tpl,newPid); chg('cnt',`${u.name}: místa ${counts.join('+')}`); });
+  bar.querySelector('[data-a=add]').onclick=()=>{ const lv=u.level==='predseda'?'odbor':(u.level==='sekce'?'odbor':'odd'); const n=prompt('Název nového útvaru (pod „'+u.name+'“):',lv==='odbor'?'Odbor ':'Oddělení '); if(n===null||!n.trim()) return;
+    const nu={id:newUid(),parent:u.id,name:n.trim(),level:/^územní pracoviště/i.test(n)?'up':(/^odbor/i.test(n)?'odbor':(lv)),src:u.src||'Nové',positions:[]}; if(u.kraj) nu.kraj=u.kraj; nu.positions=makePositions(nu,nu.level==='odbor'?[1,1,0]:[1,0,5]);
+    const last=state.units.map((x,i)=>x.parent===u.id?i:-1).filter(i=>i>=0).pop(); state.units.splice((last>=0?last:state.units.indexOf(u))+1,0,nu); state.collapsed[u.id]=false; chg('add',`nový útvar ${nu.name} pod ${u.name}`); };
+  const move=(dir)=>{ const j=idx+dir; if(j<0||j>=sibs.length) return; const other=sibs[j]; const a=state.units.indexOf(u), b=state.units.indexOf(other);
+    const blockOf=x=>{ const ids=new Set([x.id]); let grew=true; while(grew){ grew=false; state.units.forEach(y=>{ if(y.parent&&ids.has(y.parent)&&!ids.has(y.id)){ ids.add(y.id); grew=true; } }); } return state.units.filter(y=>ids.has(y.id)); };
+    const bu=blockOf(u), bo=blockOf(other); const rest=state.units.filter(x=>!bu.includes(x)&&!bo.includes(x)); const pos=Math.min(a,b); const first=dir<0?bu:bo, second=dir<0?bo:bu;
+    // rebuild: keep order of rest, insert both blocks at position of the earlier one
+    const out=[]; let inserted=false; const earlier=a<b?u:other; state.units.forEach(x=>{ if(!inserted&&(x===u||x===other)){ out.push(...first,...second); inserted=true; } if(!bu.includes(x)&&!bo.includes(x)) out.push(x); }); state.units=out; chg('move',`${u.name} posunuto`); };
+  bar.querySelector('[data-a=up]').onclick=()=>move(-1); bar.querySelector('[data-a=down]').onclick=()=>move(1);
+  bar.querySelector('[data-a=mv]').onchange=e=>{ const t=e.target.value; if(!t) return; u.parent=t; chg('mv',`${u.name} přesunuto pod ${m[t].name}`); };
+  const cl=bar.querySelector('[data-a=clone]'); if(cl) cl.onclick=()=>openCloneDialog(u);
+  bar.querySelector('[data-a=del]').onclick=()=>{ const ids=new Set([u.id]); let grew=true; while(grew){ grew=false; state.units.forEach(y=>{ if(y.parent&&ids.has(y.parent)&&!ids.has(y.id)){ ids.add(y.id); grew=true; } }); }
+    const occupied=state.units.filter(y=>ids.has(y.id)).reduce((a,y)=>a+y.positions.filter(p=>p.persons&&p.persons.length).length,0);
+    if(occupied){ alert('Útvar nelze zrušit – na jeho místech (nebo v podřízených) sedí '+occupied+' lidí. Nejdřív je uvolněte.'); return; }
+    if(!confirm(`Zrušit „${u.name}“${ids.size>1?' včetně '+(ids.size-1)+' podřízených útvarů':''}?`)) return; state.units=state.units.filter(y=>!ids.has(y.id)); chg('del',`zrušen útvar ${u.name}`); };
+  div.insertBefore(bar,head.nextSibling);
+}
+function isDesc(anc,x){ const m=byId(); let c=x; while(c){ if(c.parent===anc.id) return true; c=m[c.parent]; } return false; }
+function openCloneDialog(root){ const dlg=$('#dlgClone'); const existing=new Set(state.units.filter(u=>!u.parent).map(u=>u.kraj).filter(Boolean));
+  $('#cloneList').innerHTML=KRAJE.map(k=>`<label><input type="checkbox" value="${esc(k)}" ${existing.has(k)?'disabled':''}> ${esc(k)}${existing.has(k)?' <span style="color:var(--muted)">(už existuje)</span>':''}</label>`).join('');
+  $('#cloneAll').onclick=()=>$('#cloneList').querySelectorAll('input:not(:disabled)').forEach(i=>i.checked=true);
+  $('#cloneOk').onclick=()=>{ const sel=[...$('#cloneList').querySelectorAll('input:checked')].map(i=>i.value); if(!sel.length) return; let n=0; sel.forEach(k=>{ state.units.push(...cloneSubtree(root.id,state.units,k)); n++; }); dlg.close(); logChange&&logChange('struktura',`vzor zkopírován do ${n} krajů`); save(); render(); toast(`Vytvořeno ${n} krajských ÚRÚ.`); };
+  $('#cloneCancel').onclick=()=>dlg.close(); dlg.showModal(); }
+$('#btnEdit').onclick=()=>{ editing=!editing; document.body.classList.toggle('editing',editing); $('#btnEdit').classList.toggle('on',editing); if(editing&&state.view!=='tree') setView('tree'); else render(); };
+$('#wsCr').onclick=()=>setWorkspace('cr'); $('#wsKr').onclick=()=>setWorkspace('kr');
 // ---------- úvazky / vícenásobné obsazení ----------
 const fmtF=v=>(+v).toLocaleString('cs-CZ',{maximumFractionDigits:2});
 function personFte(h){ const v=parseFloat(String(h&&h.fte!==undefined&&h.fte!==''?h.fte:'1').replace(',','.')); return isNaN(v)||v<=0?1:Math.min(v,1); }
@@ -257,14 +343,14 @@ function posCap(u,p){ const v=+sysOf(u,p).fte; return v>0?v:1; }
 function posPersons(p){ return (p.persons||[]).filter(id=>state.people[id]); }
 function posOcc(p){ return posPersons(p).reduce((a,id)=>a+personFte(state.people[id]),0); }
 function posFree(u,p){ return Math.round((posCap(u,p)-posOcc(p))*100)/100; }
-function normalizePositions(){ state.units.forEach(u=>u.positions.forEach(p=>{ const d=Object.getOwnPropertyDescriptor(p,'person');
+function normalizePositions(){ allUnitsBoth().forEach(u=>u.positions.forEach(p=>{ const d=Object.getOwnPropertyDescriptor(p,'person');
   if(!Array.isArray(p.persons)) p.persons=(d&&!d.get&&d.value)?[d.value]:[];
   if(!d||!d.get){ delete p.person; Object.defineProperty(p,'person',{get(){return this.persons[0]||null;},set(v){this.persons=v?[v]:[];},enumerable:false,configurable:true}); } })); }
 function assignedList(){ const out=[]; allPositions().forEach(({u,p})=>posPersons(p).forEach(id=>out.push({h:state.people[id],u,p}))); return out; }
 function unitFte(u,deep){ let occ=0,cap=0; const walk=x=>{ x.positions.forEach(p=>{ occ+=posOcc(p); cap+=posCap(x,p); }); if(deep) childrenOf(x.id).forEach(walk); }; walk(u); return {occ,cap}; }
 // ---------- assignment ----------
 function findPos(pid){ for(const u of state.units){const p=u.positions.find(x=>x.id===pid); if(p) return {u,p};} return null; }
-function currentPosOf(personId){ for(const u of state.units){const p=u.positions.find(x=>x.persons&&x.persons.includes(personId)); if(p) return {u,p};} return null; }
+function currentPosOf(personId){ for(const u of allUnitsBoth()){const p=u.positions.find(x=>x.persons&&x.persons.includes(personId)); if(p) return {u,p};} return null; }
 function assign(personId, posId){
   const t=findPos(posId); if(!t) return;
   const from=currentPosOf(personId);
@@ -470,7 +556,7 @@ $('#btnExport').onclick=()=>{
 $('#btnSave').onclick=()=>download(new Blob([JSON.stringify(state,null,1)],{type:'application/json'}),`URU_obsazeni_${stamp()}.json`);
 $('#btnLoad').onclick=()=>$('#fileJson').click();
 $('#fileJson').onchange=async e=>{const f=e.target.files[0];if(!f)return;e.target.value='';
-  try{const s=JSON.parse(await f.text()); if(!s.units||!s.people) throw new Error('neplatný formát'); state=s; const mg=migrateStructure(state); logChange('načtení','stav nahrazen ze souboru '+f.name); save(); render(); toast('Stav načten.'); reportMigration(mg); toast('Stav načten.');}catch(err){alert('Soubor se nepodařilo načíst: '+err.message);}};
+  try{const s=JSON.parse(await f.text()); if(!s.units||!s.people) throw new Error('neplatný formát'); state=s; const mg=migrateActive(state); logChange('načtení','stav nahrazen ze souboru '+f.name); save(); render(); toast('Stav načten.'); reportMigration(mg); toast('Stav načten.');}catch(err){alert('Soubor se nepodařilo načíst: '+err.message);}};
 $('#btnReset').onclick=()=>{ if(confirm('Opravdu vymazat všechny lidi i úpravy míst a vrátit prázdný organigram? (Doporučuji nejdřív „Uložit stav“.)')){const v=state.view,z=state.zoom;state=freshState();state.view=v;state.zoom=z;logChange('vymazání','celý stav vymazán');save();render();} };
 let allCollapsed=false;
 $('#btnCollapse').onclick=()=>{allCollapsed=!allCollapsed; state.units.forEach(u=>{ if(u.level!=='predseda') state.collapsed[u.id]=allCollapsed; }); $('#btnCollapse').textContent=allCollapsed?'Rozbalit vše':'Sbalit vše'; render();};
@@ -507,7 +593,7 @@ let chartFresh=true;
 const CRIT_STEPS=[null,25,50,75]; let critLevel=0;
 function isCrit(u){ const v=CRIT_STEPS[critLevel]; if(!v) return false; const c=childrenOf(u.id).length?subtreeCount(u):{total:u.positions.length,filled:u.positions.filter(p=>p.person).length}; if(!c.total) return false; return 100*c.filled/c.total<=v; }
 $('#crit').oninput=()=>{ critLevel=+$('#crit').value; const v=CRIT_STEPS[critLevel]; $('#critVal').textContent=v?`obsazeno 0–${v} %`:'vypnuto'; document.body.classList.toggle('critmode',!!v); render(); };
-function setView(v){ if(!ROLE.org&&!['it','chart','loc'].includes(v)) v='it'; state.view=v; if(v==='chart') chartFresh=true; document.body.classList.toggle('view-chart',v==='chart'); document.body.classList.toggle('view-loc',v==='loc'); document.body.classList.toggle('view-sys',v==='sys'); document.body.classList.toggle('view-it',v==='it');
+function setView(v){ if(!ROLE.org&&!['it','chart','loc'].includes(v)) v='it'; if(isKraj()&&v==='loc') v='tree'; if(editing&&v!=='tree'){ editing=false; document.body.classList.remove('editing'); $('#btnEdit').classList.remove('on'); } state.view=v; if(v==='chart') chartFresh=true; document.body.classList.toggle('view-chart',v==='chart'); document.body.classList.toggle('view-loc',v==='loc'); document.body.classList.toggle('view-sys',v==='sys'); document.body.classList.toggle('view-it',v==='it');
   $('#vwTree').classList.toggle('on',!['chart','loc','sys','it'].includes(v)); $('#vwSys').classList.toggle('on',v==='sys'); $('#vwIT').classList.toggle('on',v==='it'); $('#vwChart').classList.toggle('on',v==='chart'); $('#vwLoc').classList.toggle('on',v==='loc'); $('#zoomWrap').hidden=v!=='chart'; $('#critWrap').hidden=v!=='chart'; render(); }
 $('#vwTree').onclick=()=>setView('tree'); $('#vwChart').onclick=()=>setView('chart'); $('#vwLoc').onclick=()=>setView('loc'); $('#vwSys').onclick=()=>setView('sys'); $('#vwIT').onclick=()=>setView('it');
 $('#zoom').oninput=()=>{ state.zoom=+$('#zoom').value; $('#zoomVal').textContent=state.zoom+' %'; const oc=$('#chart .oc'); if(oc) oc.style.transform='scale('+state.zoom/100+')'; };
@@ -534,7 +620,7 @@ function boxEl(u){
 function chartNode(u){
   const li=document.createElement('li'); li.appendChild(boxEl(u));
   const kids=childrenOf(u.id); if(!kids.length) return li;
-  const horiz=kids.filter(k=>k.level==='sekce'||k.level==='odbor'), stack=kids.filter(k=>k.level==='odd');
+  const horiz=kids.filter(k=>k.level==='sekce'||k.level==='odbor'), stack=kids.filter(k=>k.level==='odd'||k.level==='up');
   const wrap=document.createElement('div'); wrap.className='oc-down'+(horiz.length?'':' stack-only'); wrap.style.width='100%';
   if(horiz.length||stack.length){
     const row=document.createElement('ul'); row.className='oc-row';
@@ -707,10 +793,10 @@ function exportIT(){ const cat=catById();
   XLSX.writeFile(wb,`URU_IT_vybaveni_${stamp()}.xlsx`); }
 // ---------- systemizace ----------
 const SYS_TYP={sluz:'služební',prac:'pracovní'};
-function stupen(u,p){ if(p.kind!=='head') return 0; return {predseda:4,sekce:3,odbor:2,odd:1}[u.level]||0; }
+function stupen(u,p){ if(p.kind!=='head') return 0; return {predseda:isKraj()?3:4,sekce:3,odbor:2,odd:1,up:1}[u.level]||0; }
 function defaultOzn(u,p){ if(p.kind==='asst') return 'ORef/VRef'; if(p.kind==='ref') return 'ORa';
-  return {predseda:'vedoucí služebního úřadu',sekce:'VRa/'+p.label+'/'+u.name.replace(/^(Místopředseda|Vrchní ředitel sekce) – /,''),odbor:'VRa/ředitel odboru/'+u.name.replace(/^Odbor /,'odbor '),odd:'ORa/vedoucí oddělení/'+u.name.replace(/^(Samostatné )?[Oo]ddělení /,m=>m.toLowerCase())}[u.level]||p.label; }
-function defaultCls(u,p){ if(p.kind==='asst') return 9; if(p.kind==='ref') return 13; return {predseda:16,sekce:15,odbor:14,odd:13}[u.level]||13; }
+  return {predseda:'vedoucí služebního úřadu',sekce:'VRa/'+p.label+'/'+u.name.replace(/^(Místopředseda|Vrchní ředitel sekce) – /,''),odbor:'VRa/ředitel odboru/'+u.name.replace(/^Odbor /,'odbor '),odd:'ORa/vedoucí oddělení/'+u.name.replace(/^(Samostatné )?[Oo]ddělení /,m=>m.toLowerCase()),up:'ORa/vedoucí územního pracoviště/'+u.name.replace(/^Územní pracoviště /,'')}[u.level]||p.label; }
+function defaultCls(u,p){ if(p.kind==='asst') return 9; if(p.kind==='ref') return 13; return {predseda:isKraj()?15:16,sekce:15,odbor:14,odd:13,up:13}[u.level]||13; }
 function sysOf(u,p){ const typ=p.typ||(p.kind==='asst'?'prac':'sluz');
   return {typ, fte:p.fte??1, ozn:p.ozn??defaultOzn(u,p), obor:p.obor||'', kod:p.kod||'', odb:p.odb||'', cls:p.cls??defaultCls(u,p), obc:p.obc??(typ==='sluz'), zk:!!p.zk, zanik:p.zanik||''}; }
 function personCls(h){ const n=parseInt(String(h.cls||'').replace(/\D/g,'')); return isNaN(n)?null:n; }
@@ -776,7 +862,7 @@ function renderSys(){
 // export in the MV form layout
 $('#btnSys').onclick=()=>{
   const A=[]; const put=(r,c,v)=>{ while(A.length<=r) A.push([]); A[r][c]=v; };
-  const H=[['Správní úřad:',null,null,null,'Úřad rozvoje území ČR'],['IČO :',null,null,null,'24858234'],['Kapitola státního rozpočtu:',null,null,null,''],[],['NÁVRH SYSTEMIZACE '],['SLUŽEBNÍCH A PRACOVNÍCH MÍST'],[],
+  const H=[['Správní úřad:',null,null,null,isKraj()?'Krajské úřady rozvoje území (návrh)':'Úřad rozvoje území ČR'],['IČO :',null,null,null,'24858234'],['Kapitola státního rozpočtu:',null,null,null,''],[],['NÁVRH SYSTEMIZACE '],['SLUŽEBNÍCH A PRACOVNÍCH MÍST'],[],
     ['Služební/pracovní místa',null,null,null,null,null,null,'Rozdělení',null,null,null,null,null,null,null,null,null,'Platová třída','Požadavek na státní občanství ČR','Zákaz konkurence','Datum zániku místa'],
     ['Pořad. číslo','Představený/Ved. zaměstnanec',null,null,null,'Ostatní','Funkční  a služební označení služebního/pracovního místa','Služební místa',null,null,null,null,null,'Pracovní místa'],
     [null,'4. stupeň řízení','3. stupeň řízení','2. stupeň řízení','1. stupeň řízení',null,null,'Představení','Ostatní','Úvazek na služ. místě','Obor služby ','Kód správ. činností','Odb. požadavky','Vedoucí zaměst.','Ostatní','Úvazek na prac. místě','Kód prací'],
@@ -808,7 +894,7 @@ function drawConnectors(oc){
   const boxes={}; oc.querySelectorAll('.box').forEach(b=>boxes[b.dataset.uid]=b);
   let d='';
   const line=(x1,y1,x2,y2)=>{ d+=`M${x1.toFixed(1)} ${y1.toFixed(1)}L${x2.toFixed(1)} ${y2.toFixed(1)}`; };
-  state.units.filter(u=>!u.parent).forEach(function walk(u){
+  state.units.filter(u=>!u.parent&&boxes[u.id]).forEach(function walk(u){
     const pb=boxes[u.id]; if(!pb) return; const P=rel(pb); const kids=childrenOf(u.id).filter(k=>boxes[k.id]);
     const horiz=kids.filter(k=>!boxes[k.id].closest('.oc-stack')), stack=kids.filter(k=>boxes[k.id].closest('.oc-stack'));
     const busY=P.y+P.h+11; let xs=[];
@@ -825,9 +911,12 @@ function renderChart(){
   const c=$('#chart'); const sl=c.scrollLeft, st=c.scrollTop; c.innerHTML='';
   const oc=document.createElement('div'); oc.className='oc'; oc.style.transform='scale('+(state.zoom||85)/100+')';
   const root=document.createElement('ul'); root.className='oc-row oc-root';
-  state.units.filter(u=>!u.parent).forEach(u=>root.appendChild(chartNode(u)));
+  const roots=state.units.filter(u=>!u.parent); const sel=$('#chartRoot');
+  if(roots.length>1){ sel.hidden=false; sel.innerHTML=roots.map(u=>`<option value="${u.id}" ${(state.chartRoot||roots[0].id)===u.id?'selected':''}>${esc(u.name)}</option>`).join(''); sel.onchange=()=>{ state.chartRoot=sel.value; chartFresh=true; render(); }; } else sel.hidden=true;
+  const shown=roots.length>1?roots.filter(u=>u.id===(state.chartRoot||roots[0].id)):roots;
+  shown.forEach(u=>root.appendChild(chartNode(u)));
   oc.appendChild(root); c.appendChild(oc); drawConnectors(oc);
-  if(chartFresh){const pb=c.querySelector('.box.predseda'); const sc=(state.zoom||85)/100; c.scrollLeft=Math.max(0,pb.offsetLeft*sc+pb.offsetWidth*sc/2-c.clientWidth/2); c.scrollTop=0; chartFresh=false;} else {c.scrollLeft=sl; c.scrollTop=st;}
+  if(chartFresh){const pb=c.querySelector('.box.predseda')||c.querySelector('.box'); if(pb){ const sc=(state.zoom||85)/100; c.scrollLeft=Math.max(0,pb.offsetLeft*sc+pb.offsetWidth*sc/2-c.clientWidth/2); c.scrollTop=0;} chartFresh=false;} else {c.scrollLeft=sl; c.scrollTop=st;}
 }
 
 window.addEventListener('error',e=>{ try{ const t=$('#toast'); t.textContent='Chyba: '+(e.message||e.error||'?'); t.style.background='var(--danger)'; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>{t.classList.remove('show');t.style.background='';},8000); }catch(_){} });
@@ -902,7 +991,7 @@ async function start(){
   try{ await loadRemote(); }catch(e){ $('#authMsg').className='msg err'; $('#authMsg').textContent='Načtení dat selhalo: '+(e.message||e)+' (zkontrolujte tabulky a RLS)'; return; }
   $('#auth').style.display='none';
   $('#zoom').value=state.zoom; $('#zoomVal').textContent=state.zoom+' %';
-  setView(ROLE.org?(['chart','loc','sys','it'].includes(state.view)?state.view:'tree'):'it'); setDot('','připojeno');
+  document.body.classList.toggle('ws-kr',isKraj()); $('#wsCr').classList.toggle('on',!isKraj()); $('#wsKr').classList.toggle('on',isKraj()); setView(ROLE.org?(['chart','loc','sys','it'].includes(state.view)?state.view:'tree'):'it'); setDot('','připojeno');
   sb.channel('organigram').on('postgres_changes',{event:'UPDATE',schema:'public',table:'organigram_state',filter:'id=eq.'+STATE_ID},payload=>{
     if(payload.new&&payload.new.version>version&&!dirty&&!saving){ const v=state.view,z=state.zoom,c=state.collapsed; state=payload.new.data; version=payload.new.version; state.view=v; state.zoom=z; state.collapsed=c; render(); toast('Stav aktualizován z jiného okna.'); } }).subscribe();
   window.addEventListener('beforeunload',e=>{ if(dirty||saving){ flush(); e.preventDefault(); e.returnValue=''; } });
