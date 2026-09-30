@@ -1,4 +1,4 @@
-const APP_VERSION='2026-09-23.2';
+const APP_VERSION='2026-09-30.1';
 
 const STRUCTURE = window.STRUCTURE;
 const SOURCES = ['DESÚ','MMR','ÚÚR','MD','MPO','Nové','Jiný'];
@@ -86,7 +86,7 @@ async function loadRemote(){
 function load(){ state=freshState(); }
 const byId = ()=>Object.fromEntries(state.units.map(u=>[u.id,u]));
 const childrenOf = id => state.units.filter(u=>u.parent===id);
-function allPositions(){ return state.units.flatMap(u=>u.positions.map(p=>({u,p}))); }
+function allPositions(){ normalizePositions(); return state.units.flatMap(u=>u.positions.map(p=>({u,p}))); }
 function unitPath(u){ const m=byId(); const out=[]; let c=u; while(c){ out.unshift(c.name); c=m[c.parent]; } return out; }
 
 
@@ -105,11 +105,12 @@ const RENAMES = {
 function reconcilePositions(oldPos,tplPos,newId){
   const out=[...oldPos]; const kinds=['head','asst','ref'];
   kinds.forEach(k=>{ const target=tplPos.filter(p=>p.kind===k).length; let cur=out.filter(p=>p.kind===k).length;
-    for(let i=out.length-1;i>=0&&cur>target;i--){ if(out[i].kind===k&&!out[i].person){ out.splice(i,1); cur--; } }
+    for(let i=out.length-1;i>=0&&cur>target;i--){ if(out[i].kind===k&&!(out[i].persons&&out[i].persons.length)){ out.splice(i,1); cur--; } }
     const tplK=tplPos.filter(p=>p.kind===k); while(cur<target){ const t=tplK[Math.min(cur,tplK.length-1)]; out.push({id:newId(),...t,person:null}); cur++; } });
   return out;
 }
 function migrateStructure(st){
+  st.units.forEach(u=>u.positions.forEach(p=>{ if(!Array.isArray(p.persons)){ const d=Object.getOwnPropertyDescriptor(p,'person'); p.persons=(d&&!d.get&&d.value)?[d.value]:[]; if(d&&!d.get) delete p.person; } }));
   if((st.structureVersion||1)>=STRUCTURE_VERSION) return null;
   const oldByName={}; st.units.forEach(u=>oldByName[RENAMES[u.name]||u.name]=u);
   let n=1; const usedOld=new Set(); const newUnits=STRUCTURE.map(tpl=>{
@@ -118,7 +119,7 @@ function migrateStructure(st){
     return {...tpl, loc:guessUnitLoc(tpl.name), positions:tpl.positions.map(p=>({id:'p'+Date.now().toString(36)+(n++), ...p, person:null}))};
   });
   const removed=st.units.filter(u=>!usedOld.has(u)); const freed=[];
-  removed.forEach(u=>u.positions.forEach(p=>{ if(p.person&&st.people[p.person]) freed.push(st.people[p.person].name); }));
+  removed.forEach(u=>u.positions.forEach(p=>(p.persons||[]).forEach(id=>{ if(st.people[id]) freed.push(st.people[id].name); })));
   const added=STRUCTURE.filter(t=>!oldByName[t.name]).map(t=>t.name);
   const renamed=st.units.filter(u=>RENAMES[u.name]).map(u=>u.name+' → '+RENAMES[u.name]);
   const oldTotal=st.units.reduce((a,u)=>a+u.positions.length,0);
@@ -155,14 +156,14 @@ function renderUnit(u){
   const div=document.createElement('div');
   div.className='unit '+u.level+(state.collapsed[u.id]?' collapsed':'');
   div.dataset.uid=u.id;
-  const filled=u.positions.filter(p=>p.person).length, total=u.positions.length;
+  normalizePositions(); const filled=u.positions.filter(p=>p.persons.length).length, total=u.positions.length; const F=unitFte(u,false), FD=unitFte(u,true);
   const sub=subtreeCount(u);
   const head=document.createElement('div'); head.className='uhead';
   head.innerHTML=`<span class="bar" style="background:${SRC_DARK[u.src]||'#999'}"></span>
     <button class="tog" aria-label="Sbalit/rozbalit">${state.collapsed[u.id]?'▸':'▾'}</button>
     <span class="uname" title="${u.head?'v organigramu uveden/a: '+esc(u.head):''}">${esc(u.name)}<span class="lvl">${LEVEL_LBL[u.level]||''}</span>${u.head?`<span class="lvl" style="font-style:italic">${esc(u.head)}</span>`:''}</span>
     <span class="srcbadge" style="background:${SRC_COLOR[u.src]}">${esc(u.src)}</span>
-    <span class="fill ${filled===total&&total?'full':''}" title="obsazeno / míst (včetně podřízených útvarů)">${filled}/${total}${sub.total!==total?` <span style="opacity:.7">(${sub.filled}/${sub.total})</span>`:''}</span>`;
+    <span class="fill ${filled===total&&total?'full':''}" title="obsazeno / míst · FTE obsazeno / kapacita${sub.total!==total?' (v závorce včetně podřízených)':''}">${filled}/${total}${sub.total!==total?` <span style="opacity:.7">(${sub.filled}/${sub.total})</span>`:''} <span class="ftec">${fmtF(sub.total!==total?FD.occ:F.occ)}/${fmtF(sub.total!==total?FD.cap:F.cap)}&nbsp;FTE</span></span>`;
   head.querySelector('.fill').before(locSelect(u));
   head.querySelector('.tog').onclick=()=>{state.collapsed[u.id]=!state.collapsed[u.id];render();};
   // drop on header -> first free slot
@@ -177,14 +178,16 @@ function renderUnit(u){
     const lab=document.createElement('div'); lab.className='plabel';
     lab.innerHTML=`<span class="cat ${p.cat==='nad'?'nad':''}" title="${p.cat==='nad'?'nadpožadavek (nové místo)':'delimitace'}"></span><span class="t" title="Dvojklik: přejmenovat">${esc(p.label)}</span>${(()=>{const c=sysOf(u,p).cls;return c?`<span class="clsb" title="platová třída místa">${c}</span>`:'';})()}`;
     lab.querySelector('.t').ondblclick=()=>{const n=prompt('Označení místa:',p.label);if(n!==null&&n.trim()){p.label=n.trim();save();render();}};
-    const slot=document.createElement('div'); slot.className='slot'+(p.person?' filled':'');
-    if(p.person&&state.people[p.person]) slot.appendChild(personChip(state.people[p.person]));
-    else slot.innerHTML='<span class="empty">volné místo</span>';
+    const slot=document.createElement('div'); const cap=posCap(u,p), free=posFree(u,p); slot.className='slot'+(p.persons.length?' filled':'')+(free<-0.005?' overb':'');
+    posPersons(p).forEach(id=>slot.appendChild(personChip(state.people[id])));
+    if(!p.persons.length) slot.innerHTML=`<span class="empty">volné místo${cap!==1?' ('+fmtF(cap)+' úv.)':''}</span>`;
+    else if(free>0.005){ const e=document.createElement('span'); e.className='empty'; e.textContent='volných '+fmtF(free)+' úv.'; slot.appendChild(e); }
+    else if(free<-0.005){ const e=document.createElement('span'); e.className='empty ov'; e.textContent='překročeno o '+fmtF(-free)+' úv.'; slot.appendChild(e); }
     slot.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move';slot.classList.add('over');});
     slot.addEventListener('dragleave',()=>slot.classList.remove('over'));
     slot.addEventListener('drop',e=>{e.preventDefault();e.stopPropagation();slot.classList.remove('over');const pid=e.dataTransfer.getData('text/pid');if(pid&&ROLE.org)assign(pid,p.id);});
-    const del=document.createElement('button'); del.className='small del'; del.textContent='×'; del.title=p.person?'Uvolnit místo':'Odebrat místo';
-    del.onclick=()=>{ if(p.person){unassign(p.person);} else { if(confirm('Odebrat toto místo z organigramu?')){u.positions=u.positions.filter(x=>x!==p);} } save();render(); };
+    const del=document.createElement('button'); del.className='small del'; del.textContent='×'; del.title=p.persons.length?'Uvolnit místo':'Odebrat místo';
+    del.onclick=()=>{ if(p.persons.length){[...p.persons].forEach(id=>unassign(id));} else { if(confirm('Odebrat toto místo z organigramu?')){u.positions=u.positions.filter(x=>x!==p);} } save();render(); };
     row.append(lab,slot,del); body.appendChild(row);
   });
   const add=document.createElement('div'); add.className='addpos';
@@ -199,10 +202,11 @@ function renderUnit(u){
   if(kids.length){const c=document.createElement('div');c.className='children';kids.forEach(k=>c.appendChild(renderUnit(k)));div.appendChild(c);}
   return div;
 }
-function subtreeCount(u){ let t=u.positions.length,f=u.positions.filter(p=>p.person).length; childrenOf(u.id).forEach(k=>{const s=subtreeCount(k);t+=s.total;f+=s.filled;}); return {total:t,filled:f}; }
+function subtreeCount(u){ normalizePositions(); let t=u.positions.length,f=u.positions.filter(p=>p.persons.length).length; childrenOf(u.id).forEach(k=>{const s=subtreeCount(k);t+=s.total;f+=s.filled;}); return {total:t,filled:f}; }
 
 let activeFilters=new Set(SOURCES);
 function render(){
+  normalizePositions();
   const tree=$('#tree'); const scroll=tree.scrollTop; tree.innerHTML='';
   state.units.filter(u=>!u.parent).forEach(u=>tree.appendChild(renderUnit(u)));
   tree.scrollTop=scroll;
@@ -212,7 +216,7 @@ function render(){
   if(document.body.classList.contains('view-sys')){ try{ renderSys(); }catch(e){ console.error(e); $('#sysview').innerHTML='<div style="padding:20px;color:var(--danger)">Pohled Systemizace se nepodařilo vykreslit: '+esc(e.message||e)+'<br><span style="color:var(--muted);font-size:12px">'+esc((e.stack||'').split('\n').slice(0,3).join(' | '))+'</span></div>'; } } else $('#sysview').innerHTML='';
   // pool
   const pool=$('#pool'); pool.innerHTML='';
-  const assigned=new Set(allPositions().map(x=>x.p.person).filter(Boolean));
+  const assigned=new Set(allPositions().flatMap(x=>x.p.persons));
   const q=$('#search').value.trim().toLowerCase();
   let list=Object.values(state.people).filter(p=>!assigned.has(p.id));
   const totalUn=list.length;
@@ -229,12 +233,14 @@ function render(){
   renderStats();
 }
 function renderStats(){
-  const ps=allPositions(); const total=ps.length, filled=ps.filter(x=>x.p.person).length;
+  const ps=allPositions(); const total=ps.length, filled=ps.filter(x=>x.p.persons.length).length;
   const delim=ps.filter(x=>x.p.cat==='delim'), nad=ps.filter(x=>x.p.cat==='nad');
-  const un=Object.values(state.people).length - filled;
+  const assignedIds=new Set(ps.flatMap(x=>x.p.persons)); const un=Object.values(state.people).filter(h=>!assignedIds.has(h.id)).length;
+  let occ=0,cap=0; ps.forEach(({u,p})=>{ occ+=posOcc(p); cap+=posCap(u,p); });
   $('#stats').innerHTML=`<div class="stat"><b>${filled}</b><span>obsazeno z ${total} míst</span></div>
-    <div class="stat"><b>${delim.filter(x=>x.p.person).length}/${delim.length}</b><span>delimitace</span></div>
-    <div class="stat"><b>${nad.filter(x=>x.p.person).length}/${nad.length}</b><span>nadpožadavek</span></div>
+    <div class="stat"><b>${fmtF(occ)}</b><span>FTE z ${fmtF(cap)}</span></div>
+    <div class="stat"><b>${delim.filter(x=>x.p.persons.length).length}/${delim.length}</b><span>delimitace</span></div>
+    <div class="stat"><b>${nad.filter(x=>x.p.persons.length).length}/${nad.length}</b><span>nadpožadavek</span></div>
     <div class="stat"><b>${Math.max(un,0)}</b><span>nezařazených lidí</span></div>`;
 }
 function renderLegend(){
@@ -244,25 +250,42 @@ function renderLegend(){
   [$('#impSrc'),$('#npSrc')].forEach(sel=>sel.innerHTML=SOURCES.map(s=>`<option>${s}</option>`).join(''));
 }
 
+// ---------- úvazky / vícenásobné obsazení ----------
+const fmtF=v=>(+v).toLocaleString('cs-CZ',{maximumFractionDigits:2});
+function personFte(h){ const v=parseFloat(String(h&&h.fte!==undefined&&h.fte!==''?h.fte:'1').replace(',','.')); return isNaN(v)||v<=0?1:Math.min(v,1); }
+function posCap(u,p){ const v=+sysOf(u,p).fte; return v>0?v:1; }
+function posPersons(p){ return (p.persons||[]).filter(id=>state.people[id]); }
+function posOcc(p){ return posPersons(p).reduce((a,id)=>a+personFte(state.people[id]),0); }
+function posFree(u,p){ return Math.round((posCap(u,p)-posOcc(p))*100)/100; }
+function normalizePositions(){ state.units.forEach(u=>u.positions.forEach(p=>{ const d=Object.getOwnPropertyDescriptor(p,'person');
+  if(!Array.isArray(p.persons)) p.persons=(d&&!d.get&&d.value)?[d.value]:[];
+  if(!d||!d.get){ delete p.person; Object.defineProperty(p,'person',{get(){return this.persons[0]||null;},set(v){this.persons=v?[v]:[];},enumerable:false,configurable:true}); } })); }
+function assignedList(){ const out=[]; allPositions().forEach(({u,p})=>posPersons(p).forEach(id=>out.push({h:state.people[id],u,p}))); return out; }
+function unitFte(u,deep){ let occ=0,cap=0; const walk=x=>{ x.positions.forEach(p=>{ occ+=posOcc(p); cap+=posCap(x,p); }); if(deep) childrenOf(x.id).forEach(walk); }; walk(u); return {occ,cap}; }
 // ---------- assignment ----------
 function findPos(pid){ for(const u of state.units){const p=u.positions.find(x=>x.id===pid); if(p) return {u,p};} return null; }
-function currentPosOf(personId){ for(const u of state.units){const p=u.positions.find(x=>x.person===personId); if(p) return {u,p};} return null; }
+function currentPosOf(personId){ for(const u of state.units){const p=u.positions.find(x=>x.persons&&x.persons.includes(personId)); if(p) return {u,p};} return null; }
 function assign(personId, posId){
   const t=findPos(posId); if(!t) return;
   const from=currentPosOf(personId);
   if(from&&from.p.id===posId) return;
-  const displaced=t.p.person;
-  t.p.person=personId;
-  if(from) from.p.person = displaced && displaced!==personId ? displaced : null;  // swap
+  normalizePositions(); const h=state.people[personId]; const need=personFte(h); const free=posFree(t.u,t.p); let displaced=null;
+  if(need>free+0.005){
+    if(t.p.persons.length===1&&posCap(t.u,t.p)>=need-0.005){ displaced=t.p.persons[0]; t.p.persons=[]; }
+    else { toast(`${h.name} se na místo nevejde – volná kapacita ${fmtF(Math.max(free,0))} úv., potřeba ${fmtF(need)} úv.`); return; }
+  }
+  if(from) from.p.persons=from.p.persons.filter(x=>x!==personId);
+  t.p.persons.push(personId);
+  if(displaced&&from&&posFree(from.u,from.p)>=personFte(state.people[displaced])-0.005){ from.p.persons.push(displaced); } else if(displaced&&from){ /* displaced person goes to pool */ from=null; }
   const nm=id=>state.people[id]?state.people[id].name:'?';
   logChange('přesun',`${nm(personId)}: ${from?unitPath(from.u).slice(-1)[0]+' ('+from.p.label+')':'nezařazení'} → ${t.u.name} (${t.p.label})`+(displaced?`; ${nm(displaced)} ${from?'prohozen/a na původní místo':'uvolněn/a do nezařazených'}`:''));
   save(); render();
   if(displaced&&!from) toast(`${state.people[displaced].name} přesunut/a do nezařazených`);
 }
-function unassign(personId){ const c=currentPosOf(personId); if(c){c.p.person=null; logChange('uvolnění',`${state.people[personId]?state.people[personId].name:'?'}: ${c.u.name} (${c.p.label}) → nezařazení`);} save(); render(); }
+function unassign(personId){ const c=currentPosOf(personId); if(c){c.p.persons=c.p.persons.filter(x=>x!==personId); logChange('uvolnění',`${state.people[personId]?state.people[personId].name:'?'}: ${c.u.name} (${c.p.label}) → nezařazení`);} save(); render(); }
 function placeInUnit(personId,u){
-  const prs=state.people[personId]; const kind=guessKind(prs);
-  let slot=u.positions.find(p=>!p.person&&p.kind===kind&&p.cat==='delim')||u.positions.find(p=>!p.person&&p.kind===kind)||u.positions.find(p=>!p.person&&p.kind==='ref')||u.positions.find(p=>!p.person);
+  const prs=state.people[personId]; const kind=guessKind(prs); normalizePositions(); const need=personFte(prs); const fits=p=>posFree(u,p)>=need-0.005;
+  let slot=u.positions.find(p=>fits(p)&&p.kind===kind&&p.cat==='delim')||u.positions.find(p=>fits(p)&&p.kind===kind)||u.positions.find(p=>fits(p)&&p.kind==='ref')||u.positions.find(p=>fits(p));
   if(!slot){ toast('V útvaru „'+u.name+'“ není volné místo. Přidejte místo tlačítkem „+ místo“.'); return; }
   assign(personId,slot.id);
 }
@@ -284,7 +307,7 @@ function showPop(p,anchor){
     <dt>Kategorie</dt><dd>${esc(p.cat||'—')}</dd>
     <dt>Obory služby</dt><dd>${esc(p.fields||'—')}</dd>
     <dt>Platová třída</dt><dd>${esc(p.cls||'—')}</dd>
-    <dt>Úvazek</dt><dd>${esc(p.fte??'—')}</dd>
+    <dt>Úvazek</dt><dd>${ROLE.org?`<input type="number" id="popFte" step="0.05" min="0.05" max="1" value="${personFte(p)}" style="width:90px"> <span style="color:var(--muted);font-size:12px">(1 = plný)</span>`:fmtF(personFte(p))}</dd>
     ${p.note?`<dt>Poznámka</dt><dd>${esc(p.note)}</dd>`:''}
     <dt>V ÚRÚ</dt><dd>${cur?esc(unitPath(cur.u).slice(-2).join(' › '))+' – '+esc(cur.p.label):'<i>nezařazen/a</i>'}</dd>
     <dt>IT vybavení</dt><dd>${(()=>{const its=personItems(p);return its.length?esc(its.map(x=>catById()[x.id].name).join(', ')):'<i>nic</i>';})()}</dd>
@@ -295,6 +318,7 @@ function showPop(p,anchor){
   if(x+330>innerWidth) x=innerWidth-335; if(y+pop.offsetHeight>innerHeight) y=Math.max(8,r.top-pop.offsetHeight-6);
   pop.style.left=x+'px'; pop.style.top=y+'px';
   $('#popClose').onclick=hidePop;
+  if($('#popFte')) $('#popFte').onchange=()=>{ const v=Math.max(0.05,Math.min(1,parseFloat($('#popFte').value)||1)); p.fte=String(v); logChange&&logChange('úvazek',p.name+' → '+fmtF(v)); save(); render(); const c=currentPosOf(p.id); if(c&&posFree(c.u,c.p)<-0.005) toast('Pozor: kapacita místa je překročena o '+fmtF(-posFree(c.u,c.p))+' úv.'); };
   if($('#popLoc')) $('#popLoc').onchange=()=>{ p.loc=$('#popLoc').value||null; logChange&&logChange('lokalita osoby',p.name+' → '+(p.loc?LOC[p.loc].name:'dle útvaru')); save(); render(); };
   const un=$('#popUn'); if(un) un.onclick=()=>{unassign(p.id);hidePop();};
   if($('#popDel')) $('#popDel').onclick=()=>{ if(confirm('Smazat '+p.name+' z aplikace?')){unassign(p.id);delete state.people[p.id];logChange('smazání osoby',p.name);save();render();hidePop();} };
@@ -394,8 +418,9 @@ function ingest(placeByMap){
     const key=norm(src+'|'+r.name); if(existing.has(key)){skipped++;continue;} existing.add(key);
     const id='h'+(state.nextPid++); const p={id,src,...r}; if(!p.loc) delete p.loc; state.people[id]=p; added++;
     if(placeByMap){ const u=units[map[r.unit||'—']]; if(u){ const kind=guessKind(p);
-        const slot=u.positions.find(x=>!x.person&&x.kind===kind&&x.cat==='delim')||u.positions.find(x=>!x.person&&x.kind===kind)||(kind!=='head'?u.positions.find(x=>!x.person&&x.kind==='ref'):null);
-        if(slot){slot.person=id;placed++;} } }
+        normalizePositions(); const need=personFte(p); const fits=x=>posFree(u,x)>=need-0.005;
+        const slot=u.positions.find(x=>fits(x)&&x.kind===kind&&x.cat==='delim')||u.positions.find(x=>fits(x)&&x.kind===kind)||(kind!=='head'?u.positions.find(x=>fits(x)&&x.kind==='ref'):null);
+        if(slot){slot.persons.push(id);placed++;} } }
   }
   logChange('import',`${src}: přidáno ${added} lidí, ${placed} posazeno`);
   pendingImport=null; $('#dlgMap').close(); save(); render();
@@ -417,8 +442,8 @@ const stamp=()=>new Date().toISOString().slice(0,10);
 $('#btnVacant').onclick=()=>{
   const m=byId(); const rows=[];
   for(const u of state.units){ const path=unitPath(u); const loc=unitLoc(u);
-    u.positions.filter(p=>!p.person).forEach(p=>rows.push({'Sekce':path[1]||'', 'Odbor':u.level==='odbor'?u.name:(m[u.parent]&&m[u.parent].level==='odbor'?m[u.parent].name:''), 'Útvar':u.name,'Úroveň':LEVEL_LBL[u.level],'Lokalita':loc?LOC[loc].name:'','Místo':p.label,'Druh':KIND_LBL[p.kind],'Kategorie':p.cat==='nad'?'nadpožadavek':'delimitace','Zdroj útvaru':u.src})); }
-  const byUnit=state.units.map(u=>{const f=u.positions.filter(p=>!p.person); const loc=unitLoc(u); return {'Útvar':u.name,'Úroveň':LEVEL_LBL[u.level],'Lokalita':loc?LOC[loc].name:'','Volných míst':f.length,'z toho vedoucí':f.filter(p=>p.kind==='head').length,'z toho delimitace':f.filter(p=>p.cat==='delim').length,'z toho nadpožadavek':f.filter(p=>p.cat==='nad').length,'Míst celkem':u.positions.length};}).filter(r=>r['Volných míst']);
+    u.positions.filter(p=>posFree(u,p)>0.005).forEach(p=>rows.push({'Volná kapacita (úv.)':posFree(u,p),'Sekce':path[1]||'', 'Odbor':u.level==='odbor'?u.name:(m[u.parent]&&m[u.parent].level==='odbor'?m[u.parent].name:''), 'Útvar':u.name,'Úroveň':LEVEL_LBL[u.level],'Lokalita':loc?LOC[loc].name:'','Místo':p.label,'Druh':KIND_LBL[p.kind],'Kategorie':p.cat==='nad'?'nadpožadavek':'delimitace','Zdroj útvaru':u.src})); }
+  const byUnit=state.units.map(u=>{const f=u.positions.filter(p=>posFree(u,p)>0.005); const loc=unitLoc(u); return {'Útvar':u.name,'Úroveň':LEVEL_LBL[u.level],'Lokalita':loc?LOC[loc].name:'','Volných míst':f.length,'Volná kapacita (úv.)':Math.round(f.reduce((a,p)=>a+posFree(u,p),0)*100)/100,'z toho vedoucí':f.filter(p=>p.kind==='head').length,'z toho delimitace':f.filter(p=>p.cat==='delim').length,'z toho nadpožadavek':f.filter(p=>p.cat==='nad').length,'Míst celkem':u.positions.length};}).filter(r=>r['Volných míst']);
   const cols=[...LOCATIONS,{id:null,name:'Neurčeno'}].map(l=>{const f=rows.filter(r=>r['Lokalita']===(l.id?l.name:'')); return {'Lokalita':l.name,'Volných míst':f.length,'z toho vedoucí':f.filter(r=>r['Druh']==='vedoucí').length,'delimitace':f.filter(r=>r['Kategorie']==='delimitace').length,'nadpožadavek':f.filter(r=>r['Kategorie']==='nadpožadavek').length};}).filter(r=>r['Volných míst']);
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows.length?rows:[{'Útvar':'žádná volná místa'}]),'Volná místa');
@@ -429,13 +454,13 @@ $('#btnVacant').onclick=()=>{
 $('#btnExport').onclick=()=>{
   const rows=[]; const m=byId();
   for(const u of state.units){ const path=unitPath(u);
-    for(const p of u.positions){ const h=p.person?state.people[p.person]:null;
+    for(const p of u.positions){ const hs=posPersons(p).map(id=>state.people[id]); (hs.length?hs:[null]).forEach(h=>{
       rows.push({'Sekce':path[1]||'', 'Odbor':u.level==='odbor'?u.name:(m[u.parent]&&m[u.parent].level==='odbor'?m[u.parent].name:''), 'Útvar':u.name,'Úroveň':LEVEL_LBL[u.level],'Zdroj útvaru':u.src,
         'Místo':p.label,'Druh':KIND_LBL[p.kind],'Kategorie místa':p.cat==='nad'?'nadpožadavek':'delimitace',
-        'Lokalita':(()=>{const l=h?personLoc(h).id:unitLoc(u);return l?LOC[l].name:'';})(),'Jméno':h?h.name:'','Zdrojový úřad':h?h.src:'','Současný útvar':h?h.unit:'','Současné označení místa':h?h.role:'','Číslo místa':h?h.posId:'','Kategorie':h?h.cat:'','Obory služby':h?h.fields:'','Platová třída':h?h.cls:'','Úvazek':h?h.fte:'','Poznámka':h?h.note:''}); } }
-  const assigned=new Set(allPositions().map(x=>x.p.person).filter(Boolean));
+        'Lokalita':(()=>{const l=h?personLoc(h).id:unitLoc(u);return l?LOC[l].name:'';})(),'Jméno':h?h.name:'','Zdrojový úřad':h?h.src:'','Současný útvar':h?h.unit:'','Současné označení místa':h?h.role:'','Číslo místa':h?h.posId:'','Kategorie':h?h.cat:'','Obory služby':h?h.fields:'','Platová třída':h?h.cls:'','Úvazek':h?personFte(h):'','Kapacita místa (úv.)':posCap(u,p),'Poznámka':h?h.note:''}); }); } }
+  const assigned=new Set(allPositions().flatMap(x=>x.p.persons));
   const un=Object.values(state.people).filter(p=>!assigned.has(p.id)).map(p=>({'Jméno':p.name,'Lokalita':p.loc?LOC[p.loc].name:'','Zdrojový úřad':p.src,'Současný útvar':p.unit,'Označení místa':p.role,'Číslo místa':p.posId,'Kategorie':p.cat,'Obory služby':p.fields,'Platová třída':p.cls,'Úvazek':p.fte,'Poznámka':p.note}));
-  const sum=state.units.map(u=>({'Útvar':u.name,'Úroveň':LEVEL_LBL[u.level],'Zdroj':u.src,'Míst':u.positions.length,'Obsazeno':u.positions.filter(p=>p.person).length,'Volných':u.positions.filter(p=>!p.person).length,'z toho nadpožadavek volných':u.positions.filter(p=>!p.person&&p.cat==='nad').length}));
+  const sum=state.units.map(u=>({'Útvar':u.name,'Úroveň':LEVEL_LBL[u.level],'Zdroj':u.src,'Míst':u.positions.length,'Obsazeno':u.positions.filter(p=>p.persons.length).length,'Volných':u.positions.filter(p=>!p.persons.length).length,'z toho nadpožadavek volných':u.positions.filter(p=>!p.persons.length&&p.cat==='nad').length,'FTE obsazeno':Math.round(unitFte(u,false).occ*100)/100,'FTE kapacita':Math.round(unitFte(u,false).cap*100)/100}));
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'Obsazení');
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(un.length?un:[{'Jméno':''}]),'Nezařazení');
@@ -489,15 +514,15 @@ $('#zoom').oninput=()=>{ state.zoom=+$('#zoom').value; $('#zoomVal').textContent
 
 function boxEl(u){
   const box=document.createElement('div'); box.className='box '+u.level; box.dataset.uid=u.id;
-  const filled=u.positions.filter(p=>p.person).length,total=u.positions.length,free=total-filled;
+  normalizePositions(); const filled=u.positions.filter(p=>p.persons.length).length,total=u.positions.length,free=total-filled; const partial=Math.round(u.positions.filter(p=>p.persons.length).reduce((a,p)=>a+Math.max(0,posFree(u,p)),0)*100)/100; const FB=unitFte(u,childrenOf(u.id).length>0);
   const sub=subtreeCount(u); const crit=isCrit(u); if(crit) box.classList.add('crit'); const cs=childrenOf(u.id).length?sub:{total,filled}; const pctTxt=cs.total?Math.round(100*cs.filled/cs.total)+' %':'';
   box.innerHTML=`<div class="bh" style="border-top-color:${SRC_DARK[u.src]||'#999'}"><div class="bn" title="${u.head?'v organigramu uveden/a: '+esc(u.head):''}">${esc(u.name)}${u.head?`<div style="font-weight:400;font-size:11px;color:var(--muted);font-style:italic">${esc(u.head)}</div>`:''}</div>
-    <div class="bm"><span class="srcbadge" style="background:${SRC_COLOR[u.src]}">${esc(u.src)}</span><span class="pct">${pctTxt}</span><span class="fill ${filled===total&&total?'full':''}" title="obsazeno / míst${sub.total!==total?' (v závorce včetně podřízených)':''}">${filled}/${total}${sub.total!==total?` <span style="opacity:.7">(${sub.filled}/${sub.total})</span>`:''}</span></div></div>`;
+    <div class="bm"><span class="srcbadge" style="background:${SRC_COLOR[u.src]}">${esc(u.src)}</span><span class="pct">${pctTxt}</span><span class="fill ${filled===total&&total?'full':''}" title="obsazeno / míst${sub.total!==total?' (v závorce včetně podřízených)':''}">${filled}/${total}${sub.total!==total?` <span style="opacity:.7">(${sub.filled}/${sub.total})</span>`:''}<span class="ftec"> ${fmtF(FB.occ)} FTE</span></span></div></div>`;
   box.querySelector('.bm').insertBefore(locSelect(u),box.querySelector('.bm .fill'));
   const bp=document.createElement('div'); bp.className='bp';
   const heads=u.positions.filter(p=>p.kind==='head'), rest=u.positions.filter(p=>p.kind!=='head');
-  [...heads,...rest].forEach(p=>{ if(p.person&&state.people[p.person]){const c=personChip(state.people[p.person]); if(p.kind==='head') c.classList.add('lead'); c.title=p.label+'\n'+c.title; bp.appendChild(c);} });
-  if(free>0){const f=document.createElement('div');f.className='free';f.textContent=free===1?'1 volné místo':(free<5?free+' volná místa':free+' volných míst');bp.appendChild(f);}
+  [...heads,...rest].forEach(p=>posPersons(p).forEach(id=>{const c=personChip(state.people[id]); if(p.kind==='head') c.classList.add('lead'); c.title=p.label+'\n'+c.title; bp.appendChild(c);}));
+  if(free>0||partial>0){const f=document.createElement('div');f.className='free';f.textContent=(free>0?(free===1?'1 volné místo':(free<5?free+' volná místa':free+' volných míst')):'')+(partial>0?(free>0?' + ':'')+fmtF(partial)+' úv. volných':'');bp.appendChild(f);}
   const open=document.createElement('button'); open.className='bopen'; open.textContent='otevřít ve stromu'; open.onclick=e=>{e.stopPropagation(); let c=u; const m=byId(); while(c){state.collapsed[c.id]=false;c=m[c.parent];} setView('tree'); const el=document.querySelector(`#tree .unit[data-uid="${u.id}"]`); if(el) el.scrollIntoView({block:'start'});};
   bp.appendChild(open); box.appendChild(bp);
   box.addEventListener('dragover',e=>{e.preventDefault();box.classList.add('over');});
@@ -524,7 +549,7 @@ function renderLoc(){
   const c=$('#locview'); const st=c.scrollTop; c.innerHTML='';
   const cols=[...LOCATIONS,{id:null,abbr:'?',name:'Lokalita neurčena'}];
   const grid=document.createElement('div'); grid.className='loccols';
-  const assignedPeople=allPositions().filter(x=>x.p.person&&state.people[x.p.person]).map(x=>({p:state.people[x.p.person],u:x.u,pos:x.p}));
+  const assignedPeople=assignedList().map(x=>({p:x.h,u:x.u,pos:x.p}));
   cols.forEach(l=>{
     const people=assignedPeople.filter(x=>personLoc(x.p).id===l.id);
     const col=document.createElement('div'); col.className='loccol'+(l.id?'':' none');
@@ -586,7 +611,7 @@ function renderIT(){
   if(ensureCatalog()) save();
   renderItPool();
   const cat=catById(); const counts=itCounts();
-  const assigned=allPositions().filter(x=>x.p.person&&state.people[x.p.person]).map(x=>({h:state.people[x.p.person],u:x.u,p:x.p}));
+  const assigned=assignedList();
   const q=itFilter.q.toLowerCase();
   const rows=assigned.filter(r=>(!q||(r.h.name+' '+unitPath(r.u).join(' ')).toLowerCase().includes(q))&&(!itFilter.loc||personLoc(r.h).id===itFilter.loc)&&(!itFilter.none||!personItems(r.h).length)&&(!itFilter.notready||personItems(r.h).some(x=>!x.ready)));
   let readyN=0,itemN=0; assigned.forEach(({h})=>personItems(h).forEach(x=>{ itemN++; if(x.ready) readyN++; }));
@@ -668,7 +693,7 @@ function openCatalog(){ ensureCatalog(); const counts=itCounts();
 $('#catAdd').onclick=()=>{ const name=$('#catName').value.trim(); if(!name) return; state.itCatalog.push({id:'it'+Date.now().toString(36),cat:$('#catType').value,name,note:$('#catNote').value.trim(),std:$('#catStd').checked}); $('#catName').value=''; $('#catNote').value=''; $('#catStd').checked=false; logChange&&logChange('IT','katalog: přidáno '+name); save(); openCatalog(); };
 $('#catClose').onclick=()=>{ $('#dlgCat').close(); render(); };
 function exportIT(){ const cat=catById();
-  const assigned=allPositions().filter(x=>x.p.person&&state.people[x.p.person]).map(x=>({h:state.people[x.p.person],u:x.u,p:x.p}));
+  const assigned=assignedList();
   const people=assigned.map(({h,u,p})=>{ const l=personLoc(h).id; const its=personItems(h); return {'Jméno':h.name,'Zdrojový úřad':h.src,'Útvar':u.name,'Místo':p.label,'Lokalita':l?LOC[l].name:'','HW':its.filter(x=>cat[x.id].cat==='hw').map(x=>cat[x.id].name+' ['+(x.src||defaultItemSrc(h))+']'+(x.sn?' ('+x.sn+')':'')).join('; '),'SW':its.filter(x=>cat[x.id].cat==='sw').map(x=>cat[x.id].name+' ['+(x.src||defaultItemSrc(h))+']').join('; '),'Počet položek':its.length,'z toho nových':its.filter(x=>(x.src||defaultItemSrc(h))==='nový').length,'Připraveno':its.filter(x=>x.ready).length+'/'+its.length}; });
   const lines=[]; assigned.forEach(({h,u})=>personItems(h).forEach(x=>lines.push({'Jméno':h.name,'Útvar':u.name,'Lokalita':(()=>{const l=personLoc(h).id;return l?LOC[l].name:'';})(),'Typ':cat[x.id].cat.toUpperCase(),'Položka':cat[x.id].name,'Zdroj':x.src||defaultItemSrc(h),'Připraveno':x.ready?'ano':'','Inventární / sériové č.':x.sn||''})));
   const locs=[...LOCATIONS,{id:null,name:'Neurčeno'}];
@@ -689,14 +714,14 @@ function defaultCls(u,p){ if(p.kind==='asst') return 9; if(p.kind==='ref') retur
 function sysOf(u,p){ const typ=p.typ||(p.kind==='asst'?'prac':'sluz');
   return {typ, fte:p.fte??1, ozn:p.ozn??defaultOzn(u,p), obor:p.obor||'', kod:p.kod||'', odb:p.odb||'', cls:p.cls??defaultCls(u,p), obc:p.obc??(typ==='sluz'), zk:!!p.zk, zanik:p.zanik||''}; }
 function personCls(h){ const n=parseInt(String(h.cls||'').replace(/\D/g,'')); return isNaN(n)?null:n; }
-function clsMismatch(u,p){ if(!p.person||!state.people[p.person]) return false; const pc=personCls(state.people[p.person]); const sc=sysOf(u,p).cls; return pc!==null&&sc&&pc!==sc; }
+function clsMismatch(u,p){ const sc=sysOf(u,p).cls; return posPersons(p).some(id=>{ const pc=personCls(state.people[id]); return pc!==null&&sc&&pc!==sc; }); }
 let sysSel=new Set(), sysFilter={q:'',free:false,mis:false};
 function sysRows(){ const rows=[]; let n=0; const m=byId();
   for(const u of state.units){ for(const p of u.positions){ n++; rows.push({n,u,p,sys:sysOf(u,p)}); } } return rows; }
 function renderSys(){
   const c=$('#sysview'); const st=c.scrollTop; c.innerHTML='<div style="padding:20px;color:var(--muted)">Sestavuji tabulku…</div>';
   const all=sysRows(); const q=sysFilter.q.toLowerCase();
-  const rows=all.filter(r=>(!q||unitPath(r.u).join(' ').toLowerCase().includes(q)||r.sys.ozn.toLowerCase().includes(q))&&(!sysFilter.free||!r.p.person)&&(!sysFilter.mis||clsMismatch(r.u,r.p)));
+  const rows=all.filter(r=>(!q||unitPath(r.u).join(' ').toLowerCase().includes(q)||r.sys.ozn.toLowerCase().includes(q))&&(!sysFilter.free||posFree(r.u,r.p)>0.005)&&(!sysFilter.mis||clsMismatch(r.u,r.p)));
   const sluz=all.filter(r=>r.sys.typ==='sluz').length, prac=all.length-sluz, mis=all.filter(r=>clsMismatch(r.u,r.p)).length, fte=all.reduce((a,r)=>a+(+r.sys.fte||0),0);
   const bar=document.createElement('div'); bar.className='sysbar';
   bar.innerHTML=`<span class="sum"><b>${all.length}</b> míst · <b>${sluz}</b> služebních · <b>${prac}</b> pracovních · úvazky <b>${fte.toLocaleString('cs-CZ')}</b>${mis?` · <b style="color:var(--danger)">${mis}</b> nesoulad tříd`:''}</span>
@@ -719,7 +744,7 @@ function renderSys(){
       tr.querySelector('input').onchange=e=>{ ids.forEach(i=>e.target.checked?sysSel.add(i):sysSel.delete(i)); renderSys(); };
       tb.appendChild(tr); }
     const tr=document.createElement('tr'); const S=r.sys; const mis=clsMismatch(r.u,r.p); tr.className=(sysSel.has(r.p.id)?'sel ':'')+(r.p.cat==='nad'?'nad ':'')+(mis?'mis':''); tr.dataset.pid=r.p.id;
-    const h=r.p.person?state.people[r.p.person]:null; const stp=stupen(r.u,r.p);
+    const hs=posPersons(r.p).map(id=>state.people[id]); const h=hs[0]||null; const stp=stupen(r.u,r.p);
     tr.innerHTML=`<td><input type="checkbox" ${sysSel.has(r.p.id)?'checked':''}></td><td class="num">${r.n}</td><td class="st">${stp?`<b>${stp}</b>`:'ost.'}</td>
       <td><select><option value="sluz" ${S.typ==='sluz'?'selected':''}>služ.</option><option value="prac" ${S.typ==='prac'?'selected':''}>prac.</option></select></td>
       <td><input type="text" value="${esc(S.ozn)}" title="${esc(r.p.label)} · ${r.p.cat==='nad'?'nadpožadavek':'delimitace'}"></td>
@@ -730,7 +755,7 @@ function renderSys(){
       <td class="cls"><input type="number" min="1" max="16" value="${S.cls}"></td>
       <td><input type="checkbox" ${S.obc?'checked':''}></td><td><input type="checkbox" ${S.zk?'checked':''}></td>
       <td><input type="date" value="${esc(S.zanik)}" style="width:125px"></td>
-      <td class="who ${mis?'mis':''}">${h?`<span class="pc">${esc(h.name)}</span> <span class="m">${esc(h.src)}${h.cls?' · tř. '+esc(h.cls):''}${mis?' ≠ místo '+S.cls:''}</span>`:'<span class="m">volné</span>'}</td>`;
+      <td class="who ${mis?'mis':''}">${hs.length?hs.map(x=>`<span class="pc">${esc(x.name)}</span> <span class="m">${esc(x.src)}${x.cls?' · tř. '+esc(x.cls):''}${personFte(x)!==1?' · úv. '+fmtF(personFte(x)):''}</span>`).join('<br>')+(posFree(r.u,r.p)>0.005?` <span class="m">(volných ${fmtF(posFree(r.u,r.p))} úv.)</span>`:''):'<span class="m">volné</span>'}</td>`;
     const [chk,sel,ozn,fte,obor,kod,odb,cls,obc,zk,zanik]=tr.querySelectorAll('input,select');
     chk.onclick=e=>{ if(e.shiftKey&&lastClicked){ const a=visIds.indexOf(lastClicked),b=visIds.indexOf(r.p.id); const [lo,hi]=[Math.min(a,b),Math.max(a,b)]; for(let i=lo;i<=hi;i++) chk.checked?sysSel.add(visIds[i]):sysSel.delete(visIds[i]); } else { chk.checked?sysSel.add(r.p.id):sysSel.delete(r.p.id); } lastClicked=r.p.id; renderSys(); };
     bind(sel,r,'typ'); bind(ozn,r,'ozn',e=>e.value.trim()); bind(fte,r,'fte',e=>e.value===''?'':Math.max(0,Math.min(1,+e.value))); bind(obor,r,'obor',e=>e.value.trim()); bind(kod,r,'kod',e=>e.value.trim()); bind(odb,r,'odb',e=>e.value.trim());
@@ -774,7 +799,7 @@ $('#btnSys').onclick=()=>{
   ws['!cols']=[4.3,5.7,5.7,5.7,5.7,5.5,46,5.2,4.7,6.2,8,7.7,12.7,6.5,5.8,6,6.5,3.8,6,5.8,10].map(w=>({wch:w}));
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Systemizace');
   // second sheet: same data with unit names, for work
-  const flat=sysRows().map(r=>{const h=r.p.person?state.people[r.p.person]:null; return {'Pořad. č.':r.n,'Sekce':unitPath(r.u)[1]||'','Útvar':r.u.name,'Stupeň řízení':stupen(r.u,r.p)||'','Typ':SYS_TYP[r.sys.typ],'Funkční označení':r.sys.ozn,'Úvazek':+r.sys.fte,'Obor služby':r.sys.obor,'Kód činností':r.sys.kod,'Odb. požadavky':r.sys.odb,'Platová třída':r.sys.cls,'Občanství ČR':r.sys.obc?'ano':'','Zákaz konkurence':r.sys.zk?'ano':'','Datum zániku':r.sys.zanik,'Kategorie':r.p.cat==='nad'?'nadpožadavek':'delimitace','Lokalita':(()=>{const l=h?personLoc(h).id:unitLoc(r.u);return l?LOC[l].name:'';})(),'Obsazeno':h?h.name:'','Zdrojový úřad':h?h.src:'','Třída zaměstnance':h?h.cls:''};});
+  const flat=sysRows().map(r=>{const hs=posPersons(r.p).map(id=>state.people[id]); const h=hs.length?{name:hs.map(x=>x.name).join('; '),src:[...new Set(hs.map(x=>x.src))].join('; '),cls:hs.map(x=>x.cls||'').join('; '),fte:Math.round(hs.reduce((a,x)=>a+personFte(x),0)*100)/100,id:hs[0].id,loc:hs[0].loc}:null; return {'Pořad. č.':r.n,'Sekce':unitPath(r.u)[1]||'','Útvar':r.u.name,'Stupeň řízení':stupen(r.u,r.p)||'','Typ':SYS_TYP[r.sys.typ],'Funkční označení':r.sys.ozn,'Úvazek':+r.sys.fte,'Obor služby':r.sys.obor,'Kód činností':r.sys.kod,'Odb. požadavky':r.sys.odb,'Platová třída':r.sys.cls,'Občanství ČR':r.sys.obc?'ano':'','Zákaz konkurence':r.sys.zk?'ano':'','Datum zániku':r.sys.zanik,'Kategorie':r.p.cat==='nad'?'nadpožadavek':'delimitace','Lokalita':(()=>{const l=h?personLoc(h).id:unitLoc(r.u);return l?LOC[l].name:'';})(),'Obsazeno':h?h.name:'','Zdrojový úřad':h?h.src:'','Třída zaměstnance':h?h.cls:''};});
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(flat),'Podle útvarů');
   XLSX.writeFile(wb,`URU_systemizace_${stamp()}.xlsx`);
 };
@@ -814,22 +839,23 @@ let toastT; function toast(m){const t=$('#toast');t.textContent=m;t.classList.ad
 function overviewRows(){
   const rows=[];
   const agg=u=>{ const r={name:u.name,level:u.level,total:0,filled:0,delim:0,delimF:0,nad:0,nadF:0,free:0}; SOURCES.forEach(s=>r[s]=0);
-    const walk=x=>{ x.positions.forEach(p=>{ r.total++; if(p.cat==='nad'){r.nad++; if(p.person) r.nadF++;} else {r.delim++; if(p.person) r.delimF++;} if(p.person){ r.filled++; const src=state.people[p.person]?state.people[p.person].src:'Jiný'; r[SOURCES.includes(src)?src:'Jiný']++; } else r.free++; }); childrenOf(x.id).forEach(walk); }; walk(u); return r; };
+    r.occ=0; r.cap=0;
+    const walk=x=>{ x.positions.forEach(p=>{ r.total++; r.occ+=posOcc(p); r.cap+=posCap(x,p); const hs=posPersons(p); if(p.cat==='nad'){r.nad++; if(hs.length) r.nadF++;} else {r.delim++; if(hs.length) r.delimF++;} if(hs.length){ r.filled++; hs.forEach(id=>{ const src=state.people[id].src; r[SOURCES.includes(src)?src:'Jiný']++; }); } else r.free++; }); childrenOf(x.id).forEach(walk); }; walk(u); r.occ=Math.round(r.occ*100)/100; r.cap=Math.round(r.cap*100)/100; return r; };
   const visit=u=>{ rows.push(agg(u)); childrenOf(u.id).forEach(visit); };
   state.units.filter(u=>!u.parent).forEach(visit); return rows;
 }
 function locRows(){
   const cols=[...LOCATIONS,{id:null,abbr:'?',name:'Neurčeno'}];
   return cols.map(l=>{ const r={name:l.name,people:0,free:0}; SOURCES.forEach(s=>r[s]=0);
-    allPositions().forEach(({u,p})=>{ if(p.person&&state.people[p.person]){ const pl=personLoc(state.people[p.person]).id; if(pl===l.id){ r.people++; const src=state.people[p.person].src; r[SOURCES.includes(src)?src:'Jiný']++; } } else if(unitLoc(u)===l.id) r.free++; });
+    allPositions().forEach(({u,p})=>{ const hs=posPersons(p); if(hs.length){ hs.forEach(id=>{ const pl=personLoc(state.people[id]).id; if(pl===l.id){ r.people++; const src=state.people[id].src; r[SOURCES.includes(src)?src:'Jiný']++; } }); } else if(unitLoc(u)===l.id) r.free++; });
     return r; });
 }
 $('#btnOverview').onclick=()=>{ const rows=overviewRows(); const srcs=SOURCES.filter(s=>s!=='Jiný'||rows.some(r=>r['Jiný'])); const lr=locRows();
   $('#ovBody').innerHTML=`<div class="ovh">Podle lokalit</div><table class="ov"><thead><tr><th>Lokalita</th><th>Lidí</th><th>Volných míst</th>${srcs.map(s=>`<th>${s}</th>`).join('')}</tr></thead><tbody>${lr.map(r=>`<tr><td>${esc(r.name)}</td><td>${r.people}</td><td${r.free?'':' class="z"'}>${r.free}</td>${srcs.map(s=>`<td${r[s]?'':' class="z"'}>${r[s]}</td>`).join('')}</tr>`).join('')}</tbody></table>
-  <div class="ovh">Podle útvarů</div><table class="ov"><thead><tr><th>Útvar</th><th>Míst</th><th>Obsazeno</th><th>Volných</th><th>Delim.</th><th>Nadpož.</th>${srcs.map(s=>`<th>${s}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr class="${r.level}"><td>${esc(r.name)}</td><td>${r.total}</td><td>${r.filled}</td><td${r.free?'':' class="z"'}>${r.free}</td><td>${r.delimF}/${r.delim}</td><td>${r.nadF}/${r.nad}</td>${srcs.map(s=>`<td${r[s]?'':' class="z"'}>${r[s]}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+  <div class="ovh">Podle útvarů</div><table class="ov"><thead><tr><th>Útvar</th><th>Míst</th><th>Obsazeno</th><th>FTE</th><th>Volných</th><th>Delim.</th><th>Nadpož.</th>${srcs.map(s=>`<th>${s}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr class="${r.level}"><td>${esc(r.name)}</td><td>${r.total}</td><td>${r.filled}</td><td>${fmtF(r.occ)}/${fmtF(r.cap)}</td><td${r.free?'':' class="z"'}>${r.free}</td><td>${r.delimF}/${r.delim}</td><td>${r.nadF}/${r.nad}</td>${srcs.map(s=>`<td${r[s]?'':' class="z"'}>${r[s]}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
   $('#dlgOverview').showModal(); };
 $('#ovClose').onclick=()=>$('#dlgOverview').close();
-$('#ovXlsx').onclick=()=>{ const rows=overviewRows().map(r=>{const o={'Útvar':r.name,'Úroveň':LEVEL_LBL[r.level],'Míst':r.total,'Obsazeno':r.filled,'Volných':r.free,'Delimitace obsazeno':r.delimF,'Delimitace míst':r.delim,'Nadpožadavek obsazeno':r.nadF,'Nadpožadavek míst':r.nad}; SOURCES.forEach(s=>o['z '+s]=r[s]); return o;});
+$('#ovXlsx').onclick=()=>{ const rows=overviewRows().map(r=>{const o={'Útvar':r.name,'Úroveň':LEVEL_LBL[r.level],'Míst':r.total,'Obsazeno':r.filled,'FTE obsazeno':r.occ,'FTE kapacita':r.cap,'Volných':r.free,'Delimitace obsazeno':r.delimF,'Delimitace míst':r.delim,'Nadpožadavek obsazeno':r.nadF,'Nadpožadavek míst':r.nad}; SOURCES.forEach(s=>o['z '+s]=r[s]); return o;});
   const lrs=locRows().map(r=>{const o={'Lokalita':r.name,'Lidí':r.people,'Volných míst':r.free}; SOURCES.forEach(s=>o['z '+s]=r[s]); return o;});
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'Útvary'); XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(lrs),'Lokality'); XLSX.writeFile(wb,`URU_prehled_${stamp()}.xlsx`); };
 

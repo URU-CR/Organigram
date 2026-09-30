@@ -81,6 +81,10 @@ aside .pool-head h2 span{color:var(--muted);font-weight:400}
 .slot.over{background:#EAF0FF;border-color:var(--accent);border-style:solid}
 .slot.filled{border-style:solid;background:#fff}
 .slot .empty{color:#9AA5B3;font-size:12px;padding:0 6px}
+.slot{flex-wrap:wrap;gap:4px}
+.slot.overb{border-color:var(--danger)}
+.slot .empty.ov{color:var(--danger)}
+.uhead .ftec,.box .ftec{font-size:11px;color:var(--muted);font-weight:400;margin-left:4px}
 .pos .del{opacity:0;transition:opacity .1s}
 .pos:hover .del{opacity:1}
 .addpos{margin-top:6px;display:flex;gap:6px;align-items:center}
@@ -360,7 +364,7 @@ table.ov td.z{color:#B6BEC9}
 </head>
 <body>
 <header>
-  <h1>Obsazení organigramu ÚRÚ ČR<small>návrh organizační struktury z 23. 9. 2026 · <span id="ver" title="verze app.js se doplní po načtení skriptu">index 2026-09-23.2</span></small></h1>
+  <h1>Obsazení organigramu ÚRÚ ČR<small>návrh organizační struktury z 23. 9. 2026 · <span id="ver" title="verze app.js se doplní po načtení skriptu">index 2026-09-30.1</span></small></h1>
   <div class="stats" id="stats"></div>
   <span class="user" id="user"><span class="dot" id="syncDot"></span><span id="userMail"></span></span>
   <div class="legend" id="legend"></div>
@@ -453,8 +457,8 @@ table.ov td.z{color:#B6BEC9}
 
 <script src="vendor/xlsx.full.min.js"></script>
 <script src="vendor/supabase.js"></script>
-<script src="config.js?v=2026-09-23.2"></script>
-<script src="structure.js?v=2026-09-23.2"></script>
-<script src="app.js?v=2026-09-23.2"></script>
+<script src="config.js?v=2026-09-30.1"></script>
+<script src="structure.js?v=2026-09-30.1"></script>
+<script src="app.js?v=2026-09-30.1"></script>
 </body
 </html>
