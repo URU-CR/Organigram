@@ -1,4 +1,4 @@
-const APP_VERSION='2026-10-01.1';
+const APP_VERSION='2026-10-01.2';
 
 const STRUCTURE = window.STRUCTURE;
 const SOURCES = ['DESÚ','MMR','ÚÚR','MD','MPO','Nové','Jiný'];
@@ -108,7 +108,7 @@ function unitPath(u){ const m=Object.fromEntries(allUnitsBoth().map(x=>[x.id,x])
 
 
 // ---------- structure versioning / migration ----------
-const STRUCTURE_VERSION = 3; // 3 = organigram ÚRÚ z 23. 9. 2026 (tři sekce)
+const STRUCTURE_VERSION = 4; // 4 = organigram ÚRÚ z 1. 10. 2026 (říjen)
 const RENAMES = {
   'Odbor stavebně správní':'Odbor odvolací a přezkumné agendy I','Odbor odvolací a přezkumné agendy':'Odbor odvolací a přezkumné agendy I',
   'Oddělení územně a stavebně správní I':'Oddělení odvolací a přezkumné agendy I','Oddělení územně a stavebně správní II':'Oddělení odvolací a přezkumné agendy II','Oddělení územně a stavebně správní III':'Oddělení odvolací a přezkumné agendy III',
@@ -118,7 +118,8 @@ const RENAMES = {
   'Odbor metodiky územního plánování a rozvoje':'Odbor plánování a správy NGÚP',
   'Oddělení koncepční a metodické':'Samostatné oddělení koncepční a metodické',
   'Odbor legislativní a právní':'Odbor legislativní','Oddělení legislativní':'Oddělení národní legislativy','Oddělení právní (zastupování před soudy)':'Samostatné oddělení právní',
-  'Oddělení staveb pro bydlení ???Plzeň/ČB':'Oddělení staveb pro bydlení Plzeň/ČB','Samostatné oddělení odvolacích řízení - dopravní stavby':'Samostatné oddělení odvolacích řízení – dopravní stavby','Samostatné oddělení odvolacích řízení - energetické stavby':'Samostatné oddělení odvolacích řízení – energetické stavby'};
+  'Oddělení staveb pro bydlení ???Plzeň/ČB':'Oddělení staveb pro bydlení Plzeň/ČB','Samostatné oddělení odvolacích řízení - dopravní stavby':'Samostatné oddělení odvolacích řízení – dopravní stavby','Samostatné oddělení odvolacích řízení - energetické stavby':'Samostatné oddělení odvolacích řízení – energetické stavby',
+  'Oddělení vyvlastnění a právních činností Čechy I':'Oddělení vyvlastnění a právních činností Čechy','Samostatné oddělení koncepční a metodické':'Oddělení koncepční a metodické'};
 function reconcilePositions(oldPos,tplPos,newId){
   const out=[...oldPos]; const kinds=['head','asst','ref'];
   kinds.forEach(k=>{ const target=tplPos.filter(p=>p.kind===k).length; let cur=out.filter(p=>p.kind===k).length;
@@ -149,7 +150,7 @@ function reportMigration(m){ if(!m) return; const parts=[];
   if(m.removed.length) parts.push('Zrušeno: '+m.removed.join('; ')+(m.freed.length?' (do nezařazených: '+m.freed.join(', ')+')':''));
   if(m.added.length) parts.push('Nově: '+m.added.join('; '));
   if(m.oldTotal!==undefined) parts.push(`Počet míst: ${m.oldTotal} → ${m.newTotal} (obsazená místa zůstala, volná se dorovnala na nové počty)`);
-  alert('Organigram byl aktualizován na verzi z 23. 9. 2026 (tři sekce). Obsazení míst zůstalo zachováno.\n\n'+parts.join('\n')); }
+  alert('Organigram byl aktualizován na verzi z 1. 10. 2026. Obsazení míst zůstalo zachováno.\n\n'+parts.join('\n')); }
 
 // ---------- rendering ----------
 const $ = s=>document.querySelector(s);
