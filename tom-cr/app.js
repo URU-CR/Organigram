@@ -1,6 +1,6 @@
 // TOM ÚRÚ ČR – cílový provozní model úřadu od 1. 1. 2027.
 // Samostatná aplikace: model v organigram_state.id='tom-cr'; organigram ÚRÚ ČR ('main') se jen čte (živě).
-const APP_VERSION='2026-10-05.5';
+const APP_VERSION='2026-10-05.6';
 const APP_ID='tom-cr', STATE_ID='tom-cr', ORG_ID='main', LS_KEY='uru-tom-cr-v1';
 
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
@@ -277,14 +277,18 @@ function renderMap(){
   const NS='http://www.w3.org/2000/svg'; const svg=document.createElementNS(NS,'svg'); svg.setAttribute('class','links'); svg.setAttribute('width',W); svg.setAttribute('height',H);
   svg.innerHTML='<defs>'+Object.entries({...LINK_KINDS,x:KIND('x')}).map(([k,[,c]])=>`<marker id="ar-${k}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="${c}"/></marker>`).join('')+'</defs>';
   const edge=(r,tx,ty)=>{ const cx=r.x+r.w/2, cy=r.y+r.h/2, dx=tx-cx, dy=ty-cy; if(!dx&&!dy) return [cx,cy]; const s=Math.min(dx?Math.abs(r.w/2/dx):1e9, dy?Math.abs(r.h/2/dy):1e9); return [cx+dx*s,cy+dy*s]; };
+  const labels=[];
   Object.values(agg).forEach(g=>{ if(!boxes[g.from]||!boxes[g.to]) return; const a=rect(g.from), b=rect(g.to); const [k0,c,dash]=KIND(g.kind);
     const [x1,y1]=edge(a,b.x+b.w/2,b.y+b.h/2), [x2,y2]=edge(b,a.x+a.w/2,a.y+a.h/2);
     const lsel=sel&&sel.t==='l'&&g.ids.includes(sel.id); const hot=lsel||(selRep&&(g.from===selRep||g.to===selRep)); const faint=selRep&&!hot;
     const lbl=[...g.labels].join('; ')||k0; const el=document.createElementNS(NS,'g'); const soft=!selRep&&!lsel&&(F(g.from).kind||F(g.to).kind); el.setAttribute('class','lk'+(lsel?' sel':'')+(faint?' faint':'')+(soft?' soft':''));
     el.innerHTML=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="hit"/><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${c}" stroke-width="${hot?2.6:1.6}" ${dash?'stroke-dasharray="6 4"':''} marker-end="url(#ar-${LINK_KINDS[g.kind]?g.kind:'x'})"/>`+
-      (hot?`<text x="${(x1+x2)/2}" y="${(y1+y2)/2-5}" fill="${c}" text-anchor="middle">${esc(lbl)}${g.ids.length>1?' ('+g.ids.length+'×)':''}</text>`:'')+`<title>${esc(F(g.from).name+' → '+F(g.to).name+': '+lbl)}</title>`;
-    el.addEventListener('pointerdown',e=>{ e.stopPropagation(); sel={t:'l',id:g.ids[0],ids:g.ids}; render(); }); svg.appendChild(el); });
+      `<title>${esc(F(g.from).name+' → '+F(g.to).name+': '+lbl)}</title>`;
+    el.addEventListener('pointerdown',e=>{ e.stopPropagation(); sel={t:'l',id:g.ids[0],ids:g.ids}; render(); }); svg.appendChild(el);
+    if(hot) labels.push(`<text x="${(x1+x2)/2}" y="${(y1+y2)/2-5}" fill="${c}" text-anchor="middle"${lsel?' class="on"':''}>${esc(lbl)}${g.ids.length>1?' ('+g.ids.length+'×)':''}</text>`); });
   cv.insertBefore(svg,cv.firstChild);
+  // popisky vazeb ve vlastní vrstvě nad dlaždicemi – nepřekryje je sousední dlaždice
+  if(labels.length){ const lv=document.createElementNS(NS,'svg'); lv.setAttribute('class','links labels'); lv.setAttribute('width',W); lv.setAttribute('height',H); lv.innerHTML=labels.join(''); cv.appendChild(lv); }
   wrap.scrollLeft=sl; wrap.scrollTop=st;
 }
 function layoutKids(fs,h){ let y=[70,70]; fs.forEach((f,i)=>{ const c=y[0]<=y[1]?0:1; f.sx=380+c*(BW+40); f.sy=y[c]; y[c]+=((h&&h[f.id])||90)+18; delete f._lay; }); }
