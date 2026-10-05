@@ -270,6 +270,8 @@ body.presenting #locview .loccol .lb .person{cursor:default}
 #pool .person{display:flex;flex-direction:column;align-items:flex-start;gap:1px;cursor:grab}#pool .person .nm,#pool .person .meta{white-space:normal;overflow:visible}
 
 /* popover */
+#pop .popedit input,#pop .popedit select,#pop .popedit textarea{width:100%;font:inherit;font-size:13px;padding:3px 6px;border:1px solid var(--line);border-radius:5px}
+#pop .popedit dd{margin:0 0 4px}
 #pop{position:fixed;z-index:20;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(27,36,48,.18);padding:12px 14px;width:320px;font-size:13px}
 #pop h3{margin:0 0 6px;font-size:14px}
 #pop dl{margin:0 0 10px;display:grid;grid-template-columns:110px 1fr;gap:3px 8px}
@@ -387,7 +389,7 @@ table.ov td.z{color:#B6BEC9}
 </head>
 <body class="ws-kr">
 <header>
-  <h1>Krajské ÚRÚ<small><a class="back" href="../" title="organigram ÚRÚ ČR (samostatná aplikace)">← ÚRÚ ČR</a>pracovní model soustavy od roku 2028 · <span id="ver">index 2026-10-05.4</span></small></h1>
+  <h1>Krajské ÚRÚ<small><a class="back" href="../" title="organigram ÚRÚ ČR (samostatná aplikace)">← ÚRÚ ČR</a>pracovní model soustavy od roku 2028 · <span id="ver">index 2026-10-05.5</span></small></h1>
   <div class="stats" id="stats"></div>
   <span class="user" id="user"><span class="dot" id="syncDot"></span><span id="userMail"></span></span>
   <div class="legend" id="legend"></div>
@@ -474,8 +476,8 @@ table.ov td.z{color:#B6BEC9}
 
 <script src="../vendor/xlsx.full.min.js"></script>
 <script src="../vendor/supabase.js"></script>
-<script src="../config.js?v=2026-10-05.4"></script>
-<script src="template.js?v=2026-10-05.4"></script>
-<script src="app.js?v=2026-10-05.4"></script>
+<script src="../config.js?v=2026-10-05.5"></script>
+<script src="template.js?v=2026-10-05.5"></script>
+<script src="app.js?v=2026-10-05.5"></script>
 </body
 </html>
