@@ -40,7 +40,7 @@ window.TOM_SEED = {
   ],
   systems: [
     {id:'y1', st:'portal', ss:'stav', name:'Portál stavebníka', admin:'ÚRÚ ČR (centrálně)'},
-    {id:'y2', st:'agenda', ss:'stav', name:'ISSŘ', admin:'ÚRÚ ČR (centrálně)'},
+    {id:'y2', st:'agenda', ss:'stav', name:'ISSŘ', admin:'ÚRÚ ČR (centrálně)', desc:'Není napojené na spisovou službu – vlastní evidence (ESZ a správa dokumentací = ořezaný GINIS), samo přiděluje spisové značky a č. j.'},
     {id:'y3', st:'registr', ss:'stav', name:'Evidence stavebních záměrů (ESZ)', admin:'ÚRÚ ČR (centrálně)'},
     {id:'y4', st:'agenda', ss:'stav', name:'VITA', admin:'dodavatel VITA; instance u obcí'},
     {id:'y6', st:'spis', ss:'novy', name:'Spisová služba ÚRÚ (ESPIS)', admin:'ÚRÚ ČR (centrálně)', all:'evidence a oběh dokumentů, spisy'},
@@ -57,7 +57,7 @@ window.TOM_SEED = {
     ['k01','y4','pouziva','všechna pracoviště (VERA převedena do VITA)'],['k01','y2','pouziva','částečně'],['k02','y4','pouziva'],['s1','y4','pouziva','koordinované stanovisko jen ve VITA'],
     ['k07','y10','pouziva'],['k08','y10','pouziva'],['k09','y6','pouziva'],['k14','y4','spravuje','podpora uživatelů'],
     ['a4','y1','spravuje'],['a4','y2','spravuje'],['a4','y3','spravuje'],['a4','y6','spravuje'],['a4','y10','spravuje'],['a4','y11','spravuje'],['a4','y12','spravuje'],
-    ['y1','y2','data'],['y2','y3','data'],['y4','y3','data','zatím neúplně'],['y8','y6','data'],['y4','y6','data','napojení – k ověření'],
+    ['y1','y2','data'],['y2','y3','data'],['y4','y3','data','zatím neúplně'],['y8','y6','data'],['y4','y6','data','napojení – k ověření'],['y6','y2','data','integrace eSSL → ISSŘ (předávání podání)',1],
     ['k02','k01','predava','přesun věci mezi centrálou a ÚP'],['a6','k01','odvolani','správní žaloba'],['a6','k02','odvolani','správní žaloba'],['k01','s1','predava','žádost o koordinované vyjádření']
   ],
   links: [],
@@ -92,7 +92,15 @@ window.TOM_SEED = {
        ['s5','L4',4,'Sestaví a podepíše KV','step','y4'],
        ['s6','L3',5,'KV zpět jako dokument'],
        ['s7','L1',6,'Vloží KV do své instance jako podklad','end','y4']],
-     flows:[['s1','s2'],['s2','s3'],['s3','s4'],['s4','s5'],['s5','s6'],['s6','s7']]}
+     flows:[['s1','s2'],['s2','s3'],['s3','s4'],['s4','s5'],['s5','s6'],['s6','s7']]},
+    {id:'p3', name:'Podání mimo Portál do řízení vedeného v ISSŘ', desc:'ISSŘ není napojené na spisovou službu: podání doručená DS, e-mailem nebo osobně se evidují ve spisové službě ÚRÚ a do ISSŘ se dnes musí zadat ručně.',
+     lanes:[['L1','a1'],['L2',null,'r_pod'],['L3',null,'r_rup'],['L4','y2']],
+     steps:[['s1','L1',0,'Podá žádost nebo doplnění','start',null,['ds','email','osobne']],
+       ['s2','L2',1,'Zaeviduje ve spisové službě ÚRÚ (č. j. ESPIS)','step','y6'],
+       ['s3','L3',2,'Převezme dokument ve spisové službě','step','y6'],
+       ['s4','L3',3,'Ručně vloží dokument do ISSŘ (č. j. ISSŘ)','step','y2',null,'Dvojí evidence a dvě řady č. j. Řešení: urgentní vývoj integrace eSSL → ISSŘ a procesy předávání.'],
+       ['s5','L4',4,'Řízení pokračuje v ISSŘ','end']],
+     flows:[['s1','s2'],['s2','s3'],['s3','s4'],['s4','s5']]}
   ]
 };
 // Pracoviště kraje – stav systémů podle tabulky URU_prehled_ORP_ver1.xlsx (MMR, data z území 2026).

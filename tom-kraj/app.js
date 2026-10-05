@@ -1,6 +1,6 @@
 // TOM krajského ÚRÚ – cílový provozní model kraje v soustavě ÚRÚ (od 2028), modelový kraj Vysočina.
 // Odvozeno z TOM ÚRÚ ČR. Model v organigram_state.id='tom-kraj'; krajský organigram ('kraje') se jen čte (živě). Pracoviště, scénáře a posouzení: kraj.js.
-const APP_VERSION='2026-10-05.2';
+const APP_VERSION='2026-10-05.5';
 const APP_ID='tom-kraj', STATE_ID='tom-kraj', ORG_ID='kraje', LS_KEY='uru-tom-kraj-v1';
 const KRAJ=(window.TOM_KRAJ||{}).kraj||'Kraj Vysočina';
 
@@ -77,7 +77,7 @@ function addEnv(st){ const S=window.TOM_SEED; const base={desc:'',status:'navrh'
   (S.actors||[]).forEach(x=>{ if(!st.funcs[x.id]) st.funcs[x.id]={...base,notes:[],assign:[],locs:[],id:x.id,kind:'actor',name:x.name,cat:x.cat,channels:x.ch||[],period:x.p||'2027'}; });
   (S.systems||[]).forEach(x=>{ if(!st.funcs[x.id]) st.funcs[x.id]={...base,notes:[],assign:[],locs:[],id:x.id,kind:'system',name:x.name,stype:x.st,sstate:x.ss,admin:x.admin||'',period:x.p||'2027',allUsers:!!x.all,allUse:x.all||''}; });
   if(st.linkKinds) Object.entries(DEFAULT_KINDS).forEach(([k,v])=>{ if(!st.linkKinds[k]&&['zada','rozhodnuti','stanovisko','odvolava','pouziva','spravuje','data'].includes(k)) st.linkKinds[k]=[...v]; });
-  (S.links2||[]).forEach(([f,t,k,l])=>{ if(st.funcs[f]&&st.funcs[t]&&!st.links.some(x=>x.from===f&&x.to===t&&x.kind===k)) st.links.push({id:uid('l'),from:f,to:t,kind:k,label:l||''}); });
+  (S.links2||[]).forEach(([f,t,k,l,pl])=>{ if(st.funcs[f]&&st.funcs[t]&&!st.links.some(x=>x.from===f&&x.to===t&&x.kind===k)) st.links.push({id:uid('l'),from:f,to:t,kind:k,label:l||'',...(pl?{planned:true}:{})}); });
   if(st.showActors===undefined) st.showActors=true; if(st.showSystems===undefined) st.showSystems=true; }
 // souhrnné funkce z výchozího návrhu + sloučení vazeb, které vedou na více dílčích funkcí jednoho souhrnu
 function applySums(st){ (window.TOM_SEED.sums||[]).forEach(s=>{ const ch=s.children.filter(id=>st.funcs[id]&&!st.funcs[id].parent&&!st.funcs[id].sum); if(ch.length<2||st.funcs[s.id]) return;

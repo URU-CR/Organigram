@@ -5,20 +5,22 @@ const AIS_SC=['VITA','ISSŘ','žádný'];            // cílový stav ve scéná
 const toTarget=a=>a==='VERA'?'VITA':a;
 const INST={local:'u obce (lokální)',central:'krajská (centrální)',national:'celostátní'};
 const SS_URU='Spisová služba ÚRÚ';
+const pn=n=>`${n} ${n===1?'pracoviště':(n>=2&&n<=4)?'pracoviště':'pracovišť'}`;   // skloňování
 const ST_LBL={ok:'v pořádku',warn:'podmínka',fail:'překážka'};
 const VERDICT={ok:['provozovatelné','#067647'],warn:['provozovatelné s podmínkami','#B54708'],fail:['neprovozovatelné','#B42318']};
-const DEF_PARAMS={maxUsers:{VITA:150,'ISSŘ':100000},aisWarn:2,aisFail:3,moveFail:50,doFail:34,eszOk:80,eszFail:50};
+const DEF_PARAMS={maxUsers:{VITA:300,'ISSŘ':100000},provenVITA:150,aisWarn:2,aisFail:3,moveFail:50,doFail:34,eszOk:80,eszFail:50};
 
 // ---------- výchozí data ----------
 function seedKraj(st){ const K=window.TOM_KRAJ||{sites:[]}; const sites={};
   K.sites.forEach(s=>sites[s.kod]={kod:s.kod,name:s.name,ais:s.ais||'žádný',ss:s.ss||'neuvedeno',issr:s.issr||'Ne',agenda:s.agenda||0,spisy:s.spisy||0,archiv:s.archiv||0,riziko:s.riziko||'',dnes:s.dnes||0,potreba:s.potreba||0});
   const sc=(id,name,desc,fn,extra)=>{ const o={id,name,desc,doAis:'VITA',cAis:'VITA',cInst:'central',eszEnforced:false,sites:{},...(extra||{})}; Object.values(sites).forEach(s=>o.sites[s.kod]=fn(s)); return o; };
-  st.kraj={sites,noVera:true,active:'sc1',params:JSON.parse(JSON.stringify(DEF_PARAMS)),scenarios:[
+  st.kraj={sites,noVera:true,issrSs:true,vitaV2:true,sc6:true,active:'sc1',params:JSON.parse(JSON.stringify(DEF_PARAMS)),scenarios:[
     sc('sc1','Den 1: instance VITA u obcí','Každé pracoviště zůstává na své instanci u obce a na spisové službě obce; VERA převedena do VITA.',s=>({ais:toTarget(s.ais),inst:s.ais==='ISSŘ'?'national':'local',ss:s.ss})),
     sc('sc2','Jedna spisová služba ÚRÚ, instance VITA u obcí','Ke Dni 1 jediná centrální spisová služba ÚRÚ; VITA zůstává na instancích u obcí (VERA převedena).',s=>({ais:toTarget(s.ais),inst:s.ais==='ISSŘ'?'national':'local',ss:SS_URU})),
-    sc('sc4','Vše na krajskou instanci VITA','Všechna pracoviště na jedné krajské instanci VITA (VERA převedena, data převezme VITA). Smluvně vynucený zápis do ESZ.',s=>({ais:'VITA',inst:'central',ss:SS_URU}),{eszEnforced:true}),
-    sc('sc5','Vše do ISSŘ','Všechna pracoviště i centrála pracují v ISSŘ; koordinace DO v ISSŘ (k ověření).',s=>({ais:'ISSŘ',inst:'national',ss:SS_URU}),{doAis:'ISSŘ',cAis:'ISSŘ',cInst:'national',eszEnforced:true})]}; }
-function normKraj(){ if(!state.kraj||!state.kraj.sites) seedKraj(state); const k=state.kraj; if(!k.noVera) dropVera(state); k.params=Object.assign(JSON.parse(JSON.stringify(DEF_PARAMS)),k.params||{}); k.params.maxUsers=Object.assign({},DEF_PARAMS.maxUsers,k.params.maxUsers||{});
+    sc('sc4','Vše na krajskou instanci VITA','Všechna pracoviště na jedné krajské instanci VITA (VERA převedena, data převezme VITA); veškerá evidence v ESPIS/VITA, ISSŘ jen jako komunikační brána pro dokumenty z Portálu a přístup k dokumentaci.',s=>({ais:'VITA',inst:'central',ss:SS_URU}),{eszEnforced:true}),
+    sc('sc6','Kombinace: krajská VITA + ISSŘ','V ISSŘ pokračují pracoviště, která v něm dnes plně pracují (podle tabulky ORP „ISSŘ: Ano“); ostatní – dnes v obecních VITA a VERA – přecházejí na krajskou instanci VITA. Rozdělení lze upravit u každého pracoviště.',s=>(s.issr==='Ano'?{ais:'ISSŘ',inst:'national',ss:SS_URU}:{ais:'VITA',inst:'central',ss:SS_URU}),{eszEnforced:true}),
+    sc('sc5','Vše do ISSŘ','Všechna pracoviště i centrála pracují v ISSŘ; koordinace DO v ISSŘ (k ověření). ISSŘ není napojené na spisovou službu – nutná integrace eSSL → ISSŘ.',s=>({ais:'ISSŘ',inst:'national',ss:SS_URU}),{doAis:'ISSŘ',cAis:'ISSŘ',cInst:'national',eszEnforced:true})]}; }
+function normKraj(){ if(!state.kraj||!state.kraj.sites) seedKraj(state); const k=state.kraj; if(!k.noVera) dropVera(state); if(!k.issrSs) issrSsUpdate(state); if(!k.vitaV2) vitaV2Update(state); if(!k.sc6) addSc6(state); k.params=Object.assign(JSON.parse(JSON.stringify(DEF_PARAMS)),k.params||{}); k.params.maxUsers=Object.assign({},DEF_PARAMS.maxUsers,k.params.maxUsers||{});
   if(!k.scenarios.some(s=>s.id===k.active)) k.active=k.scenarios[0]&&k.scenarios[0].id; }
 // s provozem VERA se nepočítá: scénáře VERA→VITA, systém VERA z modelu pryč (jen jednou)
 function dropVera(st){ const k=st.kraj; k.noVera=true;
@@ -31,6 +33,22 @@ function dropVera(st){ const k=st.kraj; k.noVera=true;
     (st.processes||[]).forEach(p=>{ p.lanes.forEach(l=>{ if(l.ref==='y5') l.ref='y4'; }); p.steps.forEach(s=>{ if(s.sys==='y5') s.sys='y4'; }); });
     st.links.forEach(l=>{ if(l.from==='k01'&&l.to==='y4'&&/pracovišť/.test(l.label||'')) l.label='všechna pracoviště (VERA převedena do VITA)'; }); }
   if(typeof logChange==='function') logChange('model','s provozem VERA se nepočítá – scénáře převedeny na VITA'); }
+// ISSŘ není napojené na spisovou službu (jen jednou doplnit do uloženého modelu)
+function issrSsUpdate(st){ st.kraj.issrSs=true; const y=st.funcs&&st.funcs.y2; if(!y) return;
+  if(!y.desc) y.desc='Není napojené na spisovou službu – vlastní evidence (ESZ a správa dokumentací = ořezaný GINIS), samo přiděluje spisové značky a č. j.';
+  if(st.funcs.y6&&!st.links.some(l=>l.from==='y6'&&l.to==='y2')) st.links.push({id:uid('l'),from:'y6',to:'y2',kind:'data',label:'integrace eSSL → ISSŘ (předávání podání)',planned:true});
+  const sp=(window.TOM_SEED.processes||[]).find(p=>p.id==='p3'); if(sp&&!(st.processes||[]).some(p=>p.id==='p3')&&st.roles.some(r=>r.id==='r_pod')&&st.roles.some(r=>r.id==='r_rup')){ const tmp={funcs:st.funcs,roles:st.roles}; tmp.processes=null; const S=window.TOM_SEED; const save=S.processes; S.processes=[sp]; seedProcesses(tmp); S.processes=save; (tmp.processes||[]).forEach(p=>st.processes.push(p)); }
+  if(typeof logChange==='function') logChange('model','ISSŘ: chybějící napojení na spisovou službu (kontrola, plánovaná integrace, proces)'); }
+// zkušenosti s VITA (Brno ~150, DESÚ ~90 uživatelů; dle dodavatele 250–300 reálné) a stav vývoje – jen jednou
+function vitaV2Update(st){ const k=st.kraj; k.vitaV2=true; k.params=k.params||{}; k.params.maxUsers=k.params.maxUsers||{}; if(!k.params.maxUsers.VITA||k.params.maxUsers.VITA===150) k.params.maxUsers.VITA=300; if(!k.params.provenVITA) k.params.provenVITA=150;
+  const s4=k.scenarios.find(x=>x.id==='sc4'); if(s4&&/^Všechna pracoviště na jedné krajské instanci VITA/.test(s4.desc||'')) s4.desc='Všechna pracoviště na jedné krajské instanci VITA (VERA převedena, data převezme VITA); veškerá evidence v ESPIS/VITA, ISSŘ jen jako komunikační brána pro dokumenty z Portálu a přístup k dokumentaci.';
+  if(typeof logChange==='function') logChange('parametry posouzení','VITA: ověřeno ~150 uživatelů, reálné 250–300; vývoj integrace DO a předávání spisů ve VITA'); }
+// doplnění scénáře kombinace krajská VITA + ISSŘ do uloženého modelu (jen jednou)
+function addSc6(st){ const k=st.kraj; k.sc6=true; if(k.scenarios.some(x=>x.id==='sc6')) return;
+  const sites={}; Object.values(k.sites).forEach(s=>sites[s.kod]=s.issr==='Ano'?{ais:'ISSŘ',inst:'national',ss:SS_URU}:{ais:'VITA',inst:'central',ss:SS_URU});
+  const x={id:'sc6',name:'Kombinace: krajská VITA + ISSŘ',desc:'V ISSŘ pokračují pracoviště, která v něm dnes plně pracují (podle tabulky ORP „ISSŘ: Ano“); ostatní – dnes v obecních VITA a VERA – přecházejí na krajskou instanci VITA. Rozdělení lze upravit u každého pracoviště.',doAis:'VITA',cAis:'VITA',cInst:'central',eszEnforced:true,sites};
+  const i=k.scenarios.findIndex(s=>s.id==='sc5'); if(i>=0) k.scenarios.splice(i,0,x); else k.scenarios.push(x);
+  if(typeof logChange==='function') logChange('scénář','nový: '+x.name); }
 const curSc=()=>{ normKraj(); return state.kraj.scenarios.find(s=>s.id===state.kraj.active); };
 
 // ---------- uživatelé z krajského organigramu ----------
@@ -46,37 +64,50 @@ function assess(sc){ const K=state.kraj, P=K.params; const S=Object.values(K.sit
   // 1 počet agendových systémů
   const none=S.filter(s=>cfg(s).ais==='žádný');
   const aisSet=new Set(S.map(s=>cfg(s).ais).filter(a=>a!=='žádný')); aisSet.add(sc.cAis);
-  if(none.length) add('ais','Agendové systémy','fail',`${none.length} pracovišť nemá agendový systém (${none.map(s=>s.name).join(', ')}).`,'Přidělit pracovištím bez systému agendový systém (např. ISSŘ).');
-  else add('ais','Agendové systémy',aisSet.size>=P.aisFail?'fail':aisSet.size>=P.aisWarn?'warn':'ok',`V kraji se pracuje v ${aisSet.size} agendových systémech: ${[...aisSet].join(', ')}.`,aisSet.size>=P.aisWarn?'Obousměrná integrace mezi systémy a jednotný index řízení kraje.':'');
+  if(none.length) add('ais','Agendové systémy','fail',`${pn(none.length)} nemá agendový systém (${none.map(s=>s.name).join(', ')}).`,'Přidělit pracovištím bez systému agendový systém (např. ISSŘ).');
+  else add('ais','Agendové systémy',aisSet.size>=P.aisFail?'fail':aisSet.size>=P.aisWarn?'warn':'ok',(aisSet.size===1?`V kraji se pracuje v jednom agendovém systému: ${[...aisSet][0]}.`:`V kraji se pracuje v ${aisSet.size} agendových systémech: ${[...aisSet].join(', ')}.`),aisSet.size>=P.aisWarn?'Obousměrná integrace mezi systémy a jednotný index řízení kraje.':'');
   // 2 přesun věci mezi pracovišti
   const key=s=>{ const c=cfg(s); return c.inst==='local'?c.ais+'#'+s.kod:c.ais+'#'+c.inst; };
   let pairs=0, manual=0; for(let i=0;i<S.length;i++) for(let j=i+1;j<S.length;j++){ pairs++; if(key(S[i])!==key(S[j])) manual++; }
   const mp=pairs?manual/pairs*100:0;
-  add('move','Přesun věci mezi pracovišti',mp>=P.moveFail?'fail':mp>0?'warn':'ok',mp?`${manual} z ${pairs} dvojic pracovišť (${Math.round(mp)} %) nemá společnou instanci systému – přesun věci znamená ruční převod spisu a stavu řízení.`:'Všechna pracoviště sdílejí jednu instanci – věc lze přesunout bez převodu.',mp?'Pravidla přesunu věcí a podporovaný export/import mezi systémy, jinak přesun jen výjimečně.':'');
+  const sharedVita=S.filter(s=>cfg(s).ais==='VITA'&&cfg(s).inst==='central').length>1;
+  if(!mp&&sharedVita&&!sc.vitaMove) add('move','Přesun věci mezi pracovišti','warn','Pracoviště sdílejí krajskou instanci VITA, ale předávání spisů mezi útvary (pracovišti) je ve VITA dnes složité.','Dovyvinout ve VITA předávání spisů mezi útvary.');
+  else add('move','Přesun věci mezi pracovišti',mp>=P.moveFail?'fail':mp>0?'warn':'ok',mp?`${manual} z ${pairs} dvojic pracovišť (${Math.round(mp)} %) nemá společnou instanci systému – přesun věci znamená ruční převod spisu a stavu řízení.`:'Všechna pracoviště sdílejí jednu instanci – věc lze přesunout bez převodu.',mp?'Pravidla přesunu věcí a podporovaný export/import mezi systémy, jinak přesun jen výjimečně.':(sharedVita?'Předpoklad: předávání spisů mezi útvary ve VITA je dovyvinuto.':''));
   // 3 integrované DO
   const outDo=S.filter(s=>{ const c=cfg(s); return !(c.ais===sc.doAis&&(c.inst!=='local')); }); const doShare=outDo.reduce((a,s)=>a+s.agenda,0)/totalAg*100;
-  add('do','Integrované DO na centrále',doShare>=P.doFail?'fail':outDo.length?'warn':'ok',outDo.length?`DO koordinují v systému ${sc.doAis}; ${outDo.length} pracovišť (${Math.round(doShare)} % agendy) je mimo jejich instanci – koordinované vyjádření se pro ně zakládá ručně: ${outDo.map(s=>s.name).join(', ')}.`:`Všechna pracoviště jsou v instanci, ve které DO koordinují (${sc.doAis}).`,outDo.length?'Dvojí evidence koordinace; ověřit kapacitu koordinátorů na ruční zakládání.':'');
+  const vitaDoDev=sc.doAis==='VITA'&&!sc.vitaDo;
+  add('do','Integrované DO na centrále',doShare>=P.doFail?'fail':(outDo.length||vitaDoDev)?'warn':'ok',outDo.length?`DO koordinují v systému ${sc.doAis}; ${pn(outDo.length)} (${Math.round(doShare)} % agendy) je mimo jejich instanci – koordinované vyjádření se pro ně zakládá ručně: ${outDo.map(s=>s.name).join(', ')}.`:`Všechna pracoviště jsou v instanci, ve které DO koordinují (${sc.doAis}).`+(vitaDoDev?' Integrace dotčených orgánů ve VITA ale zatím není vyvinuta (zadaná, ve vývoji).':''),
+    [outDo.length?'Dvojí evidence koordinace; ověřit kapacitu koordinátorů na ruční zakládání.':'',vitaDoDev?'Dokončit vývoj integrace DO ve VITA a ověřit ji.':''].filter(Boolean).join(' '));
   // 4 jedna spisová služba
   const notUru=S.filter(s=>cfg(s).ss!==SS_URU); const veraUru=[];
-  if(notUru.length) add('ss','Jedna spisová služba ÚRÚ','fail',`${notUru.length} pracovišť zůstává na spisové službě obce (${[...new Set(notUru.map(s=>cfg(s).ss))].join(', ')}) – v rozporu se zásadou „mnoho vstupů, jeden spis“.`,'Napojit všechna pracoviště na spisovou službu ÚRÚ ke Dni 1.');
-  else add('ss','Jedna spisová služba ÚRÚ',veraUru.length?'warn':'ok',veraUru.length?`Všechna pracoviště na spisové službě ÚRÚ; ${veraUru.length} pracovišť ve VERA – napojení VERA na ESPIS není ověřené.`:'Všechna pracoviště používají spisovou službu ÚRÚ.',veraUru.length?'Ověřit napojení VERA na ESPIS.':'');
+  if(notUru.length) add('ss','Jedna spisová služba ÚRÚ','fail',`${pn(notUru.length)} zůstává na spisové službě obce (${[...new Set(notUru.map(s=>cfg(s).ss))].join(', ')}) – v rozporu se zásadou „mnoho vstupů, jeden spis“.`,'Napojit všechna pracoviště na spisovou službu ÚRÚ ke Dni 1.');
+  else add('ss','Jedna spisová služba ÚRÚ',veraUru.length?'warn':'ok',veraUru.length?`Všechna pracoviště na spisové službě ÚRÚ; ${pn(veraUru.length)} ve VERA – napojení VERA na ESPIS není ověřené.`:'Všechna pracoviště používají spisovou službu ÚRÚ.',veraUru.length?'Ověřit napojení VERA na ESPIS.':'');
+  // 4b ISSŘ a spisová služba – ISSŘ má vlastní evidenci (ořezaný GINIS), samo přiděluje sp. zn. a č. j.
+  const inIssr=S.filter(s=>cfg(s).ais==='ISSŘ'); const cIssr=sc.cAis==='ISSŘ';
+  if(inIssr.length||cIssr){ const who=(inIssr.length?pn(inIssr.length):'')+(cIssr?(inIssr.length?' a centrála':'centrála'):'');
+    add('issrss','ISSŘ a spisová služba','warn',sc.esslIssr?`Předpoklad: integrace eSSL → ISSŘ je vyvinuta. ${who} vede řízení v ISSŘ, které má vlastní evidenci a řadu č. j.; podání z DS, e-mailu a osobně se do něj předávají ze spisové služby ÚRÚ.`:
+      `${who} vede řízení v ISSŘ, které není napojené na spisovou službu – samo přiděluje spisové značky a č. j. Podání doručená DS, e-mailem a osobně se evidují ve spisové službě ÚRÚ a do ISSŘ se musí zadávat ručně: dvojí evidence a dvě řady č. j. (párování podle č. j. nefunguje).`,
+      sc.esslIssr?'Dodat integraci včas a ověřit zkušebním provozem; sjednotit řady č. j. nebo jejich převod.':'Urgentní vývoj integrace eSSL → ISSŘ a procesy předávání; do té doby ruční zadávání a dvojí evidence.'); }
   // 5 ESZ a přehled o řízeních
   const rel=s=>{ const c=cfg(s); if(c.ais==='ISSŘ') return 1; if(sc.eszEnforced) return 1; return {'Ano':1,'Částečně':0.5,'Ne':0}[s.issr]??0; };
   const ez=S.reduce((a,s)=>a+s.agenda*rel(s),0)/totalAg*100;
-  add('esz','ESZ a přehled o řízeních',ez>=P.eszOk?(sc.eszEnforced&&S.some(s=>cfg(s).ais!=='ISSŘ')?'warn':'ok'):ez>=P.eszFail?'warn':'fail',`Spolehlivě v ESZ je asi ${Math.round(ez)} % agendy kraje${sc.eszEnforced?' (předpoklad: smluvně vynucený plný zápis VITA/VERA do ESZ)':''}.`,ez<P.eszOk?'Bez úplné ESZ kraj nemá přehled o svých řízeních; náhradní index z denních extraktů.':(sc.eszEnforced&&S.some(s=>cfg(s).ais!=='ISSŘ')?'Smluvně vynutit plný zápis VITA/VERA do ESZ a obousměrnou synchronizaci stavu.':''));
+  const unified=S.length>0&&new Set(S.map(key)).size===1&&S.every(s=>cfg(s).ss===SS_URU)&&cfg(S[0]).ais!=='ISSŘ';
+  if(unified) add('esz','ESZ a přehled o řízeních','ok',`Spolehlivost ESZ není podstatná – veškerá evidence kraje je v jedné instanci ${cfg(S[0]).ais} a ve spisové službě ÚRÚ; ISSŘ slouží jako komunikační brána pro dokumenty z Portálu a přístup k dokumentaci.`); else
+  add('esz','ESZ a přehled o řízeních',ez>=P.eszOk?(sc.eszEnforced&&S.some(s=>cfg(s).ais!=='ISSŘ')?'warn':'ok'):ez>=P.eszFail?'warn':'fail',`Spolehlivě v ESZ je asi ${Math.round(ez)} % agendy kraje${sc.eszEnforced?' (předpoklad: smluvně vynucený plný zápis VITA do ESZ)':''}.`,ez<P.eszOk?'Bez úplné ESZ kraj nemá přehled o svých řízeních; náhradní index z denních extraktů.':(sc.eszEnforced&&S.some(s=>cfg(s).ais!=='ISSŘ')?'Smluvně vynutit plný zápis VITA do ESZ a obousměrnou synchronizaci stavu.':''));
   // 6 kapacita centrálních instancí
   const doU=subtreeUsers('Odbor integrovaných dotčených orgánů'), cU=subtreeUsers('Odbor stavebně správní'); const capRows=[];
   ['VITA'].forEach(ais=>{ const ss=S.filter(s=>cfg(s).ais===ais&&cfg(s).inst==='central'); let u=ss.reduce((a,s)=>a+siteUsers(s),0); if(sc.doAis===ais) u+=doU; if(sc.cAis===ais&&sc.cInst==='central') u+=cU; if(u) capRows.push({ais,u,max:P.maxUsers[ais]||1}); });
   if(!capRows.length) add('cap','Kapacita krajské instance','ok','Scénář nepočítá s krajskou instancí VITA.');
-  capRows.forEach(r=>add('cap','Kapacita krajské instance '+r.ais,r.u>r.max?'fail':r.u>0.8*r.max?'warn':'ok',`Krajská instance ${r.ais}: asi ${r.u} uživatelů (míst) proti ověřenému maximu ${r.max}.`,r.u>0.8*r.max?`Zátěžový test instance ${r.ais} pro ${r.u} uživatelů a více útvarů.`:''));
+  capRows.forEach(r=>{ const pv=r.ais==='VITA'?(P.provenVITA||0):0; const st=r.u>r.max?'fail':(r.u>0.8*r.max||(pv&&r.u>pv))?'warn':'ok';
+    add('cap','Kapacita krajské instance '+r.ais,st,`Krajská instance ${r.ais}: asi ${r.u} uživatelů (míst); reálné maximum ${r.max}${pv?`, v provozu ověřeno ~${pv} (Brno)`:''}.`,st==='fail'?`Rozdělit instanci nebo navýšit kapacitu; zátěžový test.`:st==='warn'?`Zátěžový test instance ${r.ais} pro ${r.u} uživatelů a více útvarů.`:''); });
   // 7 instance u obcí
   const loc=S.filter(s=>cfg(s).inst==='local');
-  add('local','Instance u obcí',loc.length?'warn':'ok',loc.length?`${loc.length} pracovišť zůstává na instancích u obcí – provoz, zálohy a bezpečnost mimo přímou kontrolu ÚRÚ.`:'Žádná instance u obcí.',loc.length?'Smlouvy o součinnosti a provozu s obcemi; centrální rámcové smlouvy s dodavateli.':'');
+  add('local','Instance u obcí',loc.length?'warn':'ok',loc.length?`${pn(loc.length)} zůstává na instancích u obcí – provoz, zálohy a bezpečnost mimo přímou kontrolu ÚRÚ.`:'Žádná instance u obcí.',loc.length?'Smlouvy o součinnosti a provozu s obcemi; centrální rámcové smlouvy s dodavateli.':'');
   // 8 migrace
   const chg=S.filter(s=>cfg(s).ais!==s.ais&&cfg(s).ais!=='žádný'); const vv=chg.filter(s=>s.ais==='VERA'&&cfg(s).ais==='VITA'); const mig=chg.filter(s=>!vv.includes(s)); const ms=mig.reduce((a,s)=>a+(s.spisy||0),0);
   const prac=n=>n===1?'pracoviště':n<5?'pracoviště':'pracovišť';
   const vvTxt=vv.length?` ${vv.length} ${prac(vv.length)} přechází z VERA do VITA – VITA data převezme (${vv.map(s=>s.name).join(', ')}).`:'';
-  add('mig','Migrace rozpracovaných řízení',mig.length?'warn':'ok',mig.length?`${mig.length} pracovišť mění agendový systém; nová řízení v cílovém systému, dobíhá asi ${ms} rozpracovaných spisů (převést jen dlouhý chvost).${vvTxt}`:(vv.length?vvTxt.trim():'Žádné pracoviště nemění agendový systém.'),mig.length?'Zkušební migrace; povinnost součinnosti obcí při předání dat.':'');
+  add('mig','Migrace rozpracovaných řízení',mig.length?'warn':'ok',mig.length?`${pn(mig.length)} mění agendový systém; nová řízení v cílovém systému, dobíhá asi ${ms} rozpracovaných spisů (převést jen dlouhý chvost).${vvTxt}`:(vv.length?vvTxt.trim():'Žádné pracoviště nemění agendový systém.'),mig.length?'Zkušební migrace; povinnost součinnosti obcí při předání dat.':'');
   const v=out.some(c=>c.status==='fail')?'fail':out.some(c=>c.status==='warn')?'warn':'ok';
   return {checks:out,verdict:v}; }
 function verdictStat(){ const sc=curSc(); if(!sc) return ''; const a=assess(sc); const [t,c]=VERDICT[a.verdict];
@@ -139,19 +170,25 @@ function renderWsSide(s){ normKraj(); const K=state.kraj, sc=curSc(), P=K.params
     <label>Popis<textarea id="scDesc" rows="3" ${ro}>${esc(sc.desc||'')}</textarea></label>
     <div class="g2"><label>DO na centrále koordinují v<select id="scDo" ${ro}>${AIS_SC.filter(x=>x!=='žádný').map(o=>`<option ${o===sc.doAis?'selected':''}>${o}</option>`).join('')}</select></label>
     <label>Centrála (složitější stavby)<select id="scCa" ${ro}>${AIS_SC.filter(x=>x!=='žádný').map(o=>`<option ${o===sc.cAis?'selected':''}>${o}</option>`).join('')}</select></label></div>
-    <label style="display:flex;gap:6px;align-items:center;color:var(--ink);font-size:13px;margin-top:10px"><input type="checkbox" id="scEsz" style="width:auto" ${sc.eszEnforced?'checked':''} ${ro}> smluvně vynucený plný zápis VITA/VERA do ESZ</label>
+    <label style="display:flex;gap:6px;align-items:center;color:var(--ink);font-size:13px;margin-top:10px"><input type="checkbox" id="scEsz" style="width:auto" ${sc.eszEnforced?'checked':''} ${ro}> smluvně vynucený plný zápis VITA do ESZ</label>
+    <label style="display:flex;gap:6px;align-items:center;color:var(--ink);font-size:13px;margin-top:6px"><input type="checkbox" id="scEssl" style="width:auto" ${sc.esslIssr?'checked':''} ${ro}> integrace spisové služby → ISSŘ je vyvinuta</label>
+    <div class="lbl" style="margin-top:12px">Vývoj VITA</div>
+    <label style="display:flex;gap:6px;align-items:center;color:var(--ink);font-size:13px"><input type="checkbox" id="scVdo" style="width:auto" ${sc.vitaDo?'checked':''} ${ro}> integrace dotčených orgánů ve VITA je vyvinuta <span class="muted">(dnes zadaná, ve vývoji)</span></label>
+    <label style="display:flex;gap:6px;align-items:center;color:var(--ink);font-size:13px;margin-top:6px"><input type="checkbox" id="scVmv" style="width:auto" ${sc.vitaMove?'checked':''} ${ro}> předávání spisů mezi útvary ve VITA je dovyvinuto</label>
     <div class="lbl" style="margin-top:18px">Parametry posouzení (pro všechny scénáře)</div>
-    <div class="g2"><label>Max. uživatelů VITA<input type="number" id="pVita" value="${P.maxUsers.VITA}" ${ro}></label><span></span>
+    <div class="g2"><label>VITA – reálné maximum uživatelů<input type="number" id="pVita" value="${P.maxUsers.VITA}" ${ro}></label><label>VITA – ověřeno v provozu<input type="number" id="pVpr" value="${P.provenVITA||0}" ${ro}></label>
     <label>AIS v kraji – podmínka od<input type="number" id="pAw" value="${P.aisWarn}" min="1" ${ro}></label><label>AIS v kraji – překážka od<input type="number" id="pAf" value="${P.aisFail}" min="1" ${ro}></label>
     <label>Ruční přesun – překážka od (% dvojic)<input type="number" id="pMv" value="${P.moveFail}" ${ro}></label><label>DO mimo instanci – překážka od (% agendy)<input type="number" id="pDo" value="${P.doFail}" ${ro}></label>
     <label>ESZ v pořádku od (% agendy)<input type="number" id="pEo" value="${P.eszOk}" ${ro}></label><label>ESZ překážka pod (% agendy)<input type="number" id="pEf" value="${P.eszFail}" ${ro}></label></div>
-    <p class="muted" style="font-size:12px;margin-top:10px">Maximum VITA vychází z největší dnešní instance (cca 150 uživatelů). S provozem VERA se nepočítá – VITA data z VERA převezme. Prahy jsou výchozí hodnoty k diskusi.</p>
+    <p class="muted" style="font-size:12px;margin-top:10px">Ověřeno: Brno cca 150, DESÚ cca 90 uživatelů; podle dodavatele je 250–300 uživatelů reálných. Nad ověřenou velikostí je podmínkou zátěžový test, nad reálným maximem překážka. S provozem VERA se nepočítá – VITA data z VERA převezme. Prahy jsou výchozí hodnoty k diskusi.</p>
     <p class="muted" style="font-size:12px">Kliknutím na název pracoviště v tabulce upravíte jeho dnešní stav.</p>`;
   if(!ROLE.org) return; const P2=(id,fn)=>$(id).onchange=()=>{ fn(+$(id).value||0); save('parametry posouzení'); };
   $('#scDesc').onchange=e=>{ sc.desc=e.target.value; save('scénář','popis'); };
   $('#scDo').onchange=e=>{ sc.doAis=e.target.value; save('scénář','DO v '+sc.doAis); }; $('#scCa').onchange=e=>{ sc.cAis=e.target.value; sc.cInst=sc.cAis==='ISSŘ'?'national':'central'; save('scénář','centrála v '+sc.cAis); };
   $('#scEsz').onchange=e=>{ sc.eszEnforced=e.target.checked; save('scénář','zápis do ESZ'); };
-  P2('#pVita',v=>P.maxUsers.VITA=v); P2('#pAw',v=>P.aisWarn=v); P2('#pAf',v=>P.aisFail=v); P2('#pMv',v=>P.moveFail=v); P2('#pDo',v=>P.doFail=v); P2('#pEo',v=>P.eszOk=v); P2('#pEf',v=>P.eszFail=v); }
+  $('#scEssl').onchange=e=>{ sc.esslIssr=e.target.checked; save('scénář','integrace eSSL → ISSŘ'); };
+  $('#scVdo').onchange=e=>{ sc.vitaDo=e.target.checked; save('scénář','integrace DO ve VITA'); }; $('#scVmv').onchange=e=>{ sc.vitaMove=e.target.checked; save('scénář','předávání spisů ve VITA'); };
+  P2('#pVita',v=>P.maxUsers.VITA=v); P2('#pVpr',v=>P.provenVITA=v); P2('#pAw',v=>P.aisWarn=v); P2('#pAf',v=>P.aisFail=v); P2('#pMv',v=>P.moveFail=v); P2('#pDo',v=>P.doFail=v); P2('#pEo',v=>P.eszOk=v); P2('#pEf',v=>P.eszFail=v); }
 
 // ---------- export ----------
 function exportKraj(wb,X){ normKraj(); const K=state.kraj; const S=Object.values(K.sites);
