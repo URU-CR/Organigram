@@ -1,4 +1,4 @@
-const APP_VERSION='2026-10-05.2';
+const APP_VERSION='2026-10-05.3';
 
 const STRUCTURE = window.STRUCTURE;
 const SOURCES = ['DESÚ','MMR','ÚÚR','MD','MPO','Nové','Jiný'];
@@ -385,6 +385,19 @@ function guessKind(p){
 }
 
 // ---------- popover ----------
+// úprava údajů osoby (jméno, původ, údaje ze zdrojové tabulky, poznámka); usazení, úvazek, lokalita a IT se nemění
+const PERSON_FIELDS=[['name','Jméno'],['src','Zdrojový úřad'],['unit','Současný útvar'],['role','Označení místa'],['posId','Číslo místa'],['cat','Kategorie'],['fields','Obory služby'],['cls','Platová třída'],['note','Poznámka']];
+function showPopEdit(p){ const pop=$('#pop');
+  const srcName=s=>(typeof SRC_NAME!=='undefined'&&SRC_NAME[s])?SRC_NAME[s]:s;
+  pop.innerHTML=`<h3>Upravit údaje</h3><dl class="popedit">${PERSON_FIELDS.map(([k,l])=>`<dt>${l}</dt><dd>${k==='src'?`<select data-k="src">${[...new Set([...SOURCES,p.src].filter(Boolean))].map(s=>`<option value="${esc(s)}" ${s===p.src?'selected':''}>${esc(srcName(s))}</option>`).join('')}</select>`:k==='note'?`<textarea data-k="note" rows="2">${esc(p.note||'')}</textarea>`:`<input type="text" data-k="${k}" value="${esc(p[k]??'')}">`}</dd>`).join('')}</dl>
+    <div class="row"><button id="popCancel">Zrušit</button><button id="popSave" class="primary">Uložit</button></div>`;
+  pop.hidden=false; const top=parseFloat(pop.style.top)||8; if(top+pop.offsetHeight>innerHeight) pop.style.top=Math.max(8,innerHeight-pop.offsetHeight-8)+'px';
+  pop.querySelector('[data-k=name]').focus();
+  $('#popCancel').onclick=e=>{ e.stopPropagation(); showPop(p,null); };
+  $('#popSave').onclick=e=>{ if(e) e.stopPropagation(); const ch=[]; pop.querySelectorAll('[data-k]').forEach(el=>{ const k=el.dataset.k; let v=el.value.trim(); if(k==='name'&&!v){ v=p.name; } const old=p[k]==null?'':String(p[k]); if(v!==old){ ch.push(`${PERSON_FIELDS.find(f=>f[0]===k)[1].toLowerCase()}: ${old||'—'} → ${v||'—'}`); if(v===''&&k!=='name') delete p[k]; else p[k]=v; } });
+    if(ch.length){ logChange('úprava osoby',p.name+' – '+ch.join('; ')); save(); render(); toast('Údaje uloženy.'); } showPop(p,null); };
+  pop.querySelectorAll('input[data-k]').forEach(i=>i.addEventListener('keydown',e=>{ if(e.key==='Enter') $('#popSave').click(); }));
+}
 function showPop(p,anchor){
   const pop=$('#pop'); const cur=currentPosOf(p.id);
   pop.innerHTML=`<h3>${esc(p.name)}</h3><dl>
@@ -400,12 +413,12 @@ function showPop(p,anchor){
     <dt>V ÚRÚ</dt><dd>${cur?esc(unitPath(cur.u).slice(-2).join(' › '))+' – '+esc(cur.p.label):'<i>nezařazen/a</i>'}</dd>
     <dt>IT vybavení</dt><dd>${(()=>{const its=personItems(p);return its.length?esc(its.map(x=>catById()[x.id].name).join(', ')):'<i>nic</i>';})()}</dd>
     <dt>Lokalita</dt><dd>${ROLE.org?`<select id="popLoc" style="width:100%"><option value="">dle útvaru${(()=>{const l=cur?unitLoc(cur.u):null;return l?' ('+LOC[l].name+')':' (neurčeno)';})()}</option>${LOCATIONS.map(l=>`<option value="${l.id}"${p.loc===l.id?' selected':''}>${l.abbr} · ${l.name}</option>`).join('')}</select>`:(()=>{const l=personLoc(p).id;return l?esc(LOC[l].name):'—';})()}</dd></dl>
-    <div class="row">${ROLE.org&&cur?'<button id="popUn">Uvolnit místo</button>':''}${ROLE.org?'<button id="popDel" style="color:var(--danger)">Smazat osobu</button>':''}<button id="popClose" class="primary">Zavřít</button></div>`;
+    <div class="row">${ROLE.org&&cur?'<button id="popUn">Uvolnit místo</button>':''}${ROLE.org?'<button id="popDel" style="color:var(--danger)">Smazat osobu</button>':''}${ROLE.org?'<button id="popEdit">Upravit údaje</button>':''}<button id="popClose" class="primary">Zavřít</button></div>`;
   pop.hidden=false;
-  const r=anchor.getBoundingClientRect(); let x=r.left, y=r.bottom+6;
+  if(anchor){ const r=anchor.getBoundingClientRect(); let x=r.left, y=r.bottom+6;
   if(x+330>innerWidth) x=innerWidth-335; if(y+pop.offsetHeight>innerHeight) y=Math.max(8,r.top-pop.offsetHeight-6);
-  pop.style.left=x+'px'; pop.style.top=y+'px';
-  $('#popClose').onclick=hidePop;
+  pop.style.left=x+'px'; pop.style.top=y+'px'; }
+  $('#popClose').onclick=hidePop; if($('#popEdit')) $('#popEdit').onclick=e=>{ e.stopPropagation(); showPopEdit(p); };
   if($('#popFte')) $('#popFte').onchange=()=>{ const v=Math.max(0.05,Math.min(1,parseFloat($('#popFte').value)||1)); p.fte=String(v); logChange&&logChange('úvazek',p.name+' → '+fmtF(v)); save(); render(); const c=currentPosOf(p.id); if(c&&posFree(c.u,c.p)<-0.005) toast('Pozor: kapacita místa je překročena o '+fmtF(-posFree(c.u,c.p))+' úv.'); };
   if($('#popLoc')) $('#popLoc').onchange=()=>{ p.loc=$('#popLoc').value||null; logChange&&logChange('lokalita osoby',p.name+' → '+(p.loc?LOC[p.loc].name:'dle útvaru')); save(); render(); };
   const un=$('#popUn'); if(un) un.onclick=()=>{unassign(p.id);hidePop();};
