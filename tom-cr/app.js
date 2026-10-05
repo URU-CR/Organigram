@@ -1,6 +1,6 @@
 // TOM ÚRÚ ČR – cílový provozní model úřadu od 1. 1. 2027.
 // Samostatná aplikace: model v organigram_state.id='tom-cr'; organigram ÚRÚ ČR ('main') se jen čte (živě).
-const APP_VERSION='2026-10-05.15';
+const APP_VERSION='2026-10-05.16';
 const APP_ID='tom-cr', STATE_ID='tom-cr', ORG_ID='main', LS_KEY='uru-tom-cr-v1';
 
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
@@ -60,7 +60,7 @@ function seedState(){
     assign:(f.a||[]).map(([u,r])=>({unit:u,role:r,name:U[u]?U[u].name:''}))}; });
   S.links.forEach(([a,b,k,l])=>st.links.push({id:uid('l'),from:a,to:b,kind:k,label:l||''}));
   S.rules.forEach(r=>st.rules.push({...r,on:true}));
-  applySums(st); addEnv(st); seedProcesses(st); st.show2028=false; st.modelVersion=9; autoLayout(st); return st;
+  applySums(st); addEnv(st); seedProcesses(st); st.show2028=false; st.modelVersion=10; autoLayout(st); return st;
 }
 // vnější okolí a systémy z výchozího návrhu (doplní jen chybějící)
 // rozdělení „Ekonomický a personální systém“ na MÚZO a VEMA (model verze 8)
@@ -159,7 +159,9 @@ function normalize(){ ['groups','links','rules','proposals','versions'].forEach(
   if(state.modelVersion===7){ splitEconSystem(state); state.modelVersion=8; }
   if(state.modelVersion===8){ [['y10','docházka, dovolené, výplatní pásky'],['y5','evidence a oběh dokumentů, spisy']].forEach(([id,use])=>{ const s=state.funcs[id]; if(s&&s.kind==='system'&&s.allUsers===undefined){ s.allUsers=true; s.allUse=use; } });
     state.modelVersion=9; logChange('model','průřezové systémy: VEMA, ESPIS (používají všichni zaměstnanci)'); }
-  if(state.modelVersion<5){ seedProcesses(state); addCoordination(state); normProcesses(state); state.modelVersion=9; logChange('model','doplněny procesy a role'); setTimeout(()=>toast('Nový pohled Procesy: příjem žádosti (Portál; DS, e-mail, osobně).'),900); }
+  if(state.modelVersion===9){ let n=0; if(state.funcs.y2) ['s1','f06','s2'].forEach(f=>{ if(state.funcs[f]&&!state.links.some(l=>l.from===f&&l.to==='y2'&&l.kind==='pouziva')){ state.links.push({id:uid('l'),from:f,to:'y2',kind:'pouziva',label:'elektronická dokumentace'}); n++; } });
+    state.modelVersion=10; if(n) logChange('vazba',`ISSŘ – elektronická dokumentace: doplněno ${n} vazeb (povolování, integrované DO)`); }
+  if(state.modelVersion<5){ seedProcesses(state); addCoordination(state); normProcesses(state); state.modelVersion=10; logChange('model','doplněny procesy a role'); setTimeout(()=>toast('Nový pohled Procesy: příjem žádosti (Portál; DS, e-mail, osobně).'),900); }
   if(drill&&!(state.funcs[drill]&&state.funcs[drill].sum)) drill=null;
   if(state.show2028===undefined) state.show2028=true; state.colorBy=state.colorBy||'conf'; state.view=state.view||'map';
   Object.values(state.funcs).forEach(f=>{ f.assign=f.assign||[]; f.notes=f.notes||[]; f.locs=f.locs||[]; f.status=f.status||'navrh'; f.period=f.period||'2027'; }); }

@@ -84,7 +84,7 @@ window.TOM_SEED = {
     ['a1','s1','zada'],['a1','f06','zada'],['a1','y1','zada','podání přes portál'],['a2','f08','odvolava','rozklad'],['a2','f09','odvolava'],
     ['a5','s1','stanovisko'],['a7','s1','odvolani','soudní přezkum'],['f16','a3','metodika'],['f16','a4','metodika'],['f12','a3','podklad','ÚAP'],
     ['f17','a6','podklad','návrhy předpisů'],['f30','a8','ridi'],
-    ['s1','y4','pouziva'],['s2','y4','pouziva','koordinované stanovisko'],['f06','y4','pouziva'],['f07','y4','pouziva'],['f08','y4','pouziva'],['f09','y2','pouziva'],
+    ['s1','y4','pouziva'],['s1','y2','pouziva','elektronická dokumentace'],['f06','y2','pouziva','elektronická dokumentace'],['s2','y2','pouziva','elektronická dokumentace'],['s2','y4','pouziva','koordinované stanovisko'],['f06','y4','pouziva'],['f07','y4','pouziva'],['f08','y4','pouziva'],['f09','y2','pouziva'],
     ['f12','y6','pouziva'],['f13','y6','pouziva'],['f27','y5','pouziva'],['f23','y10','spravuje'],
     ['f26','y1','spravuje'],['f26','y2','spravuje'],['f26','y3','spravuje'],['f25','y4','spravuje'],['f25','y5','spravuje'],['f14','y6','spravuje'],['f24','y9','spravuje'],
     ['y1','y2','data'],['y2','y3','data'],['y4','y3','data','zatím neúplně'],['y7','y5','data'],['y8','y2','data']
