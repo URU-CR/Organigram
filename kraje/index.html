@@ -69,7 +69,6 @@ aside .pool-head h2 span{color:var(--muted);font-weight:400}
 .wssw{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
 .wssw button{border:0;border-radius:0;padding:6px 10px;font-weight:600}
 .wssw button.on{background:var(--accent);color:#fff}
-body.ws-kr #vwLoc,body.ws-kr select.locsel{display:none}
 .wssw{display:none} /* krajské ÚRÚ přesunuty do samostatné aplikace */
 #btnEdit.on{background:#FFF1C2;border-color:#E8C960}
 #chartRoot{font:inherit;padding:4px 8px;border:1px solid var(--line);border-radius:6px;max-width:320px}
@@ -130,10 +129,10 @@ body.presenting .gsearch{display:none}
 .person.src-DESÚ{background:var(--c-desu)}.person.src-MMR{background:var(--c-mmr)}.person.src-ÚÚR{background:var(--c-uur)}
 .person.src-MD{background:var(--c-md)}.person.src-MPO{background:var(--c-mpo)}.person.src-Nové{background:var(--c-nove)}
 .person.src-Jiný{background:#E5E7EB}
+.lockraj{padding:10px 16px 0;font-size:13px} .lockraj select{font:inherit;padding:3px 6px}
 .uname .orp{display:block;font-weight:400;font-size:11.5px;color:var(--muted);margin-top:1px}
 .box .orpb{font-weight:400;font-size:11px;color:var(--muted);margin-top:2px}
 .person.src-Obec{background:var(--c-uur)}.person.src-KÚ{background:var(--c-mmr)}.person.src-ÚRÚ{background:var(--c-desu)}
-body.ws-kr .person .loc{display:none}
 header h1 a.back{font-size:12px;font-weight:400;margin-right:8px;color:var(--accent);text-decoration:none}
 .person .loc{margin-left:auto;flex:none;font-size:10px;font-weight:700;letter-spacing:.02em;padding:1px 5px;border-radius:4px;background:rgba(255,255,255,.75);border:1px solid rgba(0,0,0,.18);color:#1B2430}
 .person .loc.inh{opacity:.7;font-weight:600}
@@ -389,12 +388,12 @@ table.ov td.z{color:#B6BEC9}
 </head>
 <body class="ws-kr">
 <header>
-  <h1>Krajské ÚRÚ<small><a class="back" href="../" title="organigram ÚRÚ ČR (samostatná aplikace)">← ÚRÚ ČR</a>pracovní model soustavy od roku 2028 · <span id="ver">index 2026-10-05.5</span></small></h1>
+  <h1>Krajské ÚRÚ<small><a class="back" href="../" title="organigram ÚRÚ ČR (samostatná aplikace)">← ÚRÚ ČR</a>pracovní model soustavy od roku 2028 · <span id="ver">index 2026-10-05.6</span></small></h1>
   <div class="stats" id="stats"></div>
   <span class="user" id="user"><span class="dot" id="syncDot"></span><span id="userMail"></span></span>
   <div class="legend" id="legend"></div>
   <div class="gsearch"><input type="search" id="search" placeholder="Hledat – jméno, útvar, číslo místa…" autocomplete="off"><span class="cnt" id="scnt"></span><div id="sres"></div></div>
-  <div class="viewsw" role="group" aria-label="Pohled"><button id="vwTree" class="on">Strom</button><button id="vwChart">Diagram</button><button id="vwLoc" hidden>Lokality</button><button id="vwSys" hidden>Systemizace</button></div><span class="treeonly"><button id="btnExpandAll" title="Rozbalit všechny útvary">▾ Rozbalit vše</button><button id="btnCollapseAll" title="Sbalit všechny útvary pod nejvyšší úrovní">▸ Sbalit vše</button></span>
+  <div class="viewsw" role="group" aria-label="Pohled"><button id="vwTree" class="on">Strom</button><button id="vwChart">Diagram</button><button id="vwLoc">Lokality</button><button id="vwSys" hidden>Systemizace</button></div><span class="treeonly"><button id="btnExpandAll" title="Rozbalit všechny útvary">▾ Rozbalit vše</button><button id="btnCollapseAll" title="Sbalit všechny útvary pod nejvyšší úrovní">▸ Sbalit vše</button></span>
   <select id="chartRoot" hidden title="který organigram zobrazit"></select>
   <span class="zoom" id="zoomWrap" hidden>Zvětšení <input type="range" id="zoom" min="50" max="120" value="85"> <span id="zoomVal">85 %</span></span>
   <span class="zoom" id="critWrap" hidden title="Zvýrazní útvary s obsazeností v daném intervalu">Kritické <input type="range" class="crit" id="crit" min="0" max="3" step="1" value="0" list="critTicks"> <span id="critVal">vypnuto</span><datalist id="critTicks"><option value="0"></option><option value="1"></option><option value="2"></option><option value="3"></option></datalist></span>
@@ -476,8 +475,8 @@ table.ov td.z{color:#B6BEC9}
 
 <script src="../vendor/xlsx.full.min.js"></script>
 <script src="../vendor/supabase.js"></script>
-<script src="../config.js?v=2026-10-05.5"></script>
-<script src="template.js?v=2026-10-05.5"></script>
-<script src="app.js?v=2026-10-05.5"></script>
+<script src="../config.js?v=2026-10-05.6"></script>
+<script src="template.js?v=2026-10-05.6"></script>
+<script src="app.js?v=2026-10-05.6"></script>
 </body
 </html>

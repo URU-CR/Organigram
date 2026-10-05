@@ -1,12 +1,22 @@
 // Krajské ÚRÚ – organigram soustavy (2028). Samostatná aplikace, data v organigram_state.id='kraje'.
 // Organigram ÚRÚ ČR (řádek 'main') se odsud pouze jednou čte při prvním spuštění (převzetí rozpracovaných krajů).
-const APP_VERSION='2026-10-05.5';
+const APP_VERSION='2026-10-05.6';
 const APP_ID='kraje';
 
 const SOURCES = ['Obec','KÚ','ÚRÚ','Nové','Jiný'];
 const SRC_NAME = {'Obec':'stavební úřad obce','KÚ':'krajský úřad','ÚRÚ':'ÚRÚ ČR','Nové':'nové místo / nábor','Jiný':'jiný'};
-const LOCATIONS = []; // lokality krajů (sídla územních pracovišť) zatím nejsou
-const LOC = Object.fromEntries(LOCATIONS.map(l=>[l.id,l]));
+const LOCATIONS = []; // lokality = sídla územních pracovišť (ORP); plní rebuildLocs() ze stavu
+const LOC = {};
+const deacc=s=>String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+function rebuildLocs(){ LOCATIONS.length=0; Object.keys(LOC).forEach(k=>delete LOC[k]); const used=new Set();
+  state.units.filter(u=>u.orp).sort((a,b)=>(a.kraj||'').localeCompare(b.kraj||'','cs')||a.orp.name.localeCompare(b.orp.name,'cs')).forEach(u=>{ const id='orp'+u.orp.kod; if(LOC[id]) return;
+    let ab=deacc(u.orp.name).replace(/[^A-Za-z]/g,'').slice(0,3).toUpperCase(), i=2; const base=ab; while(used.has(ab)) ab=base.slice(0,2)+(i++); used.add(ab);
+    const l={id,abbr:ab,name:u.orp.name,kraj:u.kraj||''}; LOCATIONS.push(l); LOC[id]=l; }); }
+// lokality modelového kraje: ÚP = jejich ORP, ředitel (a tím celá centrála) = sídlo kraje – jen jednou (vzorKrajV 3)
+function applyLocations(st){ if((st.vzorKrajV||1)>=3) return null; st.vzorKrajV=3; let n=0;
+  st.units.filter(u=>u.orp&&!u.loc).forEach(u=>{ u.loc='orp'+u.orp.kod; n++; });
+  st.units.filter(u=>!u.parent&&u.kraj&&(window.KRAJ_SIDLO||{})[u.kraj]).forEach(r=>{ const s=window.KRAJ_SIDLO[r.kraj]; const o=st.units.find(u=>u.orp&&u.kraj===r.kraj&&u.orp.name===s); if(o&&!r.loc){ r.loc='orp'+o.orp.kod; n++; } });
+  return n?'Doplněny lokality: územní pracoviště podle ORP, ostatní útvary podle sídla kraje (Vysočina: Jihlava).':null; }
 function guessUnitLoc(name){ const n=name.toLowerCase(); if(n.includes('plzeň'))return 'PL'; if(n.includes('olomouc'))return 'OL'; if(n.includes('brno'))return 'BR'; if(n.includes('budějovice'))return 'CB'; if(n.includes('letiště')||n.includes('leteck'))return null; return null; }
 // effective location of a unit (own or inherited from parent chain)
 function unitLoc(u){ const m=byId(); let c=u; while(c){ if(c.loc) return c.loc; c=m[c.parent]; } return null; }
@@ -16,7 +26,7 @@ function personLoc(p){ if(p.loc) return {id:p.loc,own:true}; const c=currentPosO
 function locTag(p){ const l=personLoc(p); const sp=document.createElement('span'); sp.className='loc '+(l.id?(l.own?'':'inh'):'none'); sp.textContent=l.id?LOC[l.id].abbr:'?'; sp.title=l.id?(LOC[l.id].name+(l.own?' (nastaveno u osoby)':' (dle útvaru)')):'lokalita neurčena'; return sp; }
 function locSelect(u,cls){ const sel=document.createElement('select'); sel.className='locsel'+(u.loc?'':' inh')+(cls?' '+cls:'');
   const src=unitLocSource(u); const inh=src&&src!==u?src:null;
-  sel.innerHTML=`<option value="">${inh?'dle nadřízeného: '+LOC[inh.loc].abbr:'— lokalita —'}</option>`+LOCATIONS.map(l=>`<option value="${l.id}">${l.abbr} · ${l.name}</option>`).join('');
+  sel.innerHTML=`<option value="">${inh?'dle nadřízeného: '+LOC[inh.loc].abbr:'— lokalita —'}</option>`+LOCATIONS.filter(l=>!u.kraj||!l.kraj||l.kraj===u.kraj).map(l=>`<option value="${l.id}">${l.abbr} · ${l.name}</option>`).join('');
   sel.value=u.loc||''; sel.title='Lokalita útvaru – přenese se na všechny jeho zaměstnance, kteří nemají nastavenou vlastní';
   sel.disabled=!ROLE.org; sel.onclick=e=>e.stopPropagation(); sel.onchange=()=>{ u.loc=sel.value||null; logChange&&logChange('lokalita útvaru',u.name+' → '+(u.loc?LOC[u.loc].name:'dle nadřízeného')); save(); render(); }; return sel; }
 const SRC_COLOR = {'Obec':'var(--c-uur)','KÚ':'var(--c-mmr)','ÚRÚ':'var(--c-desu)','Nové':'var(--c-nove)','Jiný':'#E5E7EB'};
@@ -37,9 +47,10 @@ let people = {};    // id -> person
 let pidCounter = 1;
 
 function freshState(){ const units=buildFromTemplate(KRAJ_TEMPLATE,KRAJ_VZOR); const root=units.find(u=>!u.parent); root.vzor=true; units.push(...orpUnits(root,KRAJ_VZOR,ORP_VZOR));
-  return { app:APP_ID, units, people:{}, collapsed:{}, nextPid:1, vzorKraj:KRAJ_VZOR, vzorKrajV:2, chartRoot:root.id, view:'chart' }; }
+  const sid=(window.KRAJ_SIDLO||{})[KRAJ_VZOR], so=units.find(u=>u.orp&&u.orp.name===sid); if(so) root.loc=so.loc;
+  return { app:APP_ID, units, people:{}, collapsed:{}, nextPid:1, vzorKraj:KRAJ_VZOR, vzorKrajV:3, chartRoot:root.id, view:'chart' }; }
 // územní pracoviště podle ORP: dnešní zaměstnanci = místa delimitace, rozdíl do cílové potřeby = nadpožadavek
-function orpUnits(root,kraj,list){ return (list||[]).map(o=>{ const u={id:newUid(),parent:root.id,name:'Územní pracoviště '+o.name,level:'up',src:'Obec',kraj,orp:{...o},positions:[]};
+function orpUnits(root,kraj,list){ return (list||[]).map(o=>{ const u={id:newUid(),parent:root.id,name:'Územní pracoviště '+o.name,level:'up',src:'Obec',kraj,orp:{...o},loc:'orp'+o.kod,positions:[]};
   const dnes=Math.max(1,o.dnes||0), cil=Math.ceil(o.potreba||0), nad=Math.max(0,cil-dnes); const hl=HEAD_LBL.up;
   u.positions.push({id:newPid(),kind:'head',label:hl,cat:'delim',persons:[]});
   for(let i=1;i<dnes;i++) u.positions.push({id:newPid(),kind:'ref',label:'referent',cat:'delim',persons:[]});
@@ -110,8 +121,8 @@ async function loadRemote(){
   if(data&&data.data&&data.data.units){ state=data.data; version=data.version||0; }
   else { took=await takeOverFromCr(); state=took.state; version=0; const r=await sb.from('organigram_state').upsert({id:STATE_ID,data:state,version:0,updated_by:currentUser.email}); if(r.error) throw r.error; }
   state.app=APP_ID; state.view=state.view||'tree'; if(!state.zoom) state.zoom=85;
-  migrateActive(state); const vz=applyVzorKraj(state), sv=addServiceUnits(state); markBaseline();
-  if(vz){ logChange('struktura',vz); } if(sv){ logChange('struktura',sv); } if(vz||sv){ persist(); setTimeout(()=>alert([vz,sv].filter(Boolean).join('\n\n')),400); }
+  migrateActive(state); const vz=applyVzorKraj(state), sv=addServiceUnits(state), lc=applyLocations(state); markBaseline();
+  [vz,sv,lc].filter(Boolean).forEach(m=>logChange('struktura',m)); if(vz||sv||lc){ persist(); setTimeout(()=>alert([vz,sv,lc].filter(Boolean).join('\n\n')),400); }
   if(took){ logChange('založení',took.msg); persist(); setTimeout(()=>alert(took.msg),300); }
   try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){}
 }
@@ -221,6 +232,7 @@ function subtreeCount(u){ normalizePositions(); let t=u.positions.length,f=u.pos
 
 let activeFilters=new Set(SOURCES);
 function render(){
+  rebuildLocs();
   normalizePositions();
   const tree=$('#tree'); const scroll=tree.scrollTop; tree.innerHTML='';
   state.units.filter(u=>!u.parent).forEach(u=>tree.appendChild(renderUnit(u)));
@@ -398,6 +410,7 @@ function showPop(p,anchor){
     <dt>Platová třída</dt><dd>${esc(p.cls||'—')}</dd>
     <dt>Úvazek</dt><dd>${ROLE.org?`<input type="number" id="popFte" step="0.05" min="0.05" max="1" value="${personFte(p)}" style="width:90px"> <span style="color:var(--muted);font-size:12px">(1 = plný)</span>`:fmtF(personFte(p))}</dd>
     ${p.note?`<dt>Poznámka</dt><dd>${esc(p.note)}</dd>`:''}
+    <dt>Lokalita</dt><dd>${ROLE.org?`<select id="popLoc" style="width:100%"><option value="">dle útvaru${(()=>{const l=cur?unitLoc(cur.u):null;return l&&LOC[l]?' ('+LOC[l].name+')':' (neurčeno)';})()}</option>${LOCATIONS.map(l=>`<option value="${l.id}"${p.loc===l.id?' selected':''}>${l.abbr} · ${l.name}</option>`).join('')}</select>`:(()=>{const l=personLoc(p).id;return l&&LOC[l]?esc(LOC[l].name):'—';})()}</dd>
     <dt>V krajském ÚRÚ</dt><dd>${cur?esc(unitPath(cur.u).slice(-2).join(' › '))+' – '+esc(cur.p.label):'<i>nezařazen/a</i>'}</dd>
 </dl>
     <div class="row">${ROLE.org&&cur?'<button id="popUn">Uvolnit místo</button>':''}${ROLE.org?'<button id="popDel" style="color:var(--danger)">Smazat osobu</button>':''}${ROLE.org?'<button id="popEdit">Upravit údaje</button>':''}<button id="popClose" class="primary">Zavřít</button></div>`;
@@ -593,7 +606,7 @@ let chartFresh=true;
 const CRIT_STEPS=[null,25,50,75]; let critLevel=0;
 function isCrit(u){ const v=CRIT_STEPS[critLevel]; if(!v) return false; const c=childrenOf(u.id).length?subtreeCount(u):{total:u.positions.length,filled:u.positions.filter(p=>p.person).length}; if(!c.total) return false; return 100*c.filled/c.total<=v; }
 $('#crit').oninput=()=>{ critLevel=+$('#crit').value; const v=CRIT_STEPS[critLevel]; $('#critVal').textContent=v?`obsazeno 0–${v} %`:'vypnuto'; document.body.classList.toggle('critmode',!!v); render(); };
-function setView(v){ if(!['tree','chart'].includes(v)) v='tree'; if(editing&&v!=='tree'){ editing=false; document.body.classList.remove('editing'); $('#btnEdit').classList.remove('on'); } state.view=v; if(v==='chart') chartFresh=true; document.body.classList.toggle('view-chart',v==='chart'); document.body.classList.toggle('view-loc',v==='loc'); document.body.classList.toggle('view-sys',v==='sys');
+function setView(v){ if(!['tree','chart','loc'].includes(v)) v='tree'; if(editing&&v!=='tree'){ editing=false; document.body.classList.remove('editing'); $('#btnEdit').classList.remove('on'); } state.view=v; if(v==='chart') chartFresh=true; document.body.classList.toggle('view-chart',v==='chart'); document.body.classList.toggle('view-loc',v==='loc'); document.body.classList.toggle('view-sys',v==='sys');
   $('#vwTree').classList.toggle('on',!['chart','loc','sys','it'].includes(v)); $('#vwSys').classList.toggle('on',v==='sys'); $('#vwChart').classList.toggle('on',v==='chart'); $('#vwLoc').classList.toggle('on',v==='loc'); $('#zoomWrap').hidden=v!=='chart'; $('#critWrap').hidden=v!=='chart'; render(); }
 $('#vwTree').onclick=()=>setView('tree'); $('#vwChart').onclick=()=>setView('chart'); $('#vwLoc').onclick=()=>setView('loc'); $('#vwSys').onclick=()=>setView('sys');
 $('#zoom').oninput=()=>{ state.zoom=+$('#zoom').value; $('#zoomVal').textContent=state.zoom+' %'; const oc=$('#chart .oc'); if(oc) oc.style.transform='scale('+state.zoom/100+')'; };
@@ -634,9 +647,15 @@ function chartNode(u){
 }
 function renderLoc(){
   const c=$('#locview'); const st=c.scrollTop; c.innerHTML='';
-  const cols=[...LOCATIONS,{id:null,abbr:'?',name:'Lokalita neurčena'}];
+  const roots=state.units.filter(u=>!u.parent); const root=roots.find(u=>u.id===state.chartRoot)||roots.find(u=>u.vzor)||roots[0];
+  const inRoot=new Set(); const w=id=>{ inRoot.add(id); state.units.filter(x=>x.parent===id).forEach(x=>w(x.id)); }; if(root) w(root.id);
+  const kraj=root&&root.kraj; const locs=LOCATIONS.filter(l=>!kraj||l.kraj===kraj);
+  const bar=document.createElement('div'); bar.className='lockraj'; bar.innerHTML=roots.length>1?`Kraj: <select>${roots.map(r=>`<option value="${r.id}" ${r===root?'selected':''}>${esc(r.kraj||r.name)}</option>`).join('')}</select>`:`<b>${esc(root?(root.kraj||root.name):'')}</b>`;
+  const bs=bar.querySelector('select'); if(bs) bs.onchange=()=>{ state.chartRoot=bs.value; render(); }; c.appendChild(bar);
+  if(!locs.length){ const e=document.createElement('div'); e.style.cssText='padding:24px;color:var(--muted)'; e.textContent='Tento kraj zatím nemá územní pracoviště (ORP), a tedy ani lokality.'; c.appendChild(e); return; }
+  const cols=[...locs,{id:null,abbr:'?',name:'Lokalita neurčena'}];
   const grid=document.createElement('div'); grid.className='loccols';
-  const assignedPeople=assignedList().map(x=>({p:x.h,u:x.u,pos:x.p}));
+  const assignedPeople=assignedList().filter(x=>inRoot.has(x.u.id)).map(x=>({p:x.h,u:x.u,pos:x.p}));
   cols.forEach(l=>{
     const people=assignedPeople.filter(x=>personLoc(x.p).id===l.id);
     const col=document.createElement('div'); col.className='loccol'+(l.id?'':' none');
