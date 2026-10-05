@@ -113,6 +113,27 @@ body.drilling #btnAddG{display:none}
 .gframe.band{border-style:solid;border-width:1px;background:rgba(255,255,255,.25)}
 .gframe.band-actor{background:rgba(51,65,85,.04)} .gframe.band-system{background:rgba(15,118,110,.05)}
 .leg i.acti{border-radius:7px;border-color:#94A3B8;background:#F8FAFC} .leg i.sysi{border-radius:1px;border-color:#5EAAA0;background:#F0FDFA}
+.rrow{display:grid;grid-template-columns:1fr 1fr 34px 30px;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid #EEF0F3} .rrow select{font-size:12px;padding:3px 5px}
+#v-proc{display:flex;flex-direction:column;overflow:hidden}
+#pconnHint{color:var(--accent);font-weight:600}
+#pWrap{flex:1;overflow:auto;position:relative;touch-action:pan-x pan-y}
+#pCanvas{position:relative;transform-origin:0 0}
+.plane{position:absolute;background:rgba(255,255,255,.35);border-right:1px dashed #D5DAE1} .plane.odd{background:rgba(255,255,255,.7)}
+.phead{position:absolute;background:#fff;border:1px solid var(--line);border-top:4px solid #9AA4B2;border-radius:6px;padding:4px 8px;font-size:12.5px;line-height:1.25;cursor:pointer;overflow:hidden}
+.phead .pt{display:block;font-size:10.5px;color:var(--muted)} .phead .ps{display:block;font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.phead.t-role{border-top-color:#7C3AED} .phead.t-actor{border-top-color:#334155;border-radius:14px} .phead.t-system{border-top-color:#0F766E;background:#F0FDFA} .phead.t-func{border-top-color:#4472C4} .phead.t-gone{border-top-color:var(--danger)}
+.phead.sel{box-shadow:0 0 0 3px rgba(29,78,216,.35)}
+.pstep{position:absolute;width:180px;min-height:52px;background:#fff;border:1.5px solid #B7C0CC;border-radius:7px;padding:7px 9px;font-size:12.5px;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;box-shadow:0 1px 2px rgba(27,36,48,.08)}
+.pstep .pn{font-weight:600;line-height:1.25;padding-right:14px} .pstep .pm{font-size:11px;color:var(--muted);margin-top:2px}
+.pstep.k-decision{border-color:#F79009;background:#FFFAEB;border-width:2px} .pstep.k-start,.pstep.k-end{border-radius:26px;background:#F7F8FA}
+.pstep.sel{box-shadow:0 0 0 3px rgba(29,78,216,.35)} .pstep.from{box-shadow:0 0 0 3px #7C3AED} .pstep.drag{opacity:.85;z-index:5}
+.pstep.sev-warn{border-color:#F79009} .pstep.sev-err{border-color:var(--danger)}
+.pstep .pnote{position:absolute;right:5px;top:5px;width:16px;height:16px;border-radius:50%;background:#7C3AED;color:#fff;font-size:11px;font-weight:700;text-align:center;line-height:16px}
+.pstep .cb{position:absolute;right:5px;bottom:5px;font-size:10px;padding:0 5px}
+body.pconnecting .pstep{cursor:crosshair}
+svg.pflows{position:absolute;left:0;top:0;overflow:visible;pointer-events:none} svg.pflows .pf{pointer-events:auto;cursor:pointer} svg.pflows path.hit{stroke:transparent;stroke-width:12}
+svg.plabels text{font-size:11px;font-weight:600;fill:#334155;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round} svg.plabels text.on{fill:#1D4ED8}
+body.presenting .ptools{display:none!important}
 .fbox.flash{animation:fl 1.4s} @keyframes fl{0%,60%{box-shadow:0 0 0 6px rgba(245,158,11,.6)}100%{box-shadow:none}}
 
 /* organigram */
@@ -176,10 +197,10 @@ body.presenting .fbox .cb.note{display:none}
 </head>
 <body>
 <header>
-  <h1>TOM ÚRÚ ČR<small><a href="../" title="organigram ÚRÚ ČR (samostatná aplikace)">← organigram ÚRÚ ČR</a>cílový provozní model od 1. 1. 2027 · <span id="ver">index 2026-10-05.6</span></small></h1>
+  <h1>TOM ÚRÚ ČR<small><a href="../" title="organigram ÚRÚ ČR (samostatná aplikace)">← organigram ÚRÚ ČR</a>cílový provozní model od 1. 1. 2027 · <span id="ver">index 2026-10-05.7</span></small></h1>
   <div class="stats" id="stats"></div>
   <span class="user"><span class="dot" id="syncDot"></span><span id="userMail"></span></span>
-  <div class="viewsw" role="group" aria-label="Pohled"><button data-v="map" class="on">Mapa funkcí</button><button data-v="org">Organigram</button><button data-v="conf" id="tabConf">Rozpory</button><button data-v="prop">Návrhy změn</button><button data-v="ver">Verze</button></div>
+  <div class="viewsw" role="group" aria-label="Pohled"><button data-v="map" class="on">Mapa funkcí</button><button data-v="org">Organigram</button><button data-v="proc">Procesy</button><button data-v="conf" id="tabConf">Rozpory</button><button data-v="prop">Návrhy změn</button><button data-v="ver">Verze</button></div>
   <div class="actions">
     <button id="btnUndo" class="adm" title="Zpět (Ctrl+Z)" disabled>↶ Zpět</button>
     <button id="btnRedo" class="adm" title="Znovu (Ctrl+Y)" disabled>↷</button>
@@ -213,6 +234,20 @@ body.presenting .fbox .cb.note{display:none}
     <div id="canvasWrap"><div id="canvas"></div></div>
   </section>
   <section class="view" id="v-org" hidden></section>
+  <section class="view" id="v-proc" hidden>
+    <div class="mtools ptools">
+      <select id="procSel" title="proces" style="max-width:340px"></select>
+      <button id="pBtnNew" class="adm">+ proces</button>
+      <button id="pBtnLane" class="adm" title="Přidat dráhu: kdo jedná (role, aktér, systém)">+ dráha</button>
+      <button id="pBtnStep" class="adm" title="Přidá krok pod vybraný krok, nebo do vybrané dráhy">+ krok</button>
+      <button id="pBtnConnect" class="adm" title="Šipka: klikněte na krok a pak na následující krok">Spojit</button>
+      <button id="pBtnRoles">Role…</button>
+      <span id="pconnHint" hidden></span>
+      <span style="margin-left:auto"></span>
+      <label>Zvětšení <input type="range" id="pzoom" min="40" max="130" value="85"> <span id="pzoomVal">85 %</span></label>
+    </div>
+    <div id="pWrap"><div id="pCanvas"></div></div>
+  </section>
   <section class="view" id="v-conf" hidden></section>
   <section class="view" id="v-prop" hidden></section>
   <section class="view" id="v-ver" hidden></section>
@@ -235,12 +270,19 @@ body.presenting .fbox .cb.note{display:none}
 <dialog id="dlgKinds"><div class="dhead"><h2>Druhy vazeb</h2><p class="muted">Název, barva a styl čáry. Použitý druh lze sloučit do jiného – jeho vazby se převedou.</p></div>
   <div class="dbody"><div id="kindsBody"></div><div class="krow" style="margin-top:10px"><span></span><input type="text" id="kindNew" placeholder="nový druh vazby, např. „konzultuje“"><button id="kindAdd" class="small">+ přidat</button></div></div>
   <div class="dfoot"><button id="kindsClose" class="primary">Hotovo</button></div></dialog>
+<dialog id="dlgLane"><div class="dhead"><h2>Nová dráha</h2><p class="muted">Kdo v procesu jedná: role (patří k funkci a tím k útvaru), aktér okolí, nebo systém, který krok provádí sám.</p></div>
+  <div class="dbody"><label>Kdo / co</label><select id="laneEl"></select></div>
+  <div class="dfoot"><button id="laneCancel">Zrušit</button><button id="laneOk" class="primary">Přidat</button></div></dialog>
+<dialog id="dlgRoles"><div class="dhead"><h2>Role</h2><p class="muted">Role jedná v procesech. Patří k funkci – ta určuje útvar v organigramu. Pro soustavu 2028 se stejné role budou opakovat na krajích a územních pracovištích.</p></div>
+  <div class="dbody"><div id="rolesBody"></div><div class="rrow" style="margin-top:10px"><input type="text" id="roleNew" placeholder="nová role, např. „Vedoucí územního pracoviště“"><span></span><span></span><button id="roleAdd" class="small">+ přidat</button></div></div>
+  <div class="dfoot"><button id="rolesClose" class="primary">Hotovo</button></div></dialog>
 <dialog id="dlgLog"><div class="dhead"><h2>Historie změn modelu</h2></div><div class="dbody loglist" id="logBody"></div><div class="dfoot"><button id="logClose" class="primary">Zavřít</button></div></dialog>
 
 <script src="../vendor/xlsx.full.min.js"></script>
 <script src="../vendor/supabase.js"></script>
-<script src="../config.js?v=2026-10-05.6"></script>
-<script src="model.js?v=2026-10-05.6"></script>
-<script src="app.js?v=2026-10-05.6"></script>
+<script src="../config.js?v=2026-10-05.7"></script>
+<script src="model.js?v=2026-10-05.7"></script>
+<script src="process.js?v=2026-10-05.7"></script>
+<script src="app.js?v=2026-10-05.7"></script>
 </body>
 </html>

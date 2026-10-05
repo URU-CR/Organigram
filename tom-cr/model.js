@@ -87,6 +87,27 @@ window.TOM_SEED = {
     ['f26','y1','spravuje'],['f26','y2','spravuje'],['f26','y3','spravuje'],['f25','y4','spravuje'],['f25','y5','spravuje'],['f14','y6','spravuje'],['f24','y9','spravuje'],
     ['y1','y2','data'],['y2','y3','data'],['y4','y3','data','zatím neúplně'],['y7','y5','data'],['y8','y2','data']
   ],
+  // role (kdo v procesu jedná) a procesy – doplněno 5. 10. 2026
+  roles: [
+    {id:'r_pod', name:'Podatelna', func:'f27'},
+    {id:'r_roz', name:'Rozdělovatel na sekci', func:'s1', desc:'kdo konkrétně – k ověření'},
+    {id:'r_ved', name:'Vedoucí útvaru', func:'s1'},
+    {id:'r_ref', name:'Referent', func:'s1'}
+  ],
+  processes: [
+    {id:'p1', name:'Příjem žádosti – Portál stavebníka', desc:'Podání přes Portál stavebníka; žádost vede ISSŘ → ESZ → VITA → ESPIS.',
+     lanes:[['L1','a1'],['L2','y1'],['L3','y2'],['L4','y3'],['L5',null,'r_roz'],['L6',null,'r_ved'],['L7',null,'r_ref'],['L8','y5']],
+     steps:[['s1','L1',0,'Podá žádost','start',null,'portal'],['s2','L2',1,'Odeslání žádosti'],['s3','L3',2,'Přijetí žádosti'],['s4','L4',3,'Zápis záměru do ESZ'],
+       ['s5','L5',4,'Rozdělí žádost útvarům',null,'y4',null,'Kdo na sekci rozděluje? Platí i pro stavby pro bydlení? – k ověření'],['s6','L6',5,'Přidělí referentovi',null,'y4'],
+       ['s7','L7',6,'Stáhne žádost z ESZ',null,'y4',null,'Doplnění k běžícímu řízení přes Portál – jde také přes rozdělení a vedoucího? – k ověření'],['s8','L8',7,'Založení spisu (z VITA)','end']],
+     flows:[['s1','s2'],['s2','s3'],['s3','s4'],['s4','s5'],['s5','s6'],['s6','s7'],['s7','s8']]},
+    {id:'p2', name:'Příjem žádosti – DS, e-mail, osobně', desc:'Podání mimo Portál; žádost přijímá podatelna do ESPIS a referent ji předává do VITA.',
+     lanes:[['L1','a1'],['L2',null,'r_pod'],['L3',null,'r_ved'],['L4',null,'r_ref'],['L5','y4']],
+     steps:[['s1','L1',0,'Podá žádost','start',null,'ds'],['s2','L2',1,'Příjem do ESPIS',null,'y5',null,'Osobní podání: konverze listin na podatelně – k ověření'],
+       ['s3','L2',2,'Spis už existuje?','decision','y5'],['s4','L3',3,'Přidělí referentovi',null,'y5'],['s5','L4',4,'Převezme dokument',null,'y5'],
+       ['s6','L4',5,'Předá do VITA',null,'y5'],['s7','L5',6,'Řízení vedeno ve VITA','end',null,null,'Zapisuje VITA řízení zpětně do ESZ? – k ověření']],
+     flows:[['s1','s2'],['s2','s3'],['s3','s4','ne – nový spis'],['s3','s5','ano'],['s4','s5'],['s5','s6'],['s6','s7']]}
+  ],
   links: [
     ['f08','f01','odvolani'],['f08','f02','odvolani'],['f08','f05','odvolani'],
     ['f10','f05','podklad','stanovisko jako vnitřní podklad'],['f11','f01','podklad','stanovisko jako vnitřní podklad'],
