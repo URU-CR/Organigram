@@ -130,6 +130,8 @@ body.presenting .gsearch{display:none}
 .person.src-DESÚ{background:var(--c-desu)}.person.src-MMR{background:var(--c-mmr)}.person.src-ÚÚR{background:var(--c-uur)}
 .person.src-MD{background:var(--c-md)}.person.src-MPO{background:var(--c-mpo)}.person.src-Nové{background:var(--c-nove)}
 .person.src-Jiný{background:#E5E7EB}
+.uname .orp{display:block;font-weight:400;font-size:11.5px;color:var(--muted);margin-top:1px}
+.box .orpb{font-weight:400;font-size:11px;color:var(--muted);margin-top:2px}
 .person.src-Obec{background:var(--c-uur)}.person.src-KÚ{background:var(--c-mmr)}.person.src-ÚRÚ{background:var(--c-desu)}
 body.ws-kr .person .loc{display:none}
 header h1 a.back{font-size:12px;font-weight:400;margin-right:8px;color:var(--accent);text-decoration:none}
@@ -382,7 +384,7 @@ table.ov td.z{color:#B6BEC9}
 </head>
 <body class="ws-kr">
 <header>
-  <h1>Krajské ÚRÚ<small><a class="back" href="../" title="organigram ÚRÚ ČR (samostatná aplikace)">← ÚRÚ ČR</a>pracovní model soustavy od roku 2028 · <span id="ver">index 2026-10-05.1</span></small></h1>
+  <h1>Krajské ÚRÚ<small><a class="back" href="../" title="organigram ÚRÚ ČR (samostatná aplikace)">← ÚRÚ ČR</a>pracovní model soustavy od roku 2028 · <span id="ver">index 2026-10-05.2</span></small></h1>
   <div class="stats" id="stats"></div>
   <span class="user" id="user"><span class="dot" id="syncDot"></span><span id="userMail"></span></span>
   <div class="legend" id="legend"></div>
@@ -452,7 +454,7 @@ table.ov td.z{color:#B6BEC9}
   </div>
 </dialog>
 
-<dialog id="dlgClone"><div class="dhead"><h2>Vytvořit krajské ÚRÚ ze vzoru</h2><p>Pro každý vybraný kraj vznikne kopie tohoto organigramu (s prázdnými místy). Pozdější změny vzoru se do kopií nepřenášejí.</p></div>
+<dialog id="dlgClone"><div class="dhead"><h2>Vytvořit krajské ÚRÚ ze vzoru</h2><p>Pro každý vybraný kraj vznikne kopie centrály tohoto organigramu (s prázdnými místy). Územní pracoviště (ORP) se nekopírují – každý kraj má vlastní. Pozdější změny vzoru se do kopií nepřenášejí.</p></div>
   <div class="dbody"><div id="cloneList"></div></div>
   <div class="dfoot"><button id="cloneAll">Vybrat všechny</button><button id="cloneCancel">Zrušit</button><button id="cloneOk" class="primary">Vytvořit</button></div></dialog>
 <dialog id="dlgPerson">
@@ -470,8 +472,8 @@ table.ov td.z{color:#B6BEC9}
 
 <script src="../vendor/xlsx.full.min.js"></script>
 <script src="../vendor/supabase.js"></script>
-<script src="../config.js?v=2026-10-05.1"></script>
-<script src="template.js?v=2026-10-05.1"></script>
-<script src="app.js?v=2026-10-05.1"></script>
+<script src="../config.js?v=2026-10-05.2"></script>
+<script src="template.js?v=2026-10-05.2"></script>
+<script src="app.js?v=2026-10-05.2"></script>
 </body
 </html>

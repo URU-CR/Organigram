@@ -1,6 +1,6 @@
 // Krajské ÚRÚ – organigram soustavy (2028). Samostatná aplikace, data v organigram_state.id='kraje'.
 // Organigram ÚRÚ ČR (řádek 'main') se odsud pouze jednou čte při prvním spuštění (převzetí rozpracovaných krajů).
-const APP_VERSION='2026-10-05.1';
+const APP_VERSION='2026-10-05.2';
 const APP_ID='kraje';
 
 const SOURCES = ['Obec','KÚ','ÚRÚ','Nové','Jiný'];
@@ -23,7 +23,7 @@ const SRC_COLOR = {'Obec':'var(--c-uur)','KÚ':'var(--c-mmr)','ÚRÚ':'var(--c-d
 const SRC_DARK  = {'Obec':'var(--c-uur-d)','KÚ':'var(--c-mmr-d)','ÚRÚ':'var(--c-desu-d)','Nové':'var(--c-nove-d)','Jiný':'#6B7280'};
 const LEVEL_LBL = {predseda:'úřad',sekce:'sekce',odbor:'odbor',odd:'oddělení',up:'územní pracoviště'};
 const HEAD_LBL = {predseda:'ředitel/ka',sekce:'místopředseda',odbor:'ředitel odboru',odd:'vedoucí oddělení',up:'vedoucí územního pracoviště'};
-const KRAJE=window.KRAJE, KRAJ_TEMPLATE=window.KRAJ_TEMPLATE; // template.js
+const KRAJE=window.KRAJE, KRAJ_TEMPLATE=window.KRAJ_TEMPLATE, KRAJ_VZOR=window.KRAJ_VZOR||null, ORP_VZOR=window.ORP_VYSOCINA||[]; // template.js
 const KIND_LBL = {head:'vedoucí',asst:'asistent/ka',ref:'referent'};
 const LS_KEY = 'uru-kraje-v1';
 const STATE_ID = 'kraje';
@@ -36,7 +36,31 @@ let state = null;   // {units:[{id,parent,name,level,src,positions:[{id,kind,lab
 let people = {};    // id -> person
 let pidCounter = 1;
 
-function freshState(){ return { app:APP_ID, units:buildFromTemplate(KRAJ_TEMPLATE,null), people:{}, collapsed:{}, nextPid:1 }; }
+function freshState(){ const units=buildFromTemplate(KRAJ_TEMPLATE,KRAJ_VZOR); const root=units.find(u=>!u.parent); root.vzor=true; units.push(...orpUnits(root,KRAJ_VZOR,ORP_VZOR));
+  return { app:APP_ID, units, people:{}, collapsed:{}, nextPid:1, vzorKraj:KRAJ_VZOR, chartRoot:root.id, view:'chart' }; }
+// územní pracoviště podle ORP: dnešní zaměstnanci = místa delimitace, rozdíl do cílové potřeby = nadpožadavek
+function orpUnits(root,kraj,list){ return (list||[]).map(o=>{ const u={id:newUid(),parent:root.id,name:'Územní pracoviště '+o.name,level:'up',src:'Obec',kraj,orp:{...o},positions:[]};
+  const dnes=Math.max(1,o.dnes||0), cil=Math.ceil(o.potreba||0), nad=Math.max(0,cil-dnes); const hl=HEAD_LBL.up;
+  u.positions.push({id:newPid(),kind:'head',label:hl,cat:'delim',persons:[]});
+  for(let i=1;i<dnes;i++) u.positions.push({id:newPid(),kind:'ref',label:'referent',cat:'delim',persons:[]});
+  for(let i=0;i<nad;i++) u.positions.push({id:newPid(),kind:'ref',label:'referent',cat:'nad',persons:[]});
+  return u; }); }
+// převod dosavadního vzoru na modelový kraj (Vysočina) s ORP – jen jednou
+function applyVzorKraj(st){ if(!KRAJ_VZOR||st.vzorKraj===KRAJ_VZOR) return null;
+  const roots=st.units.filter(u=>!u.parent); let root=roots.find(u=>u.vzor)||roots.find(u=>/–\s*vzor$/i.test(u.name))||roots.find(u=>u.kraj===KRAJ_VZOR);
+  const desc=id=>{ const out=[]; const w=x=>{ out.push(x); st.units.filter(y=>y.parent===x).forEach(y=>w(y.id)); }; w(id); return out; };
+  if(!root){ const us=buildFromTemplate(KRAJ_TEMPLATE,KRAJ_VZOR); root=us.find(u=>!u.parent); st.units.push(...us); }
+  root.name=root.name.replace(/–\s*vzor$/i,'– '+KRAJ_VZOR).replace('{kraj}',KRAJ_VZOR); if(!root.name.includes(KRAJ_VZOR)) root.name+=' – '+KRAJ_VZOR; root.vzor=true;
+  const ids=new Set(desc(root.id)); st.units.forEach(u=>{ if(ids.has(u.id)) u.kraj=KRAJ_VZOR; });
+  // zástupná územní pracoviště (bez ORP a bez obsazených míst) nahradit skutečnými ORP
+  const occ=u=>u.positions.some(p=>(Array.isArray(p.persons)?p.persons.length:p.person));
+  const old=st.units.filter(u=>u.parent===root.id&&u.level==='up'&&!u.orp); const keep=old.filter(occ);
+  st.units=st.units.filter(u=>!(old.includes(u)&&!occ(u)));
+  if(!st.units.some(u=>u.parent===root.id&&u.orp)) st.units.push(...orpUnits(root,KRAJ_VZOR,ORP_VZOR));
+  st.vzorKraj=KRAJ_VZOR; st.chartRoot=root.id;
+  return `Modelový kraj převeden na ${KRAJ_VZOR}: ${ORP_VZOR.length} územních pracovišť podle ORP (místa = dnešní zaměstnanci + nadpožadavek do cílové potřeby).`+(keep.length?` Obsazená zástupná pracoviště ponechána: ${keep.map(u=>u.name).join(', ')}.`:''); }
+const orpLine=o=>`ORP ${o.kod} · dnes ${o.dnes} lidí · přejde ~${String(o.prejde).replace('.',',')} · potřeba ${String(o.potreba).replace('.',',')}${o.su>1?' · slučuje '+o.su+' úřadů':''}`;
+const orpTitle=o=>[`Sloučené úřady: ${o.uradu}`,`Adresa sídla: ${o.adresa||'—'}`,`Personální hodnocení: ${o.hodnoceni}`,`Prostory: ${o.prostory}`,`Celkové riziko: ${o.riziko}`,o.det&&o.det.length?`Kandidát na detašované pracoviště: ${o.det.join('; ')}`:null,'Zdroj: URU_prehled_ORP_ver1.xlsx'].filter(Boolean).join('\n');
 function persist(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){} dirty=true; setDot('busy','ukládám…'); clearTimeout(saveTimer); saveTimer=setTimeout(flush,700); }
 // ---------- undo / redo ----------
 const UNDO_MAX=60; let undoStack=[], redoStack=[], baseline=null, restoring=false;
@@ -74,7 +98,8 @@ async function loadRemote(){
   if(data&&data.data&&data.data.units){ state=data.data; version=data.version||0; }
   else { took=await takeOverFromCr(); state=took.state; version=0; const r=await sb.from('organigram_state').upsert({id:STATE_ID,data:state,version:0,updated_by:currentUser.email}); if(r.error) throw r.error; }
   state.app=APP_ID; state.view=state.view||'tree'; if(!state.zoom) state.zoom=85;
-  migrateActive(state); markBaseline();
+  migrateActive(state); const vz=applyVzorKraj(state); markBaseline();
+  if(vz){ logChange('struktura',vz); persist(); setTimeout(()=>alert(vz),400); }
   if(took){ logChange('založení',took.msg); persist(); setTimeout(()=>alert(took.msg),300); }
   try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){}
 }
@@ -139,7 +164,7 @@ function renderUnit(u){
   const head=document.createElement('div'); head.className='uhead';
   head.innerHTML=`<span class="bar" style="background:${SRC_DARK[u.src]||'#999'}"></span>
     <button class="tog" aria-label="Sbalit/rozbalit">${state.collapsed[u.id]?'▸':'▾'}</button>
-    <span class="uname" title="${u.head?'v organigramu uveden/a: '+esc(u.head):''}">${esc(u.name)}<span class="lvl">${LEVEL_LBL[u.level]||''}</span>${u.head?`<span class="lvl" style="font-style:italic">${esc(u.head)}</span>`:''}</span>
+    <span class="uname" title="${u.head?'v organigramu uveden/a: '+esc(u.head):''}">${esc(u.name)}<span class="lvl">${LEVEL_LBL[u.level]||''}</span>${u.head?`<span class="lvl" style="font-style:italic">${esc(u.head)}</span>`:''}${u.orp?`<span class="orp" title="${esc(orpTitle(u.orp))}">${esc(orpLine(u.orp))}</span>`:''}</span>
     <span class="srcbadge" style="background:${SRC_COLOR[u.src]}">${esc(u.src)}</span>
     <span class="fill ${filled===total&&total?'full':''}" title="obsazeno / míst · FTE obsazeno / kapacita${sub.total!==total?' (v závorce včetně podřízených)':''}">${filled}/${total}${sub.total!==total?` <span style="opacity:.7">(${sub.filled}/${sub.total})</span>`:''} <span class="ftec">${fmtF(sub.total!==total?FD.occ:F.occ)}/${fmtF(sub.total!==total?FD.cap:F.cap)}&nbsp;FTE</span></span>`;
   head.querySelector('.fill').before(locSelect(u));
@@ -241,7 +266,7 @@ function buildFromTemplate(tpl,krajName){ const idmap={}; tpl.forEach(t=>idmap[t
 function migrateActive(st){ return migrateStructure(st); }
 // --- klonování vzoru do krajů ---
 function cloneSubtree(rootId,fromUnits,krajName){ const m={}; fromUnits.forEach(u=>m[u.id]=u); const out=[]; const idmap={};
-  const walk=id=>{ const u=m[id]; const nid=newUid(); idmap[id]=nid; const c={...u,id:nid,parent:u.parent&&idmap[u.parent]?idmap[u.parent]:null,name:u.name.replace(/\s*–?\s*vzor$/i,'').replace('{kraj}',krajName),kraj:krajName,positions:u.positions.map(p=>({id:newPid(),kind:p.kind,label:p.label,cat:p.cat,persons:[]}))}; delete c.vzor; delete c.head; out.push(c); fromUnits.filter(x=>x.parent===id).forEach(x=>walk(x.id)); };
+  const walk=id=>{ const u=m[id]; const nid=newUid(); idmap[id]=nid; if(u.orp) return; const c={...u,id:nid,parent:u.parent&&idmap[u.parent]?idmap[u.parent]:null,name:u.name.replace(/\s*–?\s*vzor$/i,'').replace('{kraj}',krajName),kraj:krajName,positions:u.positions.map(p=>({id:newPid(),kind:p.kind,label:p.label,cat:p.cat,persons:[]}))}; delete c.vzor; delete c.head; delete c.orp; out.push(c); fromUnits.filter(x=>x.parent===id).forEach(x=>walk(x.id)); };
   walk(rootId); if(out[0]&&!/{kraj}/.test(m[rootId].name)&&!out[0].name.includes(krajName)) out[0].name=out[0].name+' – '+krajName; return out; }
 function kraje(){ return state.units.filter(u=>!u.parent); }
 // ---------- editor struktury ----------
@@ -551,7 +576,7 @@ function boxEl(u){
   const box=document.createElement('div'); box.className='box '+u.level; box.dataset.uid=u.id;
   normalizePositions(); const filled=u.positions.filter(p=>p.persons.length).length,total=u.positions.length,free=total-filled; const partial=Math.round(u.positions.filter(p=>p.persons.length).reduce((a,p)=>a+Math.max(0,posFree(u,p)),0)*100)/100; const FB=unitFte(u,childrenOf(u.id).length>0);
   const sub=subtreeCount(u); const crit=isCrit(u); if(crit) box.classList.add('crit'); const cs=childrenOf(u.id).length?sub:{total,filled}; const pctTxt=cs.total?Math.round(100*cs.filled/cs.total)+' %':'';
-  box.innerHTML=`<div class="bh" style="border-top-color:${SRC_DARK[u.src]||'#999'}"><div class="bn" title="${u.head?'v organigramu uveden/a: '+esc(u.head):''}">${esc(u.name)}${u.head?`<div style="font-weight:400;font-size:11px;color:var(--muted);font-style:italic">${esc(u.head)}</div>`:''}</div>
+  box.innerHTML=`<div class="bh" style="border-top-color:${SRC_DARK[u.src]||'#999'}"><div class="bn" title="${u.head?'v organigramu uveden/a: '+esc(u.head):''}">${esc(u.name)}${u.head?`<div style="font-weight:400;font-size:11px;color:var(--muted);font-style:italic">${esc(u.head)}</div>`:''}${u.orp?`<div class="orpb" title="${esc(orpTitle(u.orp))}">dnes ${u.orp.dnes} · potřeba ${String(u.orp.potreba).replace('.',',')}${u.orp.hodnoceni==='Kritické'?' · <b style="color:var(--danger)">kritické</b>':''}</div>`:''}</div>
     <div class="bm"><span class="srcbadge" style="background:${SRC_COLOR[u.src]}">${esc(u.src)}</span><span class="pct">${pctTxt}</span><span class="fill ${filled===total&&total?'full':''}" title="obsazeno / míst${sub.total!==total?' (v závorce včetně podřízených)':''}">${filled}/${total}${sub.total!==total?` <span style="opacity:.7">(${sub.filled}/${sub.total})</span>`:''}<span class="ftec"> ${fmtF(FB.occ)} FTE</span></span></div></div>`;
   box.querySelector('.bm').insertBefore(locSelect(u),box.querySelector('.bm .fill'));
   const bp=document.createElement('div'); bp.className='bp';
@@ -574,8 +599,9 @@ function chartNode(u){
   if(horiz.length||stack.length){
     const row=document.createElement('ul'); row.className='oc-row';
     horiz.forEach(k=>row.appendChild(chartNode(k)));
-    if(stack.length){ const sli=document.createElement('li'); const st=document.createElement('ul'); st.className='oc-stack'; st.style.width='218px'; sli.className='oc-stackcol';
-      stack.forEach(k=>{const x=document.createElement('li'); x.appendChild(boxEl(k)); st.appendChild(x);}); sli.appendChild(st); row.appendChild(sli); }
+    if(stack.length){ const per=stack.length>8?Math.ceil(stack.length/Math.ceil(stack.length/6)):stack.length;
+      for(let i=0;i<stack.length;i+=per){ const sli=document.createElement('li'); const st=document.createElement('ul'); st.className='oc-stack'; st.style.width='218px'; sli.className='oc-stackcol';
+        stack.slice(i,i+per).forEach(k=>{const x=document.createElement('li'); x.appendChild(boxEl(k)); st.appendChild(x);}); sli.appendChild(st); row.appendChild(sli); } }
     wrap.appendChild(row);
   }
   li.appendChild(wrap); return li;
@@ -713,8 +739,9 @@ function drawConnectors(oc){
     const horiz=kids.filter(k=>!boxes[k.id].closest('.oc-stack')), stack=kids.filter(k=>boxes[k.id].closest('.oc-stack'));
     const busY=P.y+P.h+11; let xs=[];
     horiz.forEach(k=>{ const B=rel(boxes[k.id]); const cx=B.x+B.w/2; xs.push(cx); line(cx,busY,cx,B.y); });
-    if(stack.length){ const ul=boxes[stack[0].id].closest('.oc-stack'); const U=rel(ul); const bx=U.x+6; xs.push(bx);
-      let lastY=busY; stack.forEach(k=>{ const B=rel(boxes[k.id]); const my=B.y+Math.min(30,B.h/2); line(bx,my,B.x,my); lastY=Math.max(lastY,my); }); line(bx,busY,bx,lastY); }
+    if(stack.length){ const uls=[...new Set(stack.map(k=>boxes[k.id].closest('.oc-stack')))];
+      uls.forEach(ul=>{ const U=rel(ul); const bx=U.x+6; xs.push(bx); let lastY=busY;
+        stack.filter(k=>boxes[k.id].closest('.oc-stack')===ul).forEach(k=>{ const B=rel(boxes[k.id]); const my=B.y+Math.min(30,B.h/2); line(bx,my,B.x,my); lastY=Math.max(lastY,my); }); line(bx,busY,bx,lastY); }); }
     if(xs.length){ const cx=P.x+P.w/2; line(cx,P.y+P.h,cx,busY); const lo=Math.min(cx,...xs), hi=Math.max(cx,...xs); if(hi-lo>0.5) line(lo,busY,hi,busY); }
     kids.forEach(walk); });
   const svg=document.createElementNS('http://www.w3.org/2000/svg','svg'); svg.setAttribute('class','conn'); svg.setAttribute('width',oc.scrollWidth); svg.setAttribute('height',oc.scrollHeight);
@@ -805,7 +832,7 @@ async function start(){
   try{ await loadRemote(); }catch(e){ $('#authMsg').className='msg err'; $('#authMsg').textContent='Načtení dat selhalo: '+(e.message||e)+' (zkontrolujte tabulky a RLS)'; return; }
   $('#auth').style.display='none';
   $('#zoom').value=state.zoom; $('#zoomVal').textContent=state.zoom+' %';
-  document.body.classList.toggle('ws-kr',isKraj()); setView(state.view==='chart'?'chart':'tree'); setDot('','připojeno');
+  document.body.classList.toggle('ws-kr',isKraj()); { const vr=state.units.find(u=>!u.parent&&u.vzor); if(vr) state.chartRoot=vr.id; } setView('chart'); setDot('','připojeno');
   sb.channel('organigram-'+APP_ID).on('postgres_changes',{event:'UPDATE',schema:'public',table:'organigram_state',filter:'id=eq.'+STATE_ID},payload=>{
     if(payload.new&&payload.new.version>version&&!dirty&&!saving){ const v=state.view,z=state.zoom,c=state.collapsed; state=payload.new.data; migrateActive(state); version=payload.new.version; state.view=v; state.zoom=z; state.collapsed=c; render(); toast('Stav aktualizován z jiného okna.'); } }).subscribe();
   window.addEventListener('beforeunload',e=>{ if(dirty||saving){ flush(); e.preventDefault(); e.returnValue=''; } });
