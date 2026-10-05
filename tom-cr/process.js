@@ -20,11 +20,24 @@ function laneInfo(l){ if(l.role){ const r=roleOf(l.role); return r?{type:'role',
 const LANE_TYPE={actor:'aktér',system:'systém',role:'role',func:'funkce'};
 // prvek modelu, který krok reprezentuje pro odvozené vazby
 function stepEl(p,s){ const l=p.lanes.find(x=>x.id===s.lane); if(!l) return null; if(l.role){ const r=roleOf(l.role); return s.sys||(r&&r.func)||null; } return l.ref; }
+function roleFunc(p,s){ const l=p.lanes.find(x=>x.id===s.lane); if(!l||!l.role) return null; const r=roleOf(l.role); return r&&r.func&&F(r.func)?r.func:null; }
+// doplnění koordinace DO do existujícího modelu (verze modelu 7)
+function addCoordination(st){ const S=window.TOM_SEED;
+  if(st.linkKinds&&!st.linkKinds.predava) st.linkKinds.predava=[...DEFAULT_KINDS.predava];
+  const fd=S.funcs.find(f=>f.id==='f34');
+  if(fd&&!st.funcs.f34){ const s2=st.funcs.s2; st.funcs.f34={id:'f34',name:fd.name,group:fd.g,type:fd.type,period:'2027',refs:fd.refs||'',desc:fd.desc||'',fte:null,locs:[],status:'navrh',notes:[],assign:[],x:s2?s2.x:40,y:s2?s2.y:60};
+    if(s2&&s2.sum){ st.funcs.f34.parent='s2'; st.funcs.f34._lay=true; } }
+  (S.roles||[]).forEach(r=>{ if(!st.roles.some(x=>x.id===r.id)&&(!r.func||st.funcs[r.func])) st.roles.push({...r,desc:r.desc||''}); });
+  const tmp={funcs:st.funcs}; seedProcesses(tmp); (tmp.processes||[]).filter(p=>p.id==='p3'&&!st.processes.some(x=>x.id==='p3')).forEach(p=>st.processes.push(p)); }
 function derivedLinks(p){ const out=[]; const add=(a,b,k,step,label)=>{ if(!a||!b||a===b||!F(a)||!F(b)||!LINK_KINDS[k]) return; const x=out.find(x=>x.from===a&&x.to===b&&x.kind===k);
     if(x){ if(label&&!x.label.includes(label)) x.label=x.label?x.label+', '+label:label; return; } out.push({from:a,to:b,kind:k,step,label:label||''}); };
   p.steps.forEach(s=>{ const l=p.lanes.find(x=>x.id===s.lane); if(l&&l.role&&s.sys){ const r=roleOf(l.role); if(r&&r.func) add(r.func,s.sys,'pouziva',s.id); } });
   p.flows.forEach(w=>{ const A=p.steps.find(s=>s.id===w.from), B=p.steps.find(s=>s.id===w.to); if(!A||!B) return; const a=stepEl(p,A), b=stepEl(p,B); if(!F(a)||!F(b)) return;
-    const ta=F(a).kind||'func', tb=F(b).kind||'func'; if(ta==='actor') add(a,b,'zada',A.id,chNames(A)||A.sub||''); else if(ta==='system'&&tb==='system') add(a,b,'data',A.id); });
+    const ta=F(a).kind||'func', tb=F(b).kind||'func'; if(ta==='actor') add(a,b,'zada',A.id,chNames(A)||A.sub||''); else if(ta==='system'&&tb==='system') add(a,b,'data',A.id);
+    // předávka práce mezi funkcemi (role různých funkcí) nebo od role k aktérovi okolí
+    const fa=roleFunc(p,A), fb=roleFunc(p,B), lb=p.lanes.find(x=>x.id===B.lane);
+    if(fa&&fb&&fa!==fb&&!fam(fa).includes(fb)) add(fa,fb,'predava',A.id,A.name);
+    else if(fa&&lb&&lb.ref&&F(lb.ref)&&F(lb.ref).kind==='actor') add(fa,lb.ref,'predava',A.id,A.name); });
   return out; }
 // všechny vazby pro mapu a kontroly: ruční vazby + vazby odvozené z procesů (stejná vazba se sloučí, u ruční se doplní odkaz na proces)
 function allLinks(){ const out=state.links.map(l=>({...l,procs:[]})); const virt={};
@@ -77,8 +90,11 @@ function renderProc(){
   const labels=[];
   p.flows.forEach(w=>{ const A=p.steps.find(s=>s.id===w.from), B=p.steps.find(s=>s.id===w.to); if(!A||!B||!boxes[A.id]||!boxes[B.id]) return;
     const a=pos(A), b=pos(B), ah=boxes[A.id].offsetHeight, bh=boxes[B.id].offsetHeight; let d, lx, ly, anchor='middle';
+    const between=(lane,r1,r2)=>p.steps.some(s=>s.lane===lane&&s.row>r1&&s.row<r2);
     if(B.row>A.row){ const x1=a.x+BOX_W/2, y1=a.y+ah, x2=b.x+BOX_W/2, y2=b.y; anchor='start';
-      if(Math.abs(x1-x2)<1){ d=`M${x1} ${y1}L${x2} ${y2-2}`; lx=x1+6; ly=y1+16; }
+      if(Math.abs(x1-x2)<1){ if(!between(A.lane,A.row,B.row)){ d=`M${x1} ${y1}L${x2} ${y2-2}`; lx=x1+6; ly=y1+16; }
+        else { const xl=a.x-9; d=`M${x1} ${y1}L${x1} ${y1+9}L${xl} ${y1+9}L${xl} ${y2-9}L${x2} ${y2-9}L${x2} ${y2-2}`; lx=x1+6; ly=y2-13; } }
+      else if(!between(A.lane,A.row,B.row)&&B.row-A.row>1){ const ym=y2-14; d=`M${x1} ${y1}L${x1} ${ym}L${x2} ${ym}L${x2} ${y2-2}`; lx=(x1+x2)/2; ly=ym-5; anchor='middle'; }
       else { const k=p.flows.filter(z=>z.from===A.id).filter(z=>{ const T=p.steps.find(s=>s.id===z.to); return T&&T.row>A.row&&T.lane!==A.lane; }).sort((u,v)=>{ const pu=pos(p.steps.find(s=>s.id===u.to)).x, pv=pos(p.steps.find(s=>s.id===v.to)).x; return pu-pv; }).indexOf(w);
         const ym=y1+12+Math.max(0,k)*14; d=`M${x1} ${y1}L${x1} ${ym}L${x2} ${ym}L${x2} ${y2-2}`; lx=x2+6; ly=Math.max(ym+14,y2-8); } }
     else if(B.row===A.row){ const dir=b.x>a.x?1:-1; const x1=dir>0?a.x+BOX_W:a.x, x2=dir>0?b.x:b.x+BOX_W, y=a.y+Math.min(ah,bh)/2; d=`M${x1} ${y}L${x2-2*dir} ${y}`; lx=(x1+x2)/2; ly=y-6; }

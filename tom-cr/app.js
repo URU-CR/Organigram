@@ -1,6 +1,6 @@
 // TOM ÚRÚ ČR – cílový provozní model úřadu od 1. 1. 2027.
 // Samostatná aplikace: model v organigram_state.id='tom-cr'; organigram ÚRÚ ČR ('main') se jen čte (živě).
-const APP_VERSION='2026-10-05.9';
+const APP_VERSION='2026-10-05.10';
 const APP_ID='tom-cr', STATE_ID='tom-cr', ORG_ID='main', LS_KEY='uru-tom-cr-v1';
 
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
@@ -13,7 +13,7 @@ const TYPES={vykon:'výkon agendy',odvolani:'odvolání a přezkum',metodika:'me
 const STATUS={navrh:'návrh',diskuse:'v diskusi',ok:'odsouhlaseno',sporne:'sporné'};
 const STATUS_COLOR={navrh:'#9AA4B2',diskuse:'#2563EB',ok:'#067647',sporne:'#B42318'};
 const ROLES={own:'vlastník',do:'vykonává',sup:'podporuje'};
-const DEFAULT_KINDS={ridi:['řídí','#1B2430'],metodika:['metodicky vede','#7C3AED'],odvolani:['přezkoumává','#B42318'],zada:['podává / žádá','#334155'],rozhodnuti:['vydává rozhodnutí','#1D4ED8'],stanovisko:['poskytuje stanovisko','#65A30D'],odvolava:['podává odvolání / žalobu','#9F1239'],pouziva:['používá','#0F766E'],spravuje:['spravuje','#115E59',true],data:['předává data','#64748B',true],podklad:['dává podklad','#0E9AA7'],
+const DEFAULT_KINDS={ridi:['řídí','#1B2430'],metodika:['metodicky vede','#7C3AED'],odvolani:['přezkoumává','#B42318'],zada:['podává / žádá','#334155'],rozhodnuti:['vydává rozhodnutí','#1D4ED8'],stanovisko:['poskytuje stanovisko','#65A30D'],odvolava:['podává odvolání / žalobu','#9F1239'],pouziva:['používá','#0F766E'],spravuje:['spravuje','#115E59',true],predava:['předává práci','#475569'],data:['předává data','#64748B',true],podklad:['dává podklad','#0E9AA7'],
   sluzba:['poskytuje službu','#C79400'],spis:['předává spis','#ED7D31'],zpetna:['zpětná vazba','#4D8B31'],vyvoj:['vývoj do 2028','#9AA4B2',true]};
 let LINK_KINDS=DEFAULT_KINDS;
 const KIND=k=>LINK_KINDS[k]||['(neznámý druh)','#9AA4B2'];
@@ -60,7 +60,7 @@ function seedState(){
     assign:(f.a||[]).map(([u,r])=>({unit:u,role:r,name:U[u]?U[u].name:''}))}; });
   S.links.forEach(([a,b,k,l])=>st.links.push({id:uid('l'),from:a,to:b,kind:k,label:l||''}));
   S.rules.forEach(r=>st.rules.push({...r,on:true}));
-  applySums(st); addEnv(st); seedProcesses(st); st.show2028=false; st.modelVersion=6; autoLayout(st); return st;
+  applySums(st); addEnv(st); seedProcesses(st); st.show2028=false; st.modelVersion=7; autoLayout(st); return st;
 }
 // vnější okolí a systémy z výchozího návrhu (doplní jen chybějící)
 function addEnv(st){ const S=window.TOM_SEED; const base={desc:'',status:'navrh',notes:[],assign:[],locs:[],x:0,y:0};
@@ -146,7 +146,8 @@ function normalize(){ ['groups','links','rules','proposals','versions'].forEach(
   if(state.showActors===undefined) state.showActors=true; if(state.showSystems===undefined) state.showSystems=true;
   state.roles=state.roles||[]; state.processes=state.processes||[]; normProcesses(state);
   if(state.modelVersion<6&&state.modelVersion>=5){ const p2=state.processes.find(x=>x.id==='p2'), s1=p2&&p2.steps.find(x=>x.id==='s1'); if(s1&&s1.chs.length===1&&s1.chs[0]==='ds') s1.chs=['ds','email','osobne']; state.modelVersion=6; }
-  if(state.modelVersion<5){ seedProcesses(state); normProcesses(state); state.modelVersion=6; logChange('model','doplněny procesy a role'); setTimeout(()=>toast('Nový pohled Procesy: příjem žádosti (Portál; DS, e-mail, osobně).'),900); }
+  if(state.modelVersion===6){ addCoordination(state); normProcesses(state); state.modelVersion=7; logChange('model','doplněna koordinace DO (proces, role, funkce)'); setTimeout(()=>toast('Doplněn proces „Koordinace DO – koordinované vyjádření“ a související role.'),900); }
+  if(state.modelVersion<5){ seedProcesses(state); addCoordination(state); normProcesses(state); state.modelVersion=7; logChange('model','doplněny procesy a role'); setTimeout(()=>toast('Nový pohled Procesy: příjem žádosti (Portál; DS, e-mail, osobně).'),900); }
   if(drill&&!(state.funcs[drill]&&state.funcs[drill].sum)) drill=null;
   if(state.show2028===undefined) state.show2028=true; state.colorBy=state.colorBy||'conf'; state.view=state.view||'map';
   Object.values(state.funcs).forEach(f=>{ f.assign=f.assign||[]; f.notes=f.notes||[]; f.locs=f.locs||[]; f.status=f.status||'navrh'; f.period=f.period||'2027'; }); }

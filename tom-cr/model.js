@@ -24,6 +24,7 @@ window.TOM_SEED = {
     {id:'f09', g:'g2', type:'odvolani', name:'Odvolání a přezkum proti rozhodnutím krajských úřadů', a:[['u10','own'],['u11','do'],['u12','do'],['u13','do']]},
     {id:'f10', g:'g3', type:'vykon', name:'Ochrana životního prostředí (integrované DO)', refs:'R11', a:[['u47','own'],['u48','do'],['u49','do'],['u50','do']]},
     {id:'f11', g:'g3', type:'vykon', name:'Ochrana ostatních veřejných zájmů a veřejného zdraví (integrované DO)', refs:'R11', a:[['u51','own'],['u52','do'],['u53','do'],['u54','do']]},
+    {id:'f34', g:'g3', type:'vykon', name:'Koordinace dotčených orgánů a koordinované vyjádření', refs:'R11', desc:'Vedoucí koordinátorů a koordinátoři DO: přidělení, zpřístupnění DO, lhůty, parafa, sestavení a podpis KV. Útvar k určení.', a:[]},
     {id:'f12', g:'g4', type:'vykon', name:'Územně analytické podklady a informace o území', a:[['u07','own'],['u08','do']]},
     {id:'f13', g:'g4', type:'vykon', name:'Zpracování územně plánovací dokumentace', a:[['u07','own'],['u09','do']]},
     {id:'f14', g:'g4', type:'podpora', name:'Národní geoportál územního plánování (NGÚP)', a:[['u55','own'],['u56','do'],['u57','do']]},
@@ -51,7 +52,7 @@ window.TOM_SEED = {
   // souhrnné funkce (sbalené dlaždice); vazby vedoucí na více dílčích funkcí stejného souhrnu se sloučí na souhrn
   sums: [
     {id:'s1', g:'g1', name:'Povolování vyhrazených staveb', children:['f01','f02','f03','f04','f05']},
-    {id:'s2', g:'g3', name:'Integrované dotčené orgány', children:['f10','f11']},
+    {id:'s2', g:'g3', name:'Integrované dotčené orgány', children:['f10','f11','f34']},
     {id:'s3', g:'g5', name:'Metodika a legislativa', children:['f15','f16','f17']},
     {id:'s4', g:'g7', name:'Řízení úřadu', children:['f19','f20','f21']},
     {id:'s5', g:'g8', name:'Podpůrné služby', children:['f22','f23','f24','f25','f26']}
@@ -92,7 +93,10 @@ window.TOM_SEED = {
     {id:'r_pod', name:'Podatelna', func:'f27'},
     {id:'r_roz', name:'Rozdělovatel na sekci', func:'s1', desc:'kdo konkrétně – k ověření'},
     {id:'r_ved', name:'Vedoucí útvaru', func:'s1'},
-    {id:'r_ref', name:'Referent', func:'s1'}
+    {id:'r_ref', name:'Referent', func:'s1'},
+    {id:'r_vko', name:'Vedoucí koordinátorů', func:'f34'},
+    {id:'r_kdo', name:'Koordinátor DO', func:'f34'},
+    {id:'r_ido', name:'Interní DO (úsek)', func:'s2'}
   ],
   processes: [
     {id:'p1', name:'Příjem žádosti – Portál stavebníka', desc:'Podání přes Portál stavebníka; žádost vede ISSŘ → ESZ → VITA → ESPIS.',
@@ -106,7 +110,32 @@ window.TOM_SEED = {
      steps:[['s1','L1',0,'Podá žádost','start',null,['ds','email','osobne']],['s2','L2',1,'Příjem do ESPIS',null,'y5',null,'Osobní podání: konverze listin na podatelně – k ověření'],
        ['s3','L2',2,'Spis už existuje?','decision','y5'],['s4','L3',3,'Přidělí referentovi',null,'y5'],['s5','L4',4,'Převezme dokument',null,'y5'],
        ['s6','L4',5,'Předá do VITA',null,'y5'],['s7','L5',6,'Řízení vedeno ve VITA','end',null,null,'Zapisuje VITA řízení zpětně do ESZ? – k ověření']],
-     flows:[['s1','s2'],['s2','s3'],['s3','s4','ne – nový spis'],['s3','s5','ano'],['s4','s5'],['s5','s6'],['s6','s7']]}
+     flows:[['s1','s2'],['s2','s3'],['s3','s4','ne – nový spis'],['s3','s5','ano'],['s4','s5'],['s5','s6'],['s6','s7']]},
+    {id:'p3', name:'Koordinace DO – koordinované vyjádření', desc:'Zahájení → koordinované vyjádření (KV) → podklad rozhodnutí. Podle procesního modelu ověřeného v mockupu VITA (integrace DO). Dvě osy odpovědnosti: procesní stav řízení vlastní referent; úkol („kdo má míč“) putuje mezi aktéry.',
+     lanes:[['L1','a1'],['L2',null,'r_ref'],['L3',null,'r_vko'],['L4',null,'r_kdo'],['L5',null,'r_ido'],['L6','a5']],
+     steps:[['s1','L2',0,'Žádost přijata a zaevidována','start','y4',null,'Navazuje na procesy Příjem žádosti.'],
+       ['s2','L2',1,'Založí řízení, vloží podklady',null,'y4'],
+       ['s3','L2',2,'Předá koordinaci','decision','y4',null,'Konkrétnímu koordinátorovi, nebo jako „nepřiděleno“ vedoucímu koordinátorů.'],
+       ['s4','L3',3,'Přidělí koordinátora',null,'y4'],
+       ['s5','L4',4,'Převezme, zpřístupní interním DO; rozhodne o externích DO',null,'y4'],
+       ['s6','L5',5,'Kontrola úplnosti za úsek (1. lhůta)',null,'y4',null,'D2: po doplnění se řízení obnoví, až všechny vyzvané úseky potvrdí OK.'],
+       ['s7','L2',6,'Výsledek kontroly všech DO?','decision','y4',null,'D1: vyhodnotit až po kontrole všech interních DO – jinak hrozí opakovaná výzva.'],
+       ['s8','L2',7,'Výzva k doplnění, přerušení řízení',null,'y4'],
+       ['s9','L1',8,'Doplní podklady'],
+       ['s10','L2',9,'Přiřadí doplnění ke spisu, vrátí ke kontrole',null,'y5'],
+       ['s11','L2',10,'Vyrozumí o zahájení řízení',null,'y4'],
+       ['s12','L5',11,'Zpracují vyjádření (2. lhůta)',null,'y4'],
+       ['s13','L2',12,'Vyžádá stanovisko externího DO',null,'y5',['ds']],
+       ['s14','L6',13,'Vydá stanovisko / ZS / vyjádření',null,null,['ds'],'D4: druh výstupu ovlivňuje váhu v KV. Cíl: ISDS s automatickým párováním odpovědí.'],
+       ['s15','L2',14,'Přiřadí odpověď ke spisu',null,'y5'],
+       ['s16','L4',15,'Doloží, vytvoří příspěvek za externí DO',null,'y4'],
+       ['s17','L4',16,'Porovná a parafuje příspěvky','decision','y4',null,'D3: parafovat / vrátit k přepracování; po marné lhůtě fikce souhlasu.'],
+       ['s18','L4',17,'Sestaví a podepíše KV',null,'y4'],
+       ['s19','L2',18,'KV jako podklad rozhodnutí','end','y4']],
+     flows:[['s1','s2'],['s2','s3'],['s3','s4','nepřiděleno'],['s3','s5','konkrétnímu koordinátorovi'],['s4','s5'],['s5','s6'],['s6','s7'],
+       ['s7','s8','některý neúplné'],['s8','s9'],['s9','s10'],['s10','s6','opětovná kontrola'],['s7','s11','vše OK'],['s11','s12'],
+       ['s5','s13','externí DO – vyžádat'],['s13','s14'],['s14','s15'],['s15','s16'],['s12','s17'],['s16','s17'],
+       ['s17','s12','vrátit k přepracování'],['s17','s18','vše parafováno'],['s18','s19']]}
   ],
   links: [
     ['f08','f01','odvolani'],['f08','f02','odvolani'],['f08','f05','odvolani'],
