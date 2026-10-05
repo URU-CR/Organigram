@@ -1,6 +1,6 @@
 // TOM ÚRÚ ČR – cílový provozní model úřadu od 1. 1. 2027.
 // Samostatná aplikace: model v organigram_state.id='tom-cr'; organigram ÚRÚ ČR ('main') se jen čte (živě).
-const APP_VERSION='2026-10-05.10';
+const APP_VERSION='2026-10-05.11';
 const APP_ID='tom-cr', STATE_ID='tom-cr', ORG_ID='main', LS_KEY='uru-tom-cr-v1';
 
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
@@ -261,6 +261,7 @@ function renderMap(){
   if(state._layout&&!D&&fs.length&&boxes[fs[0].id].offsetHeight){ const h={}; fs.forEach(f=>h[f.id]=boxes[f.id].offsetHeight); autoLayout(state,h); fs.forEach(f=>{ boxes[f.id].style.left=f.x+'px'; boxes[f.id].style.top=f.y+'px'; }); persist(); }
   if(D&&fs.some(f=>f.sx===undefined||f._lay)){ const h={}; fs.forEach(f=>h[f.id]=boxes[f.id].offsetHeight); layoutKids(fs,h); fs.forEach(f=>{ boxes[f.id].style.left=f.sx+'px'; boxes[f.id].style.top=f.sy+'px'; }); persist(); }
   const rect=id=>{ const b=boxes[id]; return {x:parseFloat(b.style.left),y:parseFloat(b.style.top),w:b.offsetWidth,h:b.offsetHeight}; };
+  if(!D&&state.show2028) place2028(fs,boxes,rect);
   let W=600,H=400;
   if(D){ // rámeček souhrnu + vnější funkce po stranách
     let x1=1e9,y1=1e9,x2=-1e9,y2=-1e9; fs.forEach(f=>{ const r=rect(f.id); x1=Math.min(x1,r.x); y1=Math.min(y1,r.y); x2=Math.max(x2,r.x+r.w); y2=Math.max(y2,r.y+r.h); }); if(!fs.length){ x1=320;y1=80;x2=560;y2=200; }
@@ -296,6 +297,22 @@ function renderMap(){
   if(labels.length){ const lv=document.createElementNS(NS,'svg'); lv.setAttribute('class','links labels'); lv.setAttribute('width',W); lv.setAttribute('height',H); lv.innerHTML=labels.join(''); cv.appendChild(lv); }
   wrap.scrollLeft=sl; wrap.scrollTop=st;
 }
+// dlaždice výhledu 2028, které překrývají jiné dlaždice, přesune na konec své oblasti (pásu) a dlaždice pod nimi odsune níž
+function place2028(fs,boxes,rect){ const GAP=14; let moved=false;
+  const hit=(r,q)=>r.x<q.x+q.w+6&&q.x<r.x+r.w+6&&r.y<q.y+q.h+6&&q.y<r.y+r.h+6;
+  const setPos=(f,x,y)=>{ f.x=Math.round(x); f.y=Math.round(y); boxes[f.id].style.left=f.x+'px'; boxes[f.id].style.top=f.y+'px'; };
+  fs.filter(f=>f.period==='2028'&&!f.sum).forEach(t=>{ const r=rect(t.id); const unplaced=!Number.isFinite(t.x)||!Number.isFinite(t.y); if(!unplaced&&!fs.some(o=>o!==t&&hit(r,rect(o.id)))) return;
+    const mates=fs.filter(o=>o!==t&&o.period!=='2028'&&Number.isFinite(o.x)&&(t.kind?o.kind===t.kind:(!o.kind&&o.group===t.group)));
+    if(!mates.length){ if(unplaced){ setPos(t,30,Math.max(60,...fs.filter(o=>o!==t&&Number.isFinite(o.y)).map(o=>o.y+rect(o.id).h))+60); moved=true; } return; } moved=true;
+    if(t.kind){ const ly=Math.max(...mates.map(o=>o.y)); const row=mates.filter(o=>Math.abs(o.y-ly)<5); setPos(t,Math.max(...row.map(o=>o.x+rect(o.id).w))+44,ly); return; }
+    const col=fs.filter(o=>o!==t&&Number.isFinite(o.x)&&Number.isFinite(o.y)&&!o.kind&&o.group===t.group&&(o.period!=='2028'||o._p28));
+    const x=Math.min(...mates.map(o=>o.x)), y=Math.max(...col.map(o=>o.y+rect(o.id).h))+GAP; setPos(t,x,y); t._p28=1;
+    // odsunout celé oblasti / pásy, které začínají pod novou dlaždicí (zachová se řádková struktura mapy)
+    const tr=rect(t.id), need=tr.y+tr.h+GAP+40; const unitOf=o=>o.kind?'k:'+o.kind:'g:'+o.group; const tops={};
+    fs.forEach(o=>{ if(o===t||!Number.isFinite(o.y)) return; const u=unitOf(o); tops[u]=Math.min(tops[u]??1e9,o.y); });
+    const myU=unitOf(t); const units=Object.keys(tops).filter(u=>u!==myU&&tops[u]>=y-2);
+    if(units.length){ const d=need-Math.min(...units.map(u=>tops[u])); if(d>0) fs.forEach(o=>{ if(o!==t&&units.includes(unitOf(o))) setPos(o,o.x,o.y+d); }); } });
+  fs.forEach(f=>delete f._p28); if(moved) persist(); }
 function layoutKids(fs,h){ let y=[70,70]; fs.forEach((f,i)=>{ const c=y[0]<=y[1]?0:1; f.sx=380+c*(BW+40); f.sy=y[c]; y[c]+=((h&&h[f.id])||90)+18; delete f._lay; }); }
 function openSum(id){ drill=id; sel=null; setConnect(false); if(state.view!=='map') state.view='map'; $('#canvasWrap').scrollTo(0,0); render(); }
 function closeSum(){ const d=drill; drill=null; sel=d?{t:'f',id:d}:null; render(); if(d) focusFunc(d); }
