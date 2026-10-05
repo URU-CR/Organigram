@@ -326,6 +326,7 @@ body.critmode .box:not(.crit){opacity:.55}
 .oc-down{position:relative;padding-top:22px}
 .oc-down::before{content:"";position:absolute;top:0;left:50%;height:22px;border-left:2px solid var(--line)}
 .oc-stack{list-style:none;margin:0;padding:0 0 0 18px;position:relative;width:100%}
+.oc .oc-stack{padding:0 0 0 18px} /* přebíjí .oc ul{padding:0} – místo pro svislou spojnici vlevo od dlaždic */
 .oc-stack::before{content:"";position:absolute;left:6px;top:-22px;bottom:22px;border-left:2px solid var(--line)}
 .oc-down.stack-only::before{display:none}
 .oc-row>li.oc-stackcol::after{left:6px}
@@ -384,7 +385,7 @@ table.ov td.z{color:#B6BEC9}
 </head>
 <body class="ws-kr">
 <header>
-  <h1>Krajské ÚRÚ<small><a class="back" href="../" title="organigram ÚRÚ ČR (samostatná aplikace)">← ÚRÚ ČR</a>pracovní model soustavy od roku 2028 · <span id="ver">index 2026-10-05.2</span></small></h1>
+  <h1>Krajské ÚRÚ<small><a class="back" href="../" title="organigram ÚRÚ ČR (samostatná aplikace)">← ÚRÚ ČR</a>pracovní model soustavy od roku 2028 · <span id="ver">index 2026-10-05.3</span></small></h1>
   <div class="stats" id="stats"></div>
   <span class="user" id="user"><span class="dot" id="syncDot"></span><span id="userMail"></span></span>
   <div class="legend" id="legend"></div>
@@ -472,8 +473,8 @@ table.ov td.z{color:#B6BEC9}
 
 <script src="../vendor/xlsx.full.min.js"></script>
 <script src="../vendor/supabase.js"></script>
-<script src="../config.js?v=2026-10-05.2"></script>
-<script src="template.js?v=2026-10-05.2"></script>
-<script src="app.js?v=2026-10-05.2"></script>
+<script src="../config.js?v=2026-10-05.3"></script>
+<script src="template.js?v=2026-10-05.3"></script>
+<script src="app.js?v=2026-10-05.3"></script>
 </body
 </html>

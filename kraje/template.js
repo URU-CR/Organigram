@@ -13,7 +13,12 @@ window.KRAJ_TEMPLATE=[
   {id:'k7',parent:'k6',name:'Oddělení ochrany životního prostředí',level:'odd',src:'Nové',counts:[1,0,8]},
   {id:'k8',parent:'k6',name:'Oddělení ochrany ostatních veřejných zájmů',level:'odd',src:'Nové',counts:[1,0,6]},
   {id:'k9',parent:'k1',name:'Odbor územního plánování',level:'odbor',src:'Nové',counts:[1,1,0]},
-  {id:'k10',parent:'k9',name:'Oddělení územně plánovací',level:'odd',src:'Nové',counts:[1,0,6]}];
+  {id:'k10',parent:'k9',name:'Oddělení územně plánovací',level:'odd',src:'Nové',counts:[1,0,6]},
+  // obslužné (sdílené) služby vykonávané na kraji – řízeny centrálně ÚRÚ ČR (R5); počty míst jsou odhad k ověření
+  {id:'k11',parent:'k1',name:'Odbor personální, ekonomický a provozní',level:'odbor',src:'Nové',counts:[1,1,0],svc:true},
+  {id:'k12',parent:'k11',name:'Oddělení personální',level:'odd',src:'Nové',counts:[1,0,3],svc:true},
+  {id:'k13',parent:'k11',name:'Oddělení ekonomické',level:'odd',src:'Nové',counts:[1,0,3],svc:true},
+  {id:'k14',parent:'k11',name:'Oddělení provozní a IT',level:'odd',src:'Nové',counts:[1,0,4],svc:true}];
 
 // Modelový kraj a jeho územní pracoviště (ORP). Zdroj: URU_prehled_ORP_ver1.xlsx, list „Přehled pracovišť“ (MMR, data z území 2026).
 // dnes = kolik lidí tam pracuje dnes; prejde = kolik pravděpodobně přejde; potreba = kolik bude celkem potřeba.

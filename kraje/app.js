@@ -1,6 +1,6 @@
 // Krajské ÚRÚ – organigram soustavy (2028). Samostatná aplikace, data v organigram_state.id='kraje'.
 // Organigram ÚRÚ ČR (řádek 'main') se odsud pouze jednou čte při prvním spuštění (převzetí rozpracovaných krajů).
-const APP_VERSION='2026-10-05.2';
+const APP_VERSION='2026-10-05.3';
 const APP_ID='kraje';
 
 const SOURCES = ['Obec','KÚ','ÚRÚ','Nové','Jiný'];
@@ -37,7 +37,7 @@ let people = {};    // id -> person
 let pidCounter = 1;
 
 function freshState(){ const units=buildFromTemplate(KRAJ_TEMPLATE,KRAJ_VZOR); const root=units.find(u=>!u.parent); root.vzor=true; units.push(...orpUnits(root,KRAJ_VZOR,ORP_VZOR));
-  return { app:APP_ID, units, people:{}, collapsed:{}, nextPid:1, vzorKraj:KRAJ_VZOR, chartRoot:root.id, view:'chart' }; }
+  return { app:APP_ID, units, people:{}, collapsed:{}, nextPid:1, vzorKraj:KRAJ_VZOR, vzorKrajV:2, chartRoot:root.id, view:'chart' }; }
 // územní pracoviště podle ORP: dnešní zaměstnanci = místa delimitace, rozdíl do cílové potřeby = nadpožadavek
 function orpUnits(root,kraj,list){ return (list||[]).map(o=>{ const u={id:newUid(),parent:root.id,name:'Územní pracoviště '+o.name,level:'up',src:'Obec',kraj,orp:{...o},positions:[]};
   const dnes=Math.max(1,o.dnes||0), cil=Math.ceil(o.potreba||0), nad=Math.max(0,cil-dnes); const hl=HEAD_LBL.up;
@@ -59,6 +59,18 @@ function applyVzorKraj(st){ if(!KRAJ_VZOR||st.vzorKraj===KRAJ_VZOR) return null;
   if(!st.units.some(u=>u.parent===root.id&&u.orp)) st.units.push(...orpUnits(root,KRAJ_VZOR,ORP_VZOR));
   st.vzorKraj=KRAJ_VZOR; st.chartRoot=root.id;
   return `Modelový kraj převeden na ${KRAJ_VZOR}: ${ORP_VZOR.length} územních pracovišť podle ORP (místa = dnešní zaměstnanci + nadpožadavek do cílové potřeby).`+(keep.length?` Obsazená zástupná pracoviště ponechána: ${keep.map(u=>u.name).join(', ')}.`:''); }
+// doplnění obslužných útvarů (personální, ekonomické, provozní a IT) do modelového kraje – jen jednou (vzorKrajV 2)
+function addServiceUnits(st){ if((st.vzorKrajV||1)>=2) return null; st.vzorKrajV=2;
+  const root=st.units.find(u=>!u.parent&&u.vzor); if(!root) return null;
+  const tpl=KRAJ_TEMPLATE.filter(t=>t.svc); if(!tpl.length) return null;
+  const under=st.units.filter(u=>u.parent===root.id); if(tpl.some(t=>t.parent==='k1'&&under.some(u=>u.name===t.name))) return null;
+  const idmap={k1:root.id}; tpl.forEach(t=>idmap[t.id]=newUid());
+  const us=tpl.map(t=>{ const u={id:idmap[t.id],parent:idmap[t.parent],name:t.name,level:t.level,src:t.src||'Nové',kraj:root.kraj||KRAJ_VZOR,positions:[]}; u.positions=makePositions(u,t.counts||[1,0,0]); return u; });
+  // vložit za poslední odbor modelového kraje (pořadí v diagramu)
+  const lastOdbor=[...st.units].reverse().find(u=>u.parent===root.id&&u.level==='odbor'); const ix=lastOdbor?st.units.lastIndexOf(lastOdbor):st.units.length-1;
+  const after=st.units.findIndex((u,i)=>i>ix&&!descOf(st,lastOdbor).has(u.id)); st.units.splice(after<0?st.units.length:after,0,...us);
+  return `Do kraje ${root.kraj||KRAJ_VZOR} doplněn Odbor personální, ekonomický a provozní s odděleními personálním, ekonomickým a provozním a IT (počty míst jsou odhad k ověření).`; }
+function descOf(st,u){ const s=new Set(); if(!u) return s; const w=id=>{ s.add(id); st.units.filter(x=>x.parent===id).forEach(x=>w(x.id)); }; w(u.id); return s; }
 const orpLine=o=>`ORP ${o.kod} · dnes ${o.dnes} lidí · přejde ~${String(o.prejde).replace('.',',')} · potřeba ${String(o.potreba).replace('.',',')}${o.su>1?' · slučuje '+o.su+' úřadů':''}`;
 const orpTitle=o=>[`Sloučené úřady: ${o.uradu}`,`Adresa sídla: ${o.adresa||'—'}`,`Personální hodnocení: ${o.hodnoceni}`,`Prostory: ${o.prostory}`,`Celkové riziko: ${o.riziko}`,o.det&&o.det.length?`Kandidát na detašované pracoviště: ${o.det.join('; ')}`:null,'Zdroj: URU_prehled_ORP_ver1.xlsx'].filter(Boolean).join('\n');
 function persist(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){} dirty=true; setDot('busy','ukládám…'); clearTimeout(saveTimer); saveTimer=setTimeout(flush,700); }
@@ -98,8 +110,8 @@ async function loadRemote(){
   if(data&&data.data&&data.data.units){ state=data.data; version=data.version||0; }
   else { took=await takeOverFromCr(); state=took.state; version=0; const r=await sb.from('organigram_state').upsert({id:STATE_ID,data:state,version:0,updated_by:currentUser.email}); if(r.error) throw r.error; }
   state.app=APP_ID; state.view=state.view||'tree'; if(!state.zoom) state.zoom=85;
-  migrateActive(state); const vz=applyVzorKraj(state); markBaseline();
-  if(vz){ logChange('struktura',vz); persist(); setTimeout(()=>alert(vz),400); }
+  migrateActive(state); const vz=applyVzorKraj(state), sv=addServiceUnits(state); markBaseline();
+  if(vz){ logChange('struktura',vz); } if(sv){ logChange('struktura',sv); } if(vz||sv){ persist(); setTimeout(()=>alert([vz,sv].filter(Boolean).join('\n\n')),400); }
   if(took){ logChange('založení',took.msg); persist(); setTimeout(()=>alert(took.msg),300); }
   try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){}
 }
