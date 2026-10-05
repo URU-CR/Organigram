@@ -1,6 +1,6 @@
 // TOM ÚRÚ ČR – cílový provozní model úřadu od 1. 1. 2027.
 // Samostatná aplikace: model v organigram_state.id='tom-cr'; organigram ÚRÚ ČR ('main') se jen čte (živě).
-const APP_VERSION='2026-10-05.11';
+const APP_VERSION='2026-10-05.12';
 const APP_ID='tom-cr', STATE_ID='tom-cr', ORG_ID='main', LS_KEY='uru-tom-cr-v1';
 
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
@@ -60,9 +60,17 @@ function seedState(){
     assign:(f.a||[]).map(([u,r])=>({unit:u,role:r,name:U[u]?U[u].name:''}))}; });
   S.links.forEach(([a,b,k,l])=>st.links.push({id:uid('l'),from:a,to:b,kind:k,label:l||''}));
   S.rules.forEach(r=>st.rules.push({...r,on:true}));
-  applySums(st); addEnv(st); seedProcesses(st); st.show2028=false; st.modelVersion=7; autoLayout(st); return st;
+  applySums(st); addEnv(st); seedProcesses(st); st.show2028=false; st.modelVersion=8; autoLayout(st); return st;
 }
 // vnější okolí a systémy z výchozího návrhu (doplní jen chybějící)
+// rozdělení „Ekonomický a personální systém“ na MÚZO a VEMA (model verze 8)
+function splitEconSystem(st){ const y9=st.funcs.y9; if(!y9||st.funcs.y10) return;
+  if(/ekonomický a personální/i.test(y9.name)){ y9.name='Ekonomický systém (MÚZO)'; if(!y9.admin||/ověření/.test(y9.admin)) y9.admin='MÚZO'; }
+  const sys=Object.values(st.funcs).filter(f=>f.kind==='system'&&f!==y9); const lastY=Math.max(y9.y,...sys.map(f=>f.y)); const row=[y9,...sys].filter(f=>Math.abs(f.y-lastY)<5);
+  st.funcs.y10={id:'y10',kind:'system',name:'Personální systém (VEMA)',stype:'podpora',sstate:'stav',admin:'VEMA',period:'2027',desc:'',status:'navrh',notes:[],assign:[],locs:[],x:Math.max(...row.map(f=>f.x))+AW+44,y:lastY};
+  st.links.forEach(l=>{ if(l.from==='f23'&&l.to==='y9'){ l.to='y10'; if(l.kind==='pouziva') l.kind='spravuje'; } });
+  (st.processes||[]).forEach(p=>p.steps.forEach(s=>{ if(s.sys==='y9'&&p.lanes.some(l=>l.id===s.lane&&l.role&&st.roles.some(r=>r.id===l.role&&r.func==='f23'))) s.sys='y10'; }));
+  logChange('model','systém rozdělen: Ekonomický systém (MÚZO) a Personální systém (VEMA)'); setTimeout(()=>toast('Ekonomický a personální systém rozdělen na MÚZO a VEMA.'),1000); }
 function addEnv(st){ const S=window.TOM_SEED; const base={desc:'',status:'navrh',notes:[],assign:[],locs:[],x:0,y:0};
   (S.actors||[]).forEach(x=>{ if(!st.funcs[x.id]) st.funcs[x.id]={...base,notes:[],assign:[],locs:[],id:x.id,kind:'actor',name:x.name,cat:x.cat,channels:x.ch||[],period:x.p||'2027'}; });
   (S.systems||[]).forEach(x=>{ if(!st.funcs[x.id]) st.funcs[x.id]={...base,notes:[],assign:[],locs:[],id:x.id,kind:'system',name:x.name,stype:x.st,sstate:x.ss,admin:x.admin||'',period:x.p||'2027'}; });
@@ -147,7 +155,8 @@ function normalize(){ ['groups','links','rules','proposals','versions'].forEach(
   state.roles=state.roles||[]; state.processes=state.processes||[]; normProcesses(state);
   if(state.modelVersion<6&&state.modelVersion>=5){ const p2=state.processes.find(x=>x.id==='p2'), s1=p2&&p2.steps.find(x=>x.id==='s1'); if(s1&&s1.chs.length===1&&s1.chs[0]==='ds') s1.chs=['ds','email','osobne']; state.modelVersion=6; }
   if(state.modelVersion===6){ addCoordination(state); normProcesses(state); state.modelVersion=7; logChange('model','doplněna koordinace DO (proces, role, funkce)'); setTimeout(()=>toast('Doplněn proces „Koordinace DO – koordinované vyjádření“ a související role.'),900); }
-  if(state.modelVersion<5){ seedProcesses(state); addCoordination(state); normProcesses(state); state.modelVersion=7; logChange('model','doplněny procesy a role'); setTimeout(()=>toast('Nový pohled Procesy: příjem žádosti (Portál; DS, e-mail, osobně).'),900); }
+  if(state.modelVersion===7){ splitEconSystem(state); state.modelVersion=8; }
+  if(state.modelVersion<5){ seedProcesses(state); addCoordination(state); normProcesses(state); state.modelVersion=8; logChange('model','doplněny procesy a role'); setTimeout(()=>toast('Nový pohled Procesy: příjem žádosti (Portál; DS, e-mail, osobně).'),900); }
   if(drill&&!(state.funcs[drill]&&state.funcs[drill].sum)) drill=null;
   if(state.show2028===undefined) state.show2028=true; state.colorBy=state.colorBy||'conf'; state.view=state.view||'map';
   Object.values(state.funcs).forEach(f=>{ f.assign=f.assign||[]; f.notes=f.notes||[]; f.locs=f.locs||[]; f.status=f.status||'navrh'; f.period=f.period||'2027'; }); }
@@ -283,15 +292,18 @@ function renderMap(){
   const NS='http://www.w3.org/2000/svg'; const svg=document.createElementNS(NS,'svg'); svg.setAttribute('class','links'); svg.setAttribute('width',W); svg.setAttribute('height',H);
   svg.innerHTML='<defs>'+Object.entries({...LINK_KINDS,x:KIND('x')}).map(([k,[,c]])=>`<marker id="ar-${k}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="${c}"/></marker>`).join('')+'</defs>';
   const edge=(r,tx,ty)=>{ const cx=r.x+r.w/2, cy=r.y+r.h/2, dx=tx-cx, dy=ty-cy; if(!dx&&!dy) return [cx,cy]; const s=Math.min(dx?Math.abs(r.w/2/dx):1e9, dy?Math.abs(r.h/2/dy):1e9); return [cx+dx*s,cy+dy*s]; };
-  const labels=[];
+  const labels=[]; const pairIdx={}, pairCnt={}; Object.values(agg).forEach(g=>{ if(boxes[g.from]&&boxes[g.to]){ const k=[g.from,g.to].sort().join('|'); pairCnt[k]=(pairCnt[k]||0)+1; } });
   Object.values(agg).forEach(g=>{ if(!boxes[g.from]||!boxes[g.to]) return; const a=rect(g.from), b=rect(g.to); const [k0,c,dash]=KIND(g.kind);
-    const [x1,y1]=edge(a,b.x+b.w/2,b.y+b.h/2), [x2,y2]=edge(b,a.x+a.w/2,a.y+a.h/2);
+    let [x1,y1]=edge(a,b.x+b.w/2,b.y+b.h/2), [x2,y2]=edge(b,a.x+a.w/2,a.y+a.h/2);
+    // souběžné vazby mezi stejnou dvojicí prvků odsadit, aby se nepřekrývaly čáry ani popisky
+    const pk=[g.from,g.to].sort().join('|'), pi=(pairIdx[pk]=(pairIdx[pk]??-1)+1), pn=pairCnt[pk];
+    if(pn>1){ const off=(pi-(pn-1)/2)*9, len=Math.hypot(x2-x1,y2-y1)||1, nx=-(y2-y1)/len*off, ny=(x2-x1)/len*off; x1+=nx; y1+=ny; x2+=nx; y2+=ny; }
     const lsel=sel&&sel.t==='l'&&g.ids.includes(sel.id); const hot=lsel||(selRep&&(g.from===selRep||g.to===selRep)); const faint=selRep&&!hot;
     const lbl=[...g.labels].join('; ')||k0; const el=document.createElementNS(NS,'g'); const soft=!selRep&&!lsel&&(F(g.from).kind||F(g.to).kind); el.setAttribute('class','lk'+(lsel?' sel':'')+(faint?' faint':'')+(soft?' soft':''));
     el.innerHTML=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="hit"/><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${c}" stroke-width="${hot?2.6:1.6}" ${dash?'stroke-dasharray="6 4"':''} marker-end="url(#ar-${LINK_KINDS[g.kind]?g.kind:'x'})"/>`+
       `<title>${esc(F(g.from).name+' → '+F(g.to).name+': '+lbl)}</title>`;
     el.addEventListener('pointerdown',e=>{ e.stopPropagation(); sel={t:'l',id:g.ids[0],ids:g.ids}; render(); }); svg.appendChild(el);
-    if(hot) labels.push(`<text x="${(x1+x2)/2}" y="${(y1+y2)/2-5}" fill="${c}" text-anchor="middle"${lsel?' class="on"':''}>${esc(lbl)}${g.ids.length>1?' ('+g.ids.length+'×)':''}</text>`); });
+    if(hot) labels.push(`<text x="${(x1+x2)/2}" y="${(y1+y2)/2-5+(pn>1?(pi-(pn-1)/2)*14:0)}" fill="${c}" text-anchor="middle"${lsel?' class="on"':''}>${esc(lbl)}${g.ids.length>1?' ('+g.ids.length+'×)':''}</text>`); });
   cv.insertBefore(svg,cv.firstChild);
   // popisky vazeb ve vlastní vrstvě nad dlaždicemi – nepřekryje je sousední dlaždice
   if(labels.length){ const lv=document.createElementNS(NS,'svg'); lv.setAttribute('class','links labels'); lv.setAttribute('width',W); lv.setAttribute('height',H); lv.innerHTML=labels.join(''); cv.appendChild(lv); }
@@ -498,12 +510,11 @@ function renderSide(){ const s=$('#side'); const ro=ROLE.org?'':'disabled';
     <label>Platí<select id="ePeriod" ${ro}><option value="2027" ${f.period!=='2028'?'selected':''}>od 1. 1. 2027</option><option value="2028" ${f.period==='2028'?'selected':''}>od 2028 (výhled)</option></select></label>
     <label>Popis<textarea id="eDesc" rows="3" ${ro}>${esc(f.desc||'')}</textarea></label>
     ${procLinks(f.id)}
-    <div class="lbl">Vazby (${ls.length})</div>${ls.map(l=>{ const o=F(l.from===f.id?l.to:l.from); return `<div class="arow kid"><a href="#" data-o="${o?o.id:''}">${l.from===f.id?'→':'←'} ${esc(o?o.name:'?')}</a><span class="muted" style="font-size:11px">${esc(KIND(l.kind)[0])}${l.procs&&l.procs.length?' · z procesu':''}</span></div>`; }).join('')||'<div class="muted">žádné – vytvořte tlačítkem „Spojit“</div>'}
+    ${linksBlock(f)}
     ${cs.length?`<div class="lbl">Rozpory</div>${cs.map(c=>`<div class="mini sev-${c.sev}${c.ignored?' ign':''}">${esc(c.text)}</div>`).join('')}`:''}
     <div class="lbl">Poznámky z diskuse</div><div class="notes">${f.notes.map((n,i)=>`<div class="note"><div class="muted">${esc(n.t)} · ${esc(n.who||'')}${ROLE.org?` <button class="small" data-n="${i}">×</button>`:''}</div>${esc(n.text)}</div>`).join('')||'<div class="muted">zatím nic</div>'}</div>
     ${ROLE.org?`<textarea id="nText" rows="2"></textarea><button class="small" id="nAdd">Přidat poznámku</button><div class="row" style="margin-top:14px"><button id="eDel" style="color:var(--danger)">Smazat ${isA?'aktéra':'systém'}</button></div>`:''}`;
     $('#sClose').onclick=()=>{ sel=null; render(); };
-    s.querySelectorAll('a[data-o]').forEach(x=>x.onclick=e=>{ e.preventDefault(); if(!x.dataset.o) return; sel={t:'f',id:x.dataset.o}; render(); focusFunc(x.dataset.o); });
     if(!ROLE.org) return; const nm=isA?'aktér':'systém'; const ch=(fn,what)=>()=>{ fn(); save(nm,what+': '+f.name); };
     $('#eName').onchange=e=>{ const o=f.name; f.name=e.target.value.trim()||o; save(nm,`přejmenován: ${o} → ${f.name}`); };
     if(isA){ $('#eCat').onchange=ch(()=>f.cat=$('#eCat').value,'kategorie'); s.querySelectorAll('#eCh input').forEach(i=>i.onchange=ch(()=>f.channels=[...s.querySelectorAll('#eCh input:checked')].map(x=>x.value),'kanály')); }
@@ -521,6 +532,7 @@ function renderSide(){ const s=$('#side'); const ro=ROLE.org?'':'disabled';
     <p class="muted" style="font-size:12px">Souhrnný vlastník: <b>${o?esc(U[o].name):'více vlastníků'}</b>. Vazba vedená na souhrn platí pro všechny jeho funkce.</p>
     <div class="lbl">Dílčí funkce (${ks.length})</div>
     ${ks.map(k=>{ const kc=live().filter(c=>touches(c,k.id)); return `<div class="arow kid"><a href="#" data-k="${k.id}"><span class="st" style="background:${STATUS_COLOR[k.status]}"></span> ${esc(k.name)}${k.period==='2028'?' <i class="muted">(2028)</i>':''}</a><span>${kc.some(c=>c.sev==='err')?'<span class="cb err">!</span>':kc.length?'<span class="cb warn">!</span>':''}</span></div>`; }).join('')||'<div class="muted">žádné</div>'}
+    ${linksBlock(f)}
     ${procLinks(f.id)}
     <div class="row" style="margin-top:10px"><button id="sOpen" class="primary">Otevřít souhrn ▸</button>${ROLE.org?'<button id="sAddK">+ dílčí funkce</button>':''}</div>
     ${cs.length?`<div class="lbl">Rozpory dílčích funkcí</div>${cs.map(c=>`<div class="mini sev-${c.sev}${c.ignored?' ign':''}">${esc(c.text)}</div>`).join('')}`:''}
@@ -558,6 +570,7 @@ function renderSide(){ const s=$('#side'); const ro=ROLE.org?'':'disabled';
     ${cs.length?`<div class="lbl">Rozpory</div>${cs.map(c=>`<div class="mini sev-${c.sev}${c.ignored?' ign':''}">${esc(c.text)}${c.ignored?' <i>(přijato)</i>':''}</div>`).join('')}`:''}
     <div class="lbl">Poznámky z diskuse</div><div class="notes">${f.notes.map((n,i)=>`<div class="note"><div class="muted">${esc(n.t)} · ${esc(n.who||'')}${ROLE.org?` <button class="small" data-n="${i}">×</button>`:''}</div>${esc(n.text)}</div>`).join('')||'<div class="muted">zatím nic</div>'}</div>
     ${ROLE.org?`<textarea id="nText" rows="2" placeholder="např. MMR navrhuje přesunout pod sekci…"></textarea><button class="small" id="nAdd">Přidat poznámku</button>`:''}
+    ${linksBlock(f)}
     ${procLinks(f.id)}
     <div class="row" style="margin-top:14px">${ROLE.org?'<button id="fDel" style="color:var(--danger)">Smazat funkci</button>':''}<button id="fLinks">Vazby (${LINKS.filter(l=>l.from===f.id||l.to===f.id).length})</button></div>`;
     const ch=(fn,act)=>()=>{ fn(); save('funkce',act+': '+f.name); };
@@ -574,7 +587,7 @@ function renderSide(){ const s=$('#side'); const ro=ROLE.org?'':'disabled';
       if(v){ f.parent=v; f.group=F(v).group; f._lay=true; delete f.sx; } else { delete f.parent; const s0=F(old); f.x=(s0?s0.x:f.x)+30; f.y=(s0?s0.y:f.y)+120; }
       save('souhrn',f.name+(v?' → '+F(v).name:' → samostatná')); };
     s.querySelectorAll('.locs input').forEach(i=>i.onchange=ch(()=>f.locs=[...s.querySelectorAll('.locs input:checked')].map(x=>x.value),'lokality'));
-    s.querySelectorAll('.arow').forEach(r=>{ const a=f.assign[+r.dataset.i]; r.querySelector('select').onchange=e=>{ a.role=e.target.value; save('přiřazení',`${f.name}: ${a.name} → ${ROLES[a.role]}`); };
+    s.querySelectorAll('.arow[data-i]').forEach(r=>{ const a=f.assign[+r.dataset.i]; r.querySelector('select').onchange=e=>{ a.role=e.target.value; save('přiřazení',`${f.name}: ${a.name} → ${ROLES[a.role]}`); };
       r.querySelector('[data-a=x]').onclick=()=>{ f.assign.splice(+r.dataset.i,1); save('přiřazení',`${f.name}: odebrán ${a.name||a.unit}`); }; });
     $('#aAdd').onclick=()=>{ const u=$('#aUnit').value; if(!u) return; if(f.assign.some(a=>a.unit===u)){ toast('Útvar už je přiřazen.'); return; } f.assign.push({unit:u,role:$('#aRole').value,name:U[u].name}); save('přiřazení',`${f.name}: + ${U[u].name} (${ROLES[$('#aRole').value]})`); };
     $('#nAdd').onclick=()=>{ const t=$('#nText').value.trim(); if(!t) return; f.notes.push({t:today(),who:currentUser?currentUser.email:'',text:t}); save('poznámka',f.name+': '+t); };
@@ -633,6 +646,20 @@ function renderSide(){ const s=$('#side'); const ro=ROLE.org?'':'disabled';
   if($('#kindsEdit')) $('#kindsEdit').onclick=()=>openKindsDlg();
   if($('#toConf')) $('#toConf').onclick=e=>{ e.preventDefault(); setView('conf'); };
 }
+// seznam vazeb prvku + rychlé přidání vazby přímo z panelu
+function linksBlock(f){ const ls=LINKS.filter(l=>l.from===f.id||l.to===f.id);
+  const list=ls.map(l=>{ const o=F(l.from===f.id?l.to:l.from); return `<div class="arow kid"><a href="#" data-o="${o?o.id:''}">${l.from===f.id?'→':'←'} ${esc(o?o.name:'?')}</a><span class="muted" style="font-size:11px">${esc(KIND(l.kind)[0])}${l.derived?' · z procesu':l.procs&&l.procs.length?' · i v procesu':''}</span></div>`; }).join('')||'<div class="muted">žádné</div>';
+  const og=(lbl,xs)=>xs.length?`<optgroup label="${lbl}">${xs.map(x=>`<option value="${x.id}">${x.sum?'▣ ':''}${esc(x.name)}</option>`).join('')}</optgroup>`:'';
+  const all=Object.values(state.funcs).filter(x=>x.id!==f.id);
+  const opts=og('Systémy',all.filter(x=>x.kind==='system'))+og('Aktéři',all.filter(x=>x.kind==='actor'))+og('Funkce',all.filter(x=>!x.kind));
+  const def=f.kind==='system'?'data':(f.kind==='actor'?'zada':'pouziva');
+  return `<div class="lbl">Vazby (${ls.length})</div>${list}${ROLE.org?`<div class="ladd" data-f="${f.id}"><div class="lr"><select class="laDir" title="směr"><option value="out">→ k</option><option value="in">← od</option></select><select class="laEl"><option value="">— vyberte prvek —</option>${opts}</select></div>
+    <div class="lr"><select class="laKind">${Object.entries(LINK_KINDS).map(([k,[n]])=>`<option value="${k}" ${k===def?'selected':''}>${esc(n)}</option>`).join('')}</select><input type="text" class="laLbl" placeholder="popisek (nepovinný)"><button class="small laAdd">Přidat vazbu</button></div></div>`:''}`; }
+document.addEventListener('click',e=>{ const b=e.target.closest('.ladd .laAdd'); if(!b) return; const box=b.closest('.ladd'); const f=F(box.dataset.f); const t=box.querySelector('.laEl').value; if(!f||!t) { toast('Vyberte prvek, ke kterému vazba vede.'); return; }
+  const out=box.querySelector('.laDir').value==='out', kind=box.querySelector('.laKind').value, label=box.querySelector('.laLbl').value.trim(); const from=out?f.id:t, to=out?t:f.id;
+  if(state.links.some(l=>l.from===from&&l.to===to&&l.kind===kind)){ toast('Taková vazba už existuje.'); return; }
+  state.links.push({id:uid('l'),from,to,kind,label}); save('vazba',`nová: ${F(from).name} → ${F(to).name} (${KIND(kind)[0]})`); toast('Vazba přidána.'); });
+document.addEventListener('click',e=>{ const a=e.target.closest('#side a[data-o]'); if(!a||!a.dataset.o) return; e.preventDefault(); sel={t:'f',id:a.dataset.o}; render(); focusFunc(a.dataset.o); });
 function procLinks(id){ const ps=procsOf(id); return ps.length?`<div class="lbl">V procesech</div>${ps.map(p=>`<div><a href="#" class="plink" data-p="${p.id}">${esc(p.name)}</a></div>`).join('')}`:''; }
 document.addEventListener('click',e=>{ const a=e.target.closest('a.plink'); if(!a) return; e.preventDefault(); state.proc=a.dataset.p; procSel=null; setView('proc'); });
 function focusFunc(id){ const f=F(id); if(f&&f.parent&&drill!==f.parent){ drill=f.parent; render(); } else if(f&&!f.parent&&drill&&drill!==id){ drill=null; render(); } setTimeout(()=>{ const b=document.querySelector(`.fbox[data-fid="${id}"]`); if(b){ b.scrollIntoView({block:'center',inline:'center'}); b.classList.add('flash'); setTimeout(()=>b.classList.remove('flash'),1500); } },60); }

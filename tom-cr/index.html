@@ -113,6 +113,8 @@ body.drilling #btnAddG{display:none}
 .gframe.band{border-style:solid;border-width:1px;background:rgba(255,255,255,.25)}
 .gframe.band-actor{background:rgba(51,65,85,.04)} .gframe.band-system{background:rgba(15,118,110,.05)}
 .leg i.acti{border-radius:7px;border-color:#94A3B8;background:#F8FAFC} .leg i.sysi{border-radius:1px;border-color:#5EAAA0;background:#F0FDFA}
+.ladd{margin-top:8px;padding:8px;background:#F7F8FA;border:1px solid var(--line);border-radius:6px;display:flex;flex-direction:column;gap:6px}
+.ladd .lr{display:flex;gap:6px;align-items:center} .ladd select,.ladd input{font-size:12px;padding:3px 5px} .ladd .laDir{width:70px;flex:none} .ladd .laKind{width:130px;flex:none} .ladd .laAdd{flex:none;white-space:nowrap}
 .rrow{display:grid;grid-template-columns:1fr 1fr 34px 30px;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid #EEF0F3} .rrow select{font-size:12px;padding:3px 5px}
 #v-proc{display:flex;flex-direction:column;overflow:hidden}
 #pconnHint{color:var(--accent);font-weight:600}
@@ -197,7 +199,7 @@ body.presenting .fbox .cb.note{display:none}
 </head>
 <body>
 <header>
-  <h1>TOM ÚRÚ ČR<small><a href="../" title="organigram ÚRÚ ČR (samostatná aplikace)">← organigram ÚRÚ ČR</a>cílový provozní model od 1. 1. 2027 · <span id="ver">index 2026-10-05.11</span></small></h1>
+  <h1>TOM ÚRÚ ČR<small><a href="../" title="organigram ÚRÚ ČR (samostatná aplikace)">← organigram ÚRÚ ČR</a>cílový provozní model od 1. 1. 2027 · <span id="ver">index 2026-10-05.12</span></small></h1>
   <div class="stats" id="stats"></div>
   <span class="user"><span class="dot" id="syncDot"></span><span id="userMail"></span></span>
   <div class="viewsw" role="group" aria-label="Pohled"><button data-v="map" class="on">Mapa funkcí</button><button data-v="org">Organigram</button><button data-v="proc">Procesy</button><button data-v="conf" id="tabConf">Rozpory</button><button data-v="prop">Návrhy změn</button><button data-v="ver">Verze</button></div>
@@ -280,9 +282,9 @@ body.presenting .fbox .cb.note{display:none}
 
 <script src="../vendor/xlsx.full.min.js"></script>
 <script src="../vendor/supabase.js"></script>
-<script src="../config.js?v=2026-10-05.11"></script>
-<script src="model.js?v=2026-10-05.11"></script>
-<script src="process.js?v=2026-10-05.11"></script>
-<script src="app.js?v=2026-10-05.11"></script>
+<script src="../config.js?v=2026-10-05.12"></script>
+<script src="model.js?v=2026-10-05.12"></script>
+<script src="process.js?v=2026-10-05.12"></script>
+<script src="app.js?v=2026-10-05.12"></script>
 </body>
 </html>
