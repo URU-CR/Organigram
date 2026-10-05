@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TOM krajského ÚRÚ – cílový provozní model</title>
+<style>
+:root{
+  --bg:#EEF0F3; --card:#fff; --ink:#1B2430; --muted:#5D6B7A; --line:#D5DAE1;
+  --accent:#1D4ED8; --danger:#B42318; --warn:#B54708; --ok:#067647;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font:14px/1.4 "Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;color:var(--ink);background:var(--bg);display:flex;flex-direction:column;overflow:hidden}
+button{font:inherit;color:inherit;cursor:pointer;border:1px solid var(--line);background:#fff;border-radius:6px;padding:6px 11px}
+button:hover{background:#F3F5F8} button:disabled{opacity:.45;cursor:default}
+button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+button.small{padding:2px 7px;font-size:12px;border-radius:5px}
+button.on{background:#E8EEFF;border-color:var(--accent);color:var(--accent)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+input[type=text],input[type=number],select,textarea{font:inherit;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink);width:100%}
+textarea{resize:vertical}
+.muted{color:var(--muted)} .okc{color:var(--ok)} .warnc{color:var(--warn)}
+.hint{color:var(--muted);font-size:12px;font-style:italic}
+
+header{background:#fff;border-bottom:1px solid var(--line);padding:10px 18px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+header h1{font-size:17px;margin:0;font-weight:600;white-space:nowrap}
+header h1 small{display:block;font-size:12px;font-weight:400;color:var(--muted)}
+header h1 a{color:var(--accent);text-decoration:none;margin-right:8px}
+.stats{display:flex;gap:16px;align-items:baseline;flex-wrap:wrap}
+.stat{white-space:nowrap} .stat b{font-size:18px;font-weight:600} .stat span{color:var(--muted);font-size:12px;margin-left:4px}
+.stat.bad b{color:var(--danger)} .stat.warnc b{color:var(--warn)}
+.viewsw{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.viewsw button{border:0;border-radius:0;border-right:1px solid var(--line)} .viewsw button:last-child{border-right:0}
+.viewsw button.on{background:var(--ink);color:#fff}
+.actions{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+.user{font-size:12px;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ok);display:inline-block} .dot.busy{background:#F59E0B} .dot.err{background:var(--danger)}
+
+main{flex:1;display:grid;grid-template-columns:1fr 360px;min-height:0}
+.view{min-height:0;overflow:auto} .view[hidden]{display:none!important}
+aside{background:#fff;border-left:1px solid var(--line);overflow:auto;padding:12px 16px 40px}
+aside label{display:block;font-size:12px;color:var(--muted);margin:8px 0 0} aside label>input,aside label>select,aside label>textarea{margin-top:3px;font-size:13px;color:var(--ink)}
+aside .g2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+aside .lbl{font-size:12px;font-weight:600;margin:14px 0 6px;text-transform:none}
+aside .sh{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.locs{display:flex;flex-wrap:wrap;gap:4px 10px} .locs label{display:inline-flex;gap:4px;align-items:center;margin:0;color:var(--ink)}
+.locs input{width:auto}
+.arow{display:grid;grid-template-columns:1fr 110px auto;gap:6px;align-items:center;padding:4px 0;border-bottom:1px solid #EEF0F3;font-size:13px}
+.arow select{padding:2px 4px;font-size:12px} .arow.gone span{color:var(--danger);text-decoration:line-through}
+.arow a{color:var(--ink)}
+.addasg{display:grid;grid-template-columns:1fr 100px auto;gap:6px;margin-top:8px} .addasg select{font-size:12px;padding:3px 5px}
+.mini{font-size:12px;padding:5px 8px;border-radius:5px;margin:4px 0;border-left:3px solid}
+.mini.sev-err{background:#FEF3F2;border-color:var(--danger)} .mini.sev-warn{background:#FFFAEB;border-color:#F79009} .mini.sev-info{background:#F0F5FF;border-color:var(--accent)} .mini.ign{opacity:.55}
+.notes .note{font-size:13px;padding:6px 0;border-bottom:1px solid #EEF0F3} .notes .note .muted{font-size:11px}
+#nText{margin:8px 0 4px}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.leg{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:12px} .leg.col{flex-direction:column;gap:4px}
+.leg i{display:inline-block;width:12px;height:12px;vertical-align:-2px;margin-right:5px;border:1px solid rgba(0,0,0,.2)}
+.leg i.b{width:16px;border-radius:3px;border-width:2px;background:#fff} .leg i.ok{border-color:#B7C0CC} .leg i.warn{border-color:#F79009} .leg i.err{border-color:var(--danger)} .leg i.p28{border-style:dashed;border-color:#9AA4B2}
+.pal{display:flex;gap:6px;flex-wrap:wrap} .pal .sw{width:24px;height:24px;padding:0;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px var(--line)} .pal .sw.on{box-shadow:0 0 0 2px var(--ink)}
+
+/* mapa */
+#v-map{display:flex;flex-direction:column;overflow:hidden}
+.mtools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 14px;background:#F7F8FA;border-bottom:1px solid var(--line);font-size:13px}
+.mtools label{display:inline-flex;gap:5px;align-items:center} .mtools select{width:auto;padding:3px 6px}
+.mtools input[type=range]{width:110px}
+#connHint{color:var(--accent);font-weight:600}
+.lkf{display:inline-flex;gap:8px;align-items:center;padding-right:8px;border-right:1px solid var(--line)}
+#canvasWrap{flex:1;overflow:auto;position:relative;touch-action:pan-x pan-y}
+#canvas{position:relative;transform-origin:0 0}
+.gframe{position:absolute;border:1.5px dashed;border-radius:12px;background:rgba(255,255,255,.35)}
+.gframe.sel{background:rgba(29,78,216,.05);border-style:solid}
+.gframe .gl{position:absolute;top:6px;left:12px;font-weight:600;font-size:13px;cursor:move;touch-action:none;user-select:none;max-width:calc(100% - 24px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+svg.links{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
+svg.links .lk{pointer-events:auto;cursor:pointer}
+svg.links line.hit{stroke:transparent;stroke-width:14}
+svg.links text{font-size:11px;font-weight:600;paint-order:stroke;stroke:#fff;stroke-width:5px;stroke-linejoin:round}
+svg.labels{pointer-events:none} svg.labels text.on{font-size:12.5px}
+.fbox{position:absolute;width:230px;background:#fff;border:2px solid #B7C0CC;border-top-width:5px;border-radius:8px;padding:7px 9px 8px;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;box-shadow:0 1px 2px rgba(27,36,48,.08)}
+.fbox .fn{font-weight:600;font-size:13px;line-height:1.25}
+.fbox .fm{font-size:11px;color:var(--muted);margin-top:3px;display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.fbox .st{width:9px;height:9px;border-radius:50%;display:inline-block}
+.fbox .cb{margin-left:auto;font-size:11px;font-weight:600;border-radius:9px;padding:0 6px;color:#fff} .fbox .cb+.cb{margin-left:0}
+.cb.err{background:var(--danger)} .cb.warn{background:#F79009} .cb.note{background:#E8EEFF;color:var(--accent)}
+.fbox .fu{margin-top:6px;display:flex;flex-wrap:wrap;gap:3px}
+.uchip{font-size:11px;padding:1px 6px;border-radius:9px;border:1px solid var(--line);background:#F7F8FA;white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis}
+.uchip.r-do,.uchip.r-sup{max-width:104px} .uchip.r-own{background:#1B2430;color:#fff;border-color:#1B2430} .uchip.r-do{background:#E8EEFF;border-color:#B9C8F5} .uchip.r-sup{background:#fff;border-style:dashed}
+.uchip.gone{background:#FEF3F2;color:var(--danger);border-color:var(--danger);text-decoration:line-through} .uchip.more{background:#fff}
+.fbox.sev-ok{border-color:#B7C0CC} .fbox.sev-warn{border-color:#F79009} .fbox.sev-err{border-color:var(--danger)} .fbox.sev-info{border-color:#93B0F5}
+.fbox.p2028{border-style:dashed;border-color:#9AA4B2;background:#FAFBFC}
+.fbox.sel{box-shadow:0 0 0 3px rgba(29,78,216,.35)} .fbox.from{box-shadow:0 0 0 3px #7C3AED}
+body.connecting .fbox{cursor:crosshair}
+.fbox.sum{box-shadow:4px 4px 0 -1px #fff,4px 4px 0 0 #B7C0CC,8px 8px 0 -1px #fff,8px 8px 0 0 #D5DAE1}
+.fbox.sum.sev-err{box-shadow:4px 4px 0 -1px #fff,4px 4px 0 0 #E8A39C,8px 8px 0 -1px #fff,8px 8px 0 0 #F4CFCB}
+.fbox.sum.sel{box-shadow:0 0 0 3px rgba(29,78,216,.35),5px 5px 0 0 #D5DAE1}
+.fbox .fu .open{margin-left:auto;padding:1px 8px;font-size:11px}
+.fbox.ghost{background:#F7F8FA;border:1.5px dashed #B7C0CC;border-top-width:4px;opacity:.75;cursor:pointer;width:200px}
+.fbox.ghost .fn{font-weight:500;font-size:12px}
+.fbox.dim,.gframe.dim{opacity:.22}
+svg.links .lk.faint{opacity:.08} svg.links .lk.soft{opacity:.22}
+.gframe.drill{background:rgba(255,255,255,.55);border-style:solid;border-width:2px}
+.gframe.drill .gl{font-size:15px;cursor:pointer}
+body.drilling #btnAddG{display:none}
+#crumb{display:inline-flex;gap:8px;align-items:center;margin-right:10px} #crumb[hidden]{display:none}
+.leg i.sumi{border-color:#B7C0CC;box-shadow:3px 3px 0 -1px #fff,3px 3px 0 0 #B7C0CC}
+.arow.kid{grid-template-columns:1fr auto} .arow.kid a{text-decoration:none} .arow.kid .st{width:8px;height:8px;border-radius:50%;display:inline-block}
+.fbox.actor,.fbox.system{width:180px;padding:6px 8px 7px}
+.fbox.actor{border-radius:18px;border-top-width:2px;border-color:#94A3B8;background:#F8FAFC;border-top-color:#334155!important}
+.fbox.system{border-radius:3px;border-top-width:2px;border-color:#5EAAA0;background:#F0FDFA;border-top-color:#0F766E!important}
+.fbox.actor.sev-ok{border-color:#94A3B8} .fbox.system.sev-ok{border-color:#5EAAA0}
+.fbox.actor .fn,.fbox.system .fn{font-size:12.5px}
+.fbox .allu{display:inline-block;font-size:10.5px;font-weight:700;color:#fff;background:#0F766E;border-radius:9px;padding:0 7px;margin:2px 0 1px}
+.leg .allu{display:inline-block;font-size:10.5px;font-weight:700;color:#fff;background:#0F766E;border-radius:9px;padding:0 6px}
+.fbox .fu.ch .uchip{background:#fff;font-size:10px;padding:0 5px}
+.gframe.band{border-style:solid;border-width:1px;background:rgba(255,255,255,.25)}
+.gframe.band-actor{background:rgba(51,65,85,.04)} .gframe.band-system{background:rgba(15,118,110,.05)}
+.leg i.acti{border-radius:7px;border-color:#94A3B8;background:#F8FAFC} .leg i.sysi{border-radius:1px;border-color:#5EAAA0;background:#F0FDFA}
+.ladd{margin-top:8px;padding:8px;background:#F7F8FA;border:1px solid var(--line);border-radius:6px;display:flex;flex-direction:column;gap:6px}
+.ladd .lr{display:flex;gap:6px;align-items:center} .ladd select,.ladd input{font-size:12px;padding:3px 5px} .ladd .laDir{width:70px;flex:none} .ladd .laKind{width:130px;flex:none} .ladd .laAdd{flex:none;white-space:nowrap}
+.rrow{display:grid;grid-template-columns:1fr 1fr 34px 30px;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid #EEF0F3} .rrow select{font-size:12px;padding:3px 5px}
+#v-proc{display:flex;flex-direction:column;overflow:hidden}
+#pconnHint{color:var(--accent);font-weight:600}
+#pWrap{flex:1;overflow:auto;position:relative;touch-action:pan-x pan-y}
+#pCanvas{position:relative;transform-origin:0 0}
+.plane{position:absolute;background:rgba(255,255,255,.35);border-right:1px dashed #D5DAE1} .plane.odd{background:rgba(255,255,255,.7)}
+.phead{position:absolute;background:#fff;border:1px solid var(--line);border-top:4px solid #9AA4B2;border-radius:6px;padding:4px 8px;font-size:12.5px;line-height:1.25;cursor:pointer;overflow:hidden}
+.phead .pt{display:block;font-size:10.5px;color:var(--muted)} .phead .ps{display:block;font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.phead.t-role{border-top-color:#7C3AED} .phead.t-actor{border-top-color:#334155;border-radius:14px} .phead.t-system{border-top-color:#0F766E;background:#F0FDFA} .phead.t-func{border-top-color:#4472C4} .phead.t-gone{border-top-color:var(--danger)}
+.phead.sel{box-shadow:0 0 0 3px rgba(29,78,216,.35)}
+.pstep{position:absolute;width:180px;min-height:52px;background:#fff;border:1.5px solid #B7C0CC;border-radius:7px;padding:7px 9px;font-size:12.5px;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;box-shadow:0 1px 2px rgba(27,36,48,.08)}
+.pstep .pn{font-weight:600;line-height:1.25;padding-right:14px} .pstep .pm{font-size:11px;color:var(--muted);margin-top:2px}
+.pstep.k-decision{border-color:#F79009;background:#FFFAEB;border-width:2px} .pstep.k-start,.pstep.k-end{border-radius:26px;background:#F7F8FA}
+.pstep.sel{box-shadow:0 0 0 3px rgba(29,78,216,.35)} .pstep.from{box-shadow:0 0 0 3px #7C3AED} .pstep.drag{opacity:.85;z-index:5}
+.pstep.sev-warn{border-color:#F79009} .pstep.sev-err{border-color:var(--danger)}
+.pstep .pnote{position:absolute;right:5px;top:5px;width:16px;height:16px;border-radius:50%;background:#7C3AED;color:#fff;font-size:11px;font-weight:700;text-align:center;line-height:16px}
+.pstep .cb{position:absolute;right:5px;bottom:5px;font-size:10px;padding:0 5px}
+body.pconnecting .pstep{cursor:crosshair}
+svg.pflows{position:absolute;left:0;top:0;overflow:visible;pointer-events:none} svg.pflows .pf{pointer-events:auto;cursor:pointer} svg.pflows path.hit{stroke:transparent;stroke-width:12}
+svg.plabels text{font-size:11px;font-weight:600;fill:#334155;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round} svg.plabels text.on{fill:#1D4ED8}
+body.presenting .ptools{display:none!important}
+.pad.wide{max-width:none}
+.screw{gap:8px;margin-bottom:10px} .screw select{width:auto;min-width:280px}
+.verdict{border:2px solid;border-radius:10px;background:#fff;padding:12px 16px;margin:6px 0 12px} .verdict .vt{font-size:20px;font-weight:700;letter-spacing:.02em}
+.checks{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:8px}
+.chk{display:grid;grid-template-columns:28px 1fr;gap:8px;background:#fff;border:1px solid var(--line);border-left:4px solid;border-radius:6px;padding:8px 10px;font-size:13px}
+.chk.st-ok{border-left-color:var(--ok)} .chk.st-warn{border-left-color:#F79009} .chk.st-fail{border-left-color:var(--danger)}
+.chk .cond{margin-top:4px;font-size:12px;color:var(--muted)}
+.sti{display:inline-flex;width:22px;height:22px;border-radius:50%;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:12px}
+.sti.st-ok{background:var(--ok)} .sti.st-warn{background:#F79009} .sti.st-fail{background:var(--danger)}
+.tw{overflow-x:auto} .tbl.ws td,.tbl.ws th{white-space:nowrap} .tbl.ws select{width:auto;font-size:12px;padding:2px 4px}
+.tbl.ws th.sc,.tbl.ws td.sc{background:#F7F9FF} .tbl.ws td.chg{background:#FFFAEB} .tbl.ws tr.sel td{outline:1px solid var(--accent)}
+.tbl .tagr{font-size:10px;font-weight:700;color:#fff;background:var(--danger);border-radius:6px;padding:0 4px}
+.bulk{gap:6px;margin:4px 0 6px;font-size:13px} .bulk select{width:auto;font-size:12px;padding:2px 4px}
+.tbl.cmp td,.tbl.cmp th{text-align:center} .tbl.cmp td:first-child,.tbl.cmp th:first-child{text-align:left} .tbl.cmp .on{background:#EEF3FF} .tbl.cmp tr.vrow td{border-top:2px solid var(--line)}
+header h1 small a+a{margin-left:0}
+.fbox.flash{animation:fl 1.4s} @keyframes fl{0%,60%{box-shadow:0 0 0 6px rgba(245,158,11,.6)}100%{box-shadow:none}}
+
+/* organigram */
+#v-org{padding:10px 0 60px;background:#fff}
+.orghint{padding:4px 18px 10px;font-size:13px;color:var(--muted)}
+.orow{display:grid;grid-template-columns:minmax(260px,38%) 50px 1fr;gap:10px;align-items:start;padding:5px 14px;border-bottom:1px solid #F0F2F5;cursor:pointer}
+.orow:hover{background:#F7F8FA} .orow.sel{background:#E8EEFF}
+.orow .on{font-size:13px} .orow .lvl{color:var(--muted);font-size:11px;margin-left:6px}
+.orow.lv-predseda .on,.orow.lv-sekce .on{font-weight:700} .orow.lv-odbor .on{font-weight:600}
+.orow.sev-warn{background:#FFFAEB} .orow.sev-err{background:#FEF3F2}
+.ocap{font-size:12px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+.ofs{display:flex;flex-wrap:wrap;gap:4px}
+.fchip{font-size:11px;padding:2px 7px;border-radius:9px;border:1px solid #B9C8F5;background:#E8EEFF;cursor:pointer}
+.fchip.r-own{background:#1B2430;color:#fff;border-color:#1B2430} .fchip.r-sup{background:#fff;border-style:dashed} .fchip.p2028{opacity:.6;border-style:dashed}
+
+/* rozpory, návrhy, verze */
+.pad{padding:16px 22px 60px;max-width:1100px}
+.pad h2{font-size:17px;margin:0 0 4px} .pad h3{font-size:14px;margin:18px 0 6px}
+.okmsg{color:var(--ok);font-weight:600}
+.citem{display:grid;grid-template-columns:80px 1fr auto;gap:10px;align-items:start;background:#fff;border:1px solid var(--line);border-left:4px solid;border-radius:6px;padding:8px 10px;margin:5px 0;font-size:13px}
+.citem.sev-err{border-left-color:var(--danger)} .citem.sev-warn{border-left-color:#F79009} .citem.sev-info{border-left-color:var(--accent)}
+.citem .sv{font-size:11px;font-weight:600;text-transform:uppercase;color:var(--muted);padding-top:2px} .citem .ca{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+.citem .tag{font-size:11px;background:#E8EEFF;color:var(--accent);border-radius:9px;padding:0 7px;margin-left:4px;white-space:nowrap}
+.citem .why{font-size:12px;margin-top:3px}
+.rule{background:#fff;border:1px solid var(--line);border-radius:6px;padding:8px 10px;margin:6px 0;font-size:13px} .rule.off{opacity:.55}
+.rule .rab{display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12px;margin:6px 0}
+.tbl{border-collapse:collapse;width:100%;background:#fff;font-size:13px;margin-top:10px}
+.tbl th{text-align:left;font-size:12px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--line);padding:6px 8px}
+.tbl td{border-bottom:1px solid #EEF0F3;padding:6px 8px;vertical-align:top} .tbl textarea{min-width:260px;font-size:13px}
+tr.ps-provedeno td,tr.ps-zamitnuto td{opacity:.6}
+ul.diff{font-size:13px;padding-left:18px} ul.diff li.add{color:var(--ok)} ul.diff li.rem{color:var(--danger)}
+.empty{padding:40px;color:var(--muted)}
+
+dialog{border:0;border-radius:10px;padding:0;width:min(640px,94vw);box-shadow:0 20px 60px rgba(0,0,0,.25)}
+dialog::backdrop{background:rgba(27,36,48,.4)}
+.dhead{padding:14px 18px 6px} .dhead h2{margin:0;font-size:16px} .dbody{padding:6px 18px;max-height:62vh;overflow:auto} .dfoot{padding:12px 18px;display:flex;gap:8px;justify-content:flex-end;border-top:1px solid var(--line)}
+.dbody label{display:block;font-size:12px;color:var(--muted);margin:8px 0 3px}
+.flist{max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:6px;padding:4px 8px;font-size:13px}
+.flist label{display:flex;gap:6px;align-items:flex-start;color:var(--ink);margin:3px 0} .flist input{width:auto;margin-top:3px}
+.krow{display:grid;grid-template-columns:34px 1fr auto 34px 120px;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid #EEF0F3}
+.krow input[type=color]{width:30px;height:28px;padding:0;border:1px solid var(--line);border-radius:5px;background:#fff}
+.krow label{display:inline-flex;gap:4px;align-items:center;margin:0;color:var(--ink);font-size:12px;white-space:nowrap} .krow label input{width:auto}
+.krow select{font-size:12px;padding:3px 5px} .krow>button{justify-self:start}
+.loglist div{padding:5px 0;border-bottom:1px solid #EEF0F3;display:grid;grid-template-columns:130px 1fr;gap:10px;font-size:13px} .loglist time{color:var(--muted)}
+
+#auth{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:50}
+#auth .card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:24px;width:min(420px,92vw)} #auth h1{font-size:18px;margin:0 0 8px}
+#auth input{margin:6px 0} #auth .msg{font-size:13px;margin-top:8px;color:var(--muted)} #auth .msg.err{color:var(--danger)}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:9px 16px;border-radius:8px;font-size:13px;opacity:0;pointer-events:none;transition:.2s;z-index:60;white-space:pre-line;max-width:80vw}
+#toast.show{opacity:1;transform:translateX(-50%)}
+#presExit{display:none;position:fixed;right:16px;bottom:16px;z-index:40}
+
+body.role-ro .adm{display:none!important} body.role-ro .fbox{cursor:pointer}
+body.presenting header .actions,body.presenting header .viewsw,body.presenting aside,body.presenting .mtools{display:none!important}
+body.presenting main{grid-template-columns:1fr} body.presenting #presExit{display:block}
+body.presenting .fbox .cb.note{display:none}
+@media (max-width:900px){main{grid-template-columns:1fr} aside{max-height:45vh;border-left:0;border-top:1px solid var(--line)}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+@media print{header .actions,header .viewsw,aside,.mtools,#presExit{display:none!important} main{display:block} #canvasWrap{overflow:visible} body{background:#fff}}
+</style>
+</head>
+<body>
+<header>
+  <h1>TOM krajského ÚRÚ<small><a href="../kraje/" title="krajský organigram (samostatná aplikace)">← krajský organigram</a><a href="../tom-cr/" title="TOM ÚRÚ ČR">TOM ÚRÚ ČR</a>Kraj Vysočina · soustava od 2028 · <span id="ver">index 2026-10-05.2</span></small></h1>
+  <div class="stats" id="stats"></div>
+  <span class="user"><span class="dot" id="syncDot"></span><span id="userMail"></span></span>
+  <div class="viewsw" role="group" aria-label="Pohled"><button data-v="map" class="on">Mapa funkcí</button><button data-v="org">Organigram</button><button data-v="proc">Procesy</button><button data-v="ws">Pracoviště a systémy</button><button data-v="conf" id="tabConf">Rozpory</button><button data-v="prop">Návrhy změn</button><button data-v="ver">Verze</button></div>
+  <div class="actions">
+    <button id="btnUndo" class="adm" title="Zpět (Ctrl+Z)" disabled>↶ Zpět</button>
+    <button id="btnRedo" class="adm" title="Znovu (Ctrl+Y)" disabled>↷</button>
+    <button id="btnXlsx">Export (xlsx)</button>
+    <button id="btnSave" class="adm">Uložit (json)</button>
+    <button id="btnLoad" class="adm">Načíst (json)</button>
+    <button id="btnLog">Historie</button>
+    <button id="btnPresent">Prezentace</button>
+    <button id="btnLogout">Odhlásit</button>
+    <input type="file" id="fileJson" accept=".json" hidden>
+  </div>
+</header>
+<main>
+  <section class="view" id="v-map">
+    <div class="mtools">
+      <span id="crumb" hidden><button id="crumbBack" title="Esc">← celá mapa</button> <b id="crumbName"></b></span>
+      <button id="btnAddF" class="adm">+ funkce</button>
+      <button id="btnAddG" class="adm">+ oblast</button>
+      <button id="btnAddA" class="adm" title="Přidat aktéra vnějšího okolí">+ aktér</button>
+      <button id="btnAddS" class="adm" title="Přidat systém">+ systém</button>
+      <button id="btnConnect" class="adm" title="Vytvořit vazbu: klikněte na zdrojovou a pak na cílovou funkci">Spojit</button>
+      <button id="btnLayout" class="adm">Uspořádat</button>
+      <span id="connHint" hidden>Klikněte na funkci, ze které vazba vede.</span>
+      <span style="margin-left:auto"></span>
+      <span class="lkf" title="které vazby kreslit"><span class="muted">vazby:</span>
+        <label title="vazby mezi funkcemi úřadu"><input type="checkbox" id="showI"> mezi funkcemi</label>
+        <label title="vazby na systémy (používá, spravuje, předává data)"><input type="checkbox" id="showLS"> se systémy</label>
+        <label title="vazby s aktéry vnějšího okolí"><input type="checkbox" id="showLE"> s okolím</label></span>
+      <span class="lkf" title="existující vazby / vazby, které je teprve potřeba vytvořit"><label><input type="checkbox" id="showEx"> existující</label><label><input type="checkbox" id="showPl"> ⊕ k vytvoření</label></span>
+      <span class="muted">dlaždice:</span>
+      <label title="vrstva vnějšího okolí"><input type="checkbox" id="showA"> okolí</label>
+      <label title="vrstva systémů"><input type="checkbox" id="showS"> systémy</label>
+      <label><input type="checkbox" id="show2028"> výhled 2028</label>
+      <label>Barvit podle <select id="colorBy"><option value="conf">rozporů</option><option value="status">stavu diskuse</option></select></label>
+      <label>Zvětšení <input type="range" id="zoom" min="40" max="130" value="80"> <span id="zoomVal">80 %</span></label>
+    </div>
+    <div id="canvasWrap"><div id="canvas"></div></div>
+  </section>
+  <section class="view" id="v-org" hidden></section>
+  <section class="view" id="v-proc" hidden>
+    <div class="mtools ptools">
+      <select id="procSel" title="proces" style="max-width:340px"></select>
+      <button id="pBtnNew" class="adm">+ proces</button>
+      <button id="pBtnLane" class="adm" title="Přidat dráhu: kdo jedná (role, aktér, systém)">+ dráha</button>
+      <button id="pBtnStep" class="adm" title="Přidá krok pod vybraný krok, nebo do vybrané dráhy">+ krok</button>
+      <button id="pBtnConnect" class="adm" title="Šipka: klikněte na krok a pak na následující krok">Spojit</button>
+      <button id="pBtnRoles">Role…</button>
+      <span id="pconnHint" hidden></span>
+      <span style="margin-left:auto"></span>
+      <label>Zvětšení <input type="range" id="pzoom" min="40" max="130" value="85"> <span id="pzoomVal">85 %</span></label>
+    </div>
+    <div id="pWrap"><div id="pCanvas"></div></div>
+  </section>
+  <section class="view" id="v-ws" hidden></section>
+  <section class="view" id="v-conf" hidden></section>
+  <section class="view" id="v-prop" hidden></section>
+  <section class="view" id="v-ver" hidden></section>
+  <aside id="side"></aside>
+</main>
+<button id="presExit" class="primary">Ukončit prezentaci (Esc)</button>
+<div id="toast"></div>
+
+<div id="auth"><div class="card"><h1>TOM krajského ÚRÚ</h1><p>Zadejte e-mail. S heslem se přihlásíte rovnou, bez hesla vám přijde přihlašovací odkaz e-mailem.</p>
+  <input type="text" id="authMail" placeholder="vase.jmeno@urad.cz" autocomplete="email"><input type="password" id="authPass" placeholder="Heslo (máte-li nastavené)" autocomplete="current-password" style="font:inherit;padding:6px 9px;border:1px solid var(--line);border-radius:6px;width:100%">
+  <button id="authBtn" class="primary" style="margin-top:8px">Přihlásit</button><div class="msg" id="authMsg"></div></div></div>
+
+<dialog id="dlgLink"><div class="dhead"><h2>Vazba</h2><p class="muted" id="lkWhat"></p></div>
+  <div class="dbody"><label>Druh vazby</label><div style="display:flex;gap:6px"><select id="lkKind"></select><button id="lkKinds" class="small" type="button" style="white-space:nowrap">Upravit druhy…</button></div><label>Popisek (nepovinný)</label><input type="text" id="lkLabel" placeholder="např. stanovisko jako vnitřní podklad"><label style="display:flex;gap:6px;align-items:center;color:var(--ink);margin-top:10px"><input type="checkbox" id="lkExist" style="width:auto" checked> existuje <span class="muted">(prostředky k naplnění už jsou; odškrtněte, pokud je vazbu teprve potřeba vytvořit)</span></label></div>
+  <div class="dfoot"><button id="lkCancel">Zrušit</button><button id="lkOk" class="primary">Uložit</button></div></dialog>
+<dialog id="dlgRule"><div class="dhead"><h2>Pravidlo „oddělit“</h2><p class="muted">Funkce ze skupiny A a B nesmí vykonávat útvary pod stejným nadřízeným útvarem zvolené úrovně.</p></div>
+  <div class="dbody"><label>Název</label><input type="text" id="ruName"><label>Zdůvodnění</label><input type="text" id="ruDesc"><label>Oddělit na úrovni</label><select id="ruLevel"></select>
+    <label>Skupina A</label><div class="flist" id="ruA"></div><label>Skupina B</label><div class="flist" id="ruB"></div></div>
+  <div class="dfoot"><button id="ruCancel">Zrušit</button><button id="ruOk" class="primary">Uložit</button></div></dialog>
+<dialog id="dlgKinds"><div class="dhead"><h2>Druhy vazeb</h2><p class="muted">Název, barva a styl čáry. Použitý druh lze sloučit do jiného – jeho vazby se převedou.</p></div>
+  <div class="dbody"><div id="kindsBody"></div><div class="krow" style="margin-top:10px"><span></span><input type="text" id="kindNew" placeholder="nový druh vazby, např. „konzultuje“"><button id="kindAdd" class="small">+ přidat</button></div></div>
+  <div class="dfoot"><button id="kindsClose" class="primary">Hotovo</button></div></dialog>
+<dialog id="dlgLane"><div class="dhead"><h2>Nová dráha</h2><p class="muted">Kdo v procesu jedná: role (patří k funkci a tím k útvaru), aktér okolí, nebo systém, který krok provádí sám.</p></div>
+  <div class="dbody"><label>Kdo / co</label><select id="laneEl"></select></div>
+  <div class="dfoot"><button id="laneCancel">Zrušit</button><button id="laneOk" class="primary">Přidat</button></div></dialog>
+<dialog id="dlgRoles"><div class="dhead"><h2>Role</h2><p class="muted">Role jedná v procesech. Patří k funkci – ta určuje útvar v organigramu. Pro soustavu 2028 se stejné role budou opakovat na krajích a územních pracovištích.</p></div>
+  <div class="dbody"><div id="rolesBody"></div><div class="rrow" style="margin-top:10px"><input type="text" id="roleNew" placeholder="nová role, např. „Vedoucí územního pracoviště“"><span></span><span></span><button id="roleAdd" class="small">+ přidat</button></div></div>
+  <div class="dfoot"><button id="rolesClose" class="primary">Hotovo</button></div></dialog>
+<dialog id="dlgLog"><div class="dhead"><h2>Historie změn modelu</h2></div><div class="dbody loglist" id="logBody"></div><div class="dfoot"><button id="logClose" class="primary">Zavřít</button></div></dialog>
+
+<script src="../vendor/xlsx.full.min.js"></script>
+<script src="../vendor/supabase.js"></script>
+<script src="../config.js?v=2026-10-05.2"></script>
+<script src="model.js?v=2026-10-05.2"></script>
+<script src="process.js?v=2026-10-05.2"></script>
+<script src="kraj.js?v=2026-10-05.2"></script>
+<script src="app.js?v=2026-10-05.2"></script>
+</body>
+</html>
