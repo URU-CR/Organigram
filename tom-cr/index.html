@@ -66,6 +66,7 @@ aside .sh{display:flex;justify-content:space-between;align-items:center;margin-b
 .mtools label{display:inline-flex;gap:5px;align-items:center} .mtools select{width:auto;padding:3px 6px}
 .mtools input[type=range]{width:110px}
 #connHint{color:var(--accent);font-weight:600}
+.lkf{display:inline-flex;gap:8px;align-items:center;padding-right:8px;border-right:1px solid var(--line)}
 #canvasWrap{flex:1;overflow:auto;position:relative;touch-action:pan-x pan-y}
 #canvas{position:relative;transform-origin:0 0}
 .gframe{position:absolute;border:1.5px dashed;border-radius:12px;background:rgba(255,255,255,.35)}
@@ -199,7 +200,7 @@ body.presenting .fbox .cb.note{display:none}
 </head>
 <body>
 <header>
-  <h1>TOM ÚRÚ ČR<small><a href="../" title="organigram ÚRÚ ČR (samostatná aplikace)">← organigram ÚRÚ ČR</a>cílový provozní model od 1. 1. 2027 · <span id="ver">index 2026-10-05.13</span></small></h1>
+  <h1>TOM ÚRÚ ČR<small><a href="../" title="organigram ÚRÚ ČR (samostatná aplikace)">← organigram ÚRÚ ČR</a>cílový provozní model od 1. 1. 2027 · <span id="ver">index 2026-10-05.14</span></small></h1>
   <div class="stats" id="stats"></div>
   <span class="user"><span class="dot" id="syncDot"></span><span id="userMail"></span></span>
   <div class="viewsw" role="group" aria-label="Pohled"><button data-v="map" class="on">Mapa funkcí</button><button data-v="org">Organigram</button><button data-v="proc">Procesy</button><button data-v="conf" id="tabConf">Rozpory</button><button data-v="prop">Návrhy změn</button><button data-v="ver">Verze</button></div>
@@ -227,7 +228,11 @@ body.presenting .fbox .cb.note{display:none}
       <button id="btnLayout" class="adm">Uspořádat</button>
       <span id="connHint" hidden>Klikněte na funkci, ze které vazba vede.</span>
       <span style="margin-left:auto"></span>
-      <label title="vazby mezi funkcemi a systémy úřadu; po vypnutí zůstanou jen vazby s vnějším okolím"><input type="checkbox" id="showI"> interní vazby</label>
+      <span class="lkf" title="které vazby kreslit"><span class="muted">vazby:</span>
+        <label title="vazby mezi funkcemi úřadu"><input type="checkbox" id="showI"> mezi funkcemi</label>
+        <label title="vazby na systémy (používá, spravuje, předává data)"><input type="checkbox" id="showLS"> se systémy</label>
+        <label title="vazby s aktéry vnějšího okolí"><input type="checkbox" id="showLE"> s okolím</label></span>
+      <span class="muted">dlaždice:</span>
       <label title="vrstva vnějšího okolí"><input type="checkbox" id="showA"> okolí</label>
       <label title="vrstva systémů"><input type="checkbox" id="showS"> systémy</label>
       <label><input type="checkbox" id="show2028"> výhled 2028</label>
@@ -283,9 +288,9 @@ body.presenting .fbox .cb.note{display:none}
 
 <script src="../vendor/xlsx.full.min.js"></script>
 <script src="../vendor/supabase.js"></script>
-<script src="../config.js?v=2026-10-05.13"></script>
-<script src="model.js?v=2026-10-05.13"></script>
-<script src="process.js?v=2026-10-05.13"></script>
-<script src="app.js?v=2026-10-05.13"></script>
+<script src="../config.js?v=2026-10-05.14"></script>
+<script src="model.js?v=2026-10-05.14"></script>
+<script src="process.js?v=2026-10-05.14"></script>
+<script src="app.js?v=2026-10-05.14"></script>
 </body>
 </html>
