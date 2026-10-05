@@ -325,6 +325,7 @@ body.critmode .box:not(.crit){opacity:.55}
 .oc-down{position:relative;padding-top:22px}
 .oc-down::before{content:"";position:absolute;top:0;left:50%;height:22px;border-left:2px solid var(--line)}
 .oc-stack{list-style:none;margin:0;padding:0 0 0 18px;position:relative;width:100%}
+.oc .oc-stack{padding:0 0 0 18px} /* přebíjí .oc ul{padding:0} – místo pro svislou spojnici vlevo od dlaždic */
 .oc-stack::before{content:"";position:absolute;left:6px;top:-22px;bottom:22px;border-left:2px solid var(--line)}
 .oc-down.stack-only::before{display:none}
 .oc-row>li.oc-stackcol::after{left:6px}
