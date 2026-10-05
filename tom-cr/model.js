@@ -4,8 +4,8 @@
 window.TOM_SEED = {
   groups: [
     {id:'g1', name:'Rozhodování – vyhrazené stavby a bydlení', color:'#4472C4'},
-    {id:'g2', name:'Odvolání a přezkum', color:'#B42318'},
     {id:'g3', name:'Integrované dotčené orgány', color:'#70AD47'},
+    {id:'g2', name:'Odvolání a přezkum', color:'#B42318'},
     {id:'g4', name:'Územní plánování', color:'#0E9AA7'},
     {id:'g5', name:'Metodika a legislativa', color:'#7C3AED'},
     {id:'g6', name:'Příprava soustavy 2028', color:'#C79400'},
@@ -47,6 +47,14 @@ window.TOM_SEED = {
     {id:'f31', g:'g8', type:'podpora', p:'2028', name:'Sdílené služby pro celou soustavu', refs:'R5, R10', a:[]},
     {id:'f32', g:'g4', type:'vykon', p:'2028', name:'Převzetí pořizování ÚPD za obce', refs:'R7', a:[]},
     {id:'f33', g:'g8', type:'podpora', p:'2028', name:'Jedna spisová služba soustavy', refs:'R6', a:[]}
+  ],
+  // souhrnné funkce (sbalené dlaždice); vazby vedoucí na více dílčích funkcí stejného souhrnu se sloučí na souhrn
+  sums: [
+    {id:'s1', g:'g1', name:'Povolování vyhrazených staveb', children:['f01','f02','f03','f04','f05']},
+    {id:'s2', g:'g3', name:'Integrované dotčené orgány', children:['f10','f11']},
+    {id:'s3', g:'g5', name:'Metodika a legislativa', children:['f15','f16','f17']},
+    {id:'s4', g:'g7', name:'Řízení úřadu', children:['f19','f20','f21']},
+    {id:'s5', g:'g8', name:'Podpůrné služby', children:['f22','f23','f24','f25','f26']}
   ],
   links: [
     ['f08','f01','odvolani'],['f08','f02','odvolani'],['f08','f05','odvolani'],
