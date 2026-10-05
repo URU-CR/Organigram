@@ -1,6 +1,6 @@
 // TOM ÚRÚ ČR – cílový provozní model úřadu od 1. 1. 2027.
 // Samostatná aplikace: model v organigram_state.id='tom-cr'; organigram ÚRÚ ČR ('main') se jen čte (živě).
-const APP_VERSION='2026-10-05.12';
+const APP_VERSION='2026-10-05.13';
 const APP_ID='tom-cr', STATE_ID='tom-cr', ORG_ID='main', LS_KEY='uru-tom-cr-v1';
 
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
@@ -244,14 +244,15 @@ function tileHTML(f,cs){ const ne=cs.filter(c=>c.sev==='err').length, nw=cs.filt
   return `<div class="fn">${esc(f.name)}</div><div class="fm"><span class="st" style="background:${STATUS_COLOR[f.status]}" title="${STATUS[f.status]}"></span>${esc(TYPES[f.type]||'')}${f.period==='2028'?' · <b>2028</b>':''}${badges}${f.notes.length?`<span class="cb note" title="poznámky z diskuse">✎${f.notes.length}</span>`:''}</div>
     <div class="fu">${chips||(f.period==='2028'?'<span class="hint">výhled soustavy</span>':'<span class="hint">bez útvaru</span>')}</div>`; }
 function renderMap(){
-  $('#show2028').checked=!!state.show2028; $('#showA').checked=state.showActors!==false; $('#showS').checked=state.showSystems!==false; $('#colorBy').value=state.colorBy; $('#zoom').value=Math.round(zoom*100); $('#zoomVal').textContent=Math.round(zoom*100)+' %';
+  $('#show2028').checked=!!state.show2028; $('#showI').checked=state.showInternal!==false; $('#showA').checked=state.showActors!==false; $('#showS').checked=state.showSystems!==false; $('#colorBy').value=state.colorBy; $('#zoom').value=Math.round(zoom*100); $('#zoomVal').textContent=Math.round(zoom*100)+' %';
   const D=drill&&F(drill); $('#crumb').hidden=!D; document.body.classList.toggle('drilling',!!D); if(D) $('#crumbName').textContent=D.name;
   const wrap=$('#canvasWrap'), cv=$('#canvas'); const sl=wrap.scrollLeft, st=wrap.scrollTop; cv.innerHTML=''; cv.style.transform=`scale(${zoom})`;
   const fs=D?kidsOf(D.id).filter(visible):Object.values(state.funcs).filter(f=>!f.parent&&visible(f));
   if(D&&fs.some(f=>f.sx===undefined)) layoutKids(fs,null);
   // vazby převedené na zobrazené dlaždice (sloučené)
   const shown=new Set(fs.map(f=>f.id)); const agg={}; const ext={in:new Set(),out:new Set()};
-  LINKS.forEach(l=>{ let a=l.from, b=l.to;
+  const isAct=id=>F(id)&&F(id).kind==='actor';
+  LINKS.forEach(l=>{ let a=l.from, b=l.to; if(state.showInternal===false&&!isAct(a)&&!isAct(b)) return;   // jen vazby s okolím
     if(D){ const inA=a===D.id||F(a)&&F(a).parent===D.id, inB=b===D.id||F(b)&&F(b).parent===D.id; if(!inA&&!inB) return;
       const top=id=>{ const f=F(id); return f&&f.parent?f.parent:id; }; if(!inA){ a=top(a); ext.in.add(a); } if(!inB){ b=top(b); ext.out.add(b); } }
     else { a=F(a)&&F(a).parent?F(a).parent:a; b=F(b)&&F(b).parent?F(b).parent:b; }
@@ -299,7 +300,7 @@ function renderMap(){
     const pk=[g.from,g.to].sort().join('|'), pi=(pairIdx[pk]=(pairIdx[pk]??-1)+1), pn=pairCnt[pk];
     if(pn>1){ const off=(pi-(pn-1)/2)*9, len=Math.hypot(x2-x1,y2-y1)||1, nx=-(y2-y1)/len*off, ny=(x2-x1)/len*off; x1+=nx; y1+=ny; x2+=nx; y2+=ny; }
     const lsel=sel&&sel.t==='l'&&g.ids.includes(sel.id); const hot=lsel||(selRep&&(g.from===selRep||g.to===selRep)); const faint=selRep&&!hot;
-    const lbl=[...g.labels].join('; ')||k0; const el=document.createElementNS(NS,'g'); const soft=!selRep&&!lsel&&(F(g.from).kind||F(g.to).kind); el.setAttribute('class','lk'+(lsel?' sel':'')+(faint?' faint':'')+(soft?' soft':''));
+    const lbl=[...g.labels].join('; ')||k0; const el=document.createElementNS(NS,'g'); const soft=!selRep&&!lsel&&state.showInternal!==false&&(F(g.from).kind||F(g.to).kind); el.setAttribute('class','lk'+(lsel?' sel':'')+(faint?' faint':'')+(soft?' soft':''));
     el.innerHTML=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="hit"/><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${c}" stroke-width="${hot?2.6:1.6}" ${dash?'stroke-dasharray="6 4"':''} marker-end="url(#ar-${LINK_KINDS[g.kind]?g.kind:'x'})"/>`+
       `<title>${esc(F(g.from).name+' → '+F(g.to).name+': '+lbl)}</title>`;
     el.addEventListener('pointerdown',e=>{ e.stopPropagation(); sel={t:'l',id:g.ids[0],ids:g.ids}; render(); }); svg.appendChild(el);
@@ -699,7 +700,8 @@ function wire(){
   $('#btnAddG').onclick=()=>{ const n=prompt('Název nové oblasti:'); if(!n||!n.trim()) return; const g={id:uid('g'),name:n.trim(),color:PALETTE[state.groups.length%PALETTE.length]}; state.groups.push(g); sel={t:'g',id:g.id}; save('oblast','nová: '+g.name); toast('Oblast vytvořena – přidejte do ní funkci.'); };
   $('#crumbBack').onclick=closeSum; wireProc();
   $('#btnAddA').onclick=()=>addEl('actor'); $('#btnAddS').onclick=()=>addEl('system');
-  $('#showA').onchange=e=>{ state.showActors=e.target.checked; persist(); render(); }; $('#showS').onchange=e=>{ state.showSystems=e.target.checked; persist(); render(); };
+  $('#showA').onchange=e=>{ state.showActors=e.target.checked; if(!e.target.checked&&state.showInternal===false){ state.showInternal=true; } persist(); render(); };
+  $('#showI').onchange=e=>{ state.showInternal=e.target.checked; if(!e.target.checked) state.showActors=true; persist(); render(); }; $('#showS').onchange=e=>{ state.showSystems=e.target.checked; persist(); render(); };
   $('#btnConnect').onclick=()=>setConnect(!document.body.classList.contains('connecting'));
   $('#btnLayout').onclick=()=>{ if(drill){ kidsOf(drill).forEach(k=>k._lay=true); renderMap(); save('mapa','přeskládán souhrn'); return; } if(confirm('Rozmístit všechny funkce znovu podle oblastí? (Lze vrátit tlačítkem Zpět.)')){ autoLayout(state); save('mapa','automatické rozmístění'); } };
   $('#show2028').onchange=e=>{ state.show2028=e.target.checked; persist(); render(); };
