@@ -73,12 +73,12 @@ window.TOM_SEED = {
     {id:'y2', st:'agenda', ss:'prevzeti', name:'ISSŘ', admin:'k ověření'},
     {id:'y3', st:'registr', ss:'prevzeti', name:'Evidence stavebních záměrů (ESZ)', admin:'k ověření'},
     {id:'y4', st:'agenda', ss:'stav', name:'VITA – agendový systém', admin:'dodavatel VITA'},
-    {id:'y5', st:'spis', ss:'stav', name:'ESPIS – spisová služba', admin:'ICZ'},
+    {id:'y5', st:'spis', ss:'stav', name:'ESPIS – spisová služba', admin:'ICZ', all:'evidence a oběh dokumentů, spisy'},
     {id:'y6', st:'portal', ss:'prevzeti', name:'NGÚP', admin:'k ověření'},
     {id:'y7', st:'externi', ss:'stav', name:'ISDS – datové schránky', admin:'Digitální a informační agentura'},
     {id:'y8', st:'externi', ss:'stav', name:'Základní registry (ROB, ROS, RÚIAN)', admin:'Digitální a informační agentura'},
     {id:'y9', st:'podpora', ss:'stav', name:'Ekonomický systém (MÚZO)', admin:'MÚZO'},
-    {id:'y10', st:'podpora', ss:'stav', name:'Personální systém (VEMA)', admin:'VEMA'}
+    {id:'y10', st:'podpora', ss:'stav', name:'Personální systém (VEMA)', admin:'VEMA', all:'docházka, dovolené, výplatní pásky'}
   ],
   links2: [
     ['a1','s1','zada'],['a1','f06','zada'],['a1','y1','zada','podání přes portál'],['a2','f08','odvolava','rozklad'],['a2','f09','odvolava'],

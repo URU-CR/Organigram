@@ -1,6 +1,6 @@
 // TOM ÚRÚ ČR – cílový provozní model úřadu od 1. 1. 2027.
 // Samostatná aplikace: model v organigram_state.id='tom-cr'; organigram ÚRÚ ČR ('main') se jen čte (živě).
-const APP_VERSION='2026-10-05.14';
+const APP_VERSION='2026-10-05.15';
 const APP_ID='tom-cr', STATE_ID='tom-cr', ORG_ID='main', LS_KEY='uru-tom-cr-v1';
 
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
@@ -60,7 +60,7 @@ function seedState(){
     assign:(f.a||[]).map(([u,r])=>({unit:u,role:r,name:U[u]?U[u].name:''}))}; });
   S.links.forEach(([a,b,k,l])=>st.links.push({id:uid('l'),from:a,to:b,kind:k,label:l||''}));
   S.rules.forEach(r=>st.rules.push({...r,on:true}));
-  applySums(st); addEnv(st); seedProcesses(st); st.show2028=false; st.modelVersion=8; autoLayout(st); return st;
+  applySums(st); addEnv(st); seedProcesses(st); st.show2028=false; st.modelVersion=9; autoLayout(st); return st;
 }
 // vnější okolí a systémy z výchozího návrhu (doplní jen chybějící)
 // rozdělení „Ekonomický a personální systém“ na MÚZO a VEMA (model verze 8)
@@ -73,7 +73,7 @@ function splitEconSystem(st){ const y9=st.funcs.y9; if(!y9||st.funcs.y10) return
   logChange('model','systém rozdělen: Ekonomický systém (MÚZO) a Personální systém (VEMA)'); setTimeout(()=>toast('Ekonomický a personální systém rozdělen na MÚZO a VEMA.'),1000); }
 function addEnv(st){ const S=window.TOM_SEED; const base={desc:'',status:'navrh',notes:[],assign:[],locs:[],x:0,y:0};
   (S.actors||[]).forEach(x=>{ if(!st.funcs[x.id]) st.funcs[x.id]={...base,notes:[],assign:[],locs:[],id:x.id,kind:'actor',name:x.name,cat:x.cat,channels:x.ch||[],period:x.p||'2027'}; });
-  (S.systems||[]).forEach(x=>{ if(!st.funcs[x.id]) st.funcs[x.id]={...base,notes:[],assign:[],locs:[],id:x.id,kind:'system',name:x.name,stype:x.st,sstate:x.ss,admin:x.admin||'',period:x.p||'2027'}; });
+  (S.systems||[]).forEach(x=>{ if(!st.funcs[x.id]) st.funcs[x.id]={...base,notes:[],assign:[],locs:[],id:x.id,kind:'system',name:x.name,stype:x.st,sstate:x.ss,admin:x.admin||'',period:x.p||'2027',allUsers:!!x.all,allUse:x.all||''}; });
   if(st.linkKinds) Object.entries(DEFAULT_KINDS).forEach(([k,v])=>{ if(!st.linkKinds[k]&&['zada','rozhodnuti','stanovisko','odvolava','pouziva','spravuje','data'].includes(k)) st.linkKinds[k]=[...v]; });
   (S.links2||[]).forEach(([f,t,k,l])=>{ if(st.funcs[f]&&st.funcs[t]&&!st.links.some(x=>x.from===f&&x.to===t&&x.kind===k)) st.links.push({id:uid('l'),from:f,to:t,kind:k,label:l||''}); });
   if(st.showActors===undefined) st.showActors=true; if(st.showSystems===undefined) st.showSystems=true; }
@@ -157,7 +157,9 @@ function normalize(){ ['groups','links','rules','proposals','versions'].forEach(
   if(state.modelVersion<6&&state.modelVersion>=5){ const p2=state.processes.find(x=>x.id==='p2'), s1=p2&&p2.steps.find(x=>x.id==='s1'); if(s1&&s1.chs.length===1&&s1.chs[0]==='ds') s1.chs=['ds','email','osobne']; state.modelVersion=6; }
   if(state.modelVersion===6){ addCoordination(state); normProcesses(state); state.modelVersion=7; logChange('model','doplněna koordinace DO (proces, role, funkce)'); setTimeout(()=>toast('Doplněn proces „Koordinace DO – koordinované vyjádření“ a související role.'),900); }
   if(state.modelVersion===7){ splitEconSystem(state); state.modelVersion=8; }
-  if(state.modelVersion<5){ seedProcesses(state); addCoordination(state); normProcesses(state); state.modelVersion=8; logChange('model','doplněny procesy a role'); setTimeout(()=>toast('Nový pohled Procesy: příjem žádosti (Portál; DS, e-mail, osobně).'),900); }
+  if(state.modelVersion===8){ [['y10','docházka, dovolené, výplatní pásky'],['y5','evidence a oběh dokumentů, spisy']].forEach(([id,use])=>{ const s=state.funcs[id]; if(s&&s.kind==='system'&&s.allUsers===undefined){ s.allUsers=true; s.allUse=use; } });
+    state.modelVersion=9; logChange('model','průřezové systémy: VEMA, ESPIS (používají všichni zaměstnanci)'); }
+  if(state.modelVersion<5){ seedProcesses(state); addCoordination(state); normProcesses(state); state.modelVersion=9; logChange('model','doplněny procesy a role'); setTimeout(()=>toast('Nový pohled Procesy: příjem žádosti (Portál; DS, e-mail, osobně).'),900); }
   if(drill&&!(state.funcs[drill]&&state.funcs[drill].sum)) drill=null;
   if(state.show2028===undefined) state.show2028=true; state.colorBy=state.colorBy||'conf'; state.view=state.view||'map';
   Object.values(state.funcs).forEach(f=>{ f.assign=f.assign||[]; f.notes=f.notes||[]; f.locs=f.locs||[]; f.status=f.status||'navrh'; f.period=f.period||'2027'; }); }
@@ -236,7 +238,7 @@ function setP(f,x,y){ if(drill){ f.sx=x; f.sy=y; } else { f.x=x; f.y=y; } }
 function tileHTML(f,cs){ const ne=cs.filter(c=>c.sev==='err').length, nw=cs.filter(c=>c.sev==='warn').length;
   const badges=`${ne?`<span class="cb err" title="chyby">${ne}</span>`:''}${nw?`<span class="cb warn" title="varování">${nw}</span>`:''}`;
   if(f.kind==='actor') return `<div class="fn">${esc(f.name)}</div><div class="fm">${esc(ACAT[f.cat]||'')}${f.period==='2028'?' · <b>2028</b>':''}${badges}</div>${(f.channels||[]).length?`<div class="fu ch">${f.channels.map(c=>`<span class="uchip" title="komunikační kanál">${esc(CHANNELS[c]||c)}</span>`).join('')}</div>`:''}`;
-  if(f.kind==='system') return `<div class="fn">${esc(f.name)}</div><div class="fm">${esc(STYPE[f.stype]||'')} · ${esc(SSTATE[f.sstate]||'')}${f.period==='2028'?' · <b>2028</b>':''}${badges}</div>${f.admin?`<div class="fm" title="správce / dodavatel">${esc(f.admin)}</div>`:''}`;
+  if(f.kind==='system') return `<div class="fn">${esc(f.name)}</div>${f.allUsers?`<span class="allu" title="Používají všichni zaměstnanci${f.allUse?': '+esc(f.allUse):''} – vazby od jednotlivých funkcí se nekreslí.">∀ všichni</span>`:''}<div class="fm">${esc(STYPE[f.stype]||'')} · ${esc(SSTATE[f.sstate]||'')}${f.period==='2028'?' · <b>2028</b>':''}${badges}</div>${f.admin?`<div class="fm" title="správce / dodavatel">${esc(f.admin)}</div>`:''}`;
   if(f.sum){ const k=kidsOf(f.id).filter(x=>state.show2028||x.period!=='2028'); const o=sumOwner(f);
     return `<div class="fn">${esc(f.name)}</div><div class="fm"><span class="st" style="background:${STATUS_COLOR[sumStatus(f)]}" title="${STATUS[sumStatus(f)]}"></span>${k.length} funkcí${badges}</div>
       <div class="fu">${o?`<span class="uchip r-own" title="${esc(unitPath(o))}">${esc(shortName(o))}</span>`:'<span class="hint">více vlastníků</span>'}<button class="small open" data-open="${f.id}">Otevřít ▸</button></div>`; }
@@ -510,7 +512,10 @@ function renderSide(){ const s=$('#side'); const ro=ROLE.org?'':'disabled';
       <div class="lbl">Komunikační kanály</div><div class="locs" id="eCh">${Object.entries(CHANNELS).map(([k,v])=>`<label><input type="checkbox" value="${k}" ${(f.channels||[]).includes(k)?'checked':''} ${ro}> ${v}</label>`).join('')}</div>`
     :`<div class="g2"><label>Typ<select id="eType" ${ro}>${Object.entries(STYPE).map(([k,v])=>`<option value="${k}" ${k===f.stype?'selected':''}>${v}</option>`).join('')}</select></label>
       <label>Stav<select id="eState" ${ro}>${Object.entries(SSTATE).map(([k,v])=>`<option value="${k}" ${k===f.sstate?'selected':''}>${v}</option>`).join('')}</select></label></div>
-      <label>Správce / dodavatel<input type="text" id="eAdmin" value="${esc(f.admin||'')}" placeholder="např. ICZ, DIA, k ověření" ${ro}></label>`}
+      <label>Správce / dodavatel<input type="text" id="eAdmin" value="${esc(f.admin||'')}" placeholder="např. ICZ, DIA, k ověření" ${ro}></label>
+      <div class="lbl"><label style="display:inline-flex;gap:6px;align-items:center;margin:0;color:var(--ink);font-size:13px"><input type="checkbox" id="eAll" style="width:auto" ${f.allUsers?'checked':''} ${ro}> Průřezový systém – používají všichni zaměstnanci</label></div>
+      ${f.allUsers?`<label>K čemu ho používají všichni<input type="text" id="eAllUse" value="${esc(f.allUse||'')}" placeholder="např. docházka, dovolené" ${ro}></label>`:''}
+      <p class="muted" style="font-size:12px;margin:4px 0 0">Průřezové používání se nekreslí čarami a nezapočítává se do kontroly „funkce nepoužívá žádný systém“. Specifické vazby (např. „spravuje“) zůstávají.</p>`}
     <label>Platí<select id="ePeriod" ${ro}><option value="2027" ${f.period!=='2028'?'selected':''}>od 1. 1. 2027</option><option value="2028" ${f.period==='2028'?'selected':''}>od 2028 (výhled)</option></select></label>
     <label>Popis<textarea id="eDesc" rows="3" ${ro}>${esc(f.desc||'')}</textarea></label>
     ${procLinks(f.id)}
@@ -522,7 +527,7 @@ function renderSide(){ const s=$('#side'); const ro=ROLE.org?'':'disabled';
     if(!ROLE.org) return; const nm=isA?'aktér':'systém'; const ch=(fn,what)=>()=>{ fn(); save(nm,what+': '+f.name); };
     $('#eName').onchange=e=>{ const o=f.name; f.name=e.target.value.trim()||o; save(nm,`přejmenován: ${o} → ${f.name}`); };
     if(isA){ $('#eCat').onchange=ch(()=>f.cat=$('#eCat').value,'kategorie'); s.querySelectorAll('#eCh input').forEach(i=>i.onchange=ch(()=>f.channels=[...s.querySelectorAll('#eCh input:checked')].map(x=>x.value),'kanály')); }
-    else { $('#eType').onchange=ch(()=>f.stype=$('#eType').value,'typ'); $('#eState').onchange=ch(()=>f.sstate=$('#eState').value,'stav'); $('#eAdmin').onchange=ch(()=>f.admin=$('#eAdmin').value.trim(),'správce'); }
+    else { $('#eAll').onchange=ch(()=>f.allUsers=$('#eAll').checked,'průřezový'); if($('#eAllUse')) $('#eAllUse').onchange=ch(()=>f.allUse=$('#eAllUse').value.trim(),'průřezové použití'); $('#eType').onchange=ch(()=>f.stype=$('#eType').value,'typ'); $('#eState').onchange=ch(()=>f.sstate=$('#eState').value,'stav'); $('#eAdmin').onchange=ch(()=>f.admin=$('#eAdmin').value.trim(),'správce'); }
     $('#ePeriod').onchange=ch(()=>f.period=$('#ePeriod').value,'období'); $('#eDesc').onchange=ch(()=>f.desc=$('#eDesc').value,'popis');
     $('#nAdd').onclick=()=>{ const t=$('#nText').value.trim(); if(!t) return; f.notes.push({t:today(),who:currentUser?currentUser.email:'',text:t}); save('poznámka',f.name+': '+t); };
     s.querySelectorAll('[data-n]').forEach(b=>b.onclick=()=>{ if(confirm('Smazat poznámku?')){ f.notes.splice(+b.dataset.n,1); save('poznámka','smazána: '+f.name); } });
@@ -641,7 +646,7 @@ function renderSide(){ const s=$('#side'); const ro=ROLE.org?'':'disabled';
   // výchozí: legenda
   const L=live();
   s.innerHTML=`<div class="sh"><span class="muted">Legenda</span></div>
-    <div class="lbl">Dlaždice</div><div class="leg"><span><i class="b acti"></i>aktér okolí</span><span><i class="b sysi"></i>systém</span><span><i class="b sumi"></i>souhrn funkcí</span><span><i class="b ok"></i>bez rozporu</span><span><i class="b warn"></i>varování</span><span><i class="b err"></i>chyba</span><span><i class="b p28"></i>výhled 2028</span></div>
+    <div class="lbl">Dlaždice</div><div class="leg"><span><i class="b acti"></i>aktér okolí</span><span><i class="b sysi"></i>systém</span><span><span class="allu" style="position:static;margin:0">∀</span> průřezový systém</span><span><i class="b sumi"></i>souhrn funkcí</span><span><i class="b ok"></i>bez rozporu</span><span><i class="b warn"></i>varování</span><span><i class="b err"></i>chyba</span><span><i class="b p28"></i>výhled 2028</span></div>
     <div class="lbl">Útvar na dlaždici</div><div class="leg"><span class="uchip r-own">vlastník</span><span class="uchip more">+N útv.</span><span class="muted">ostatní útvary v panelu</span></div>
     <div class="lbl">Stav diskuse</div><div class="leg">${Object.entries(STATUS).map(([k,v])=>`<span><i style="background:${STATUS_COLOR[k]};border-radius:50%"></i>${v}</span>`).join('')}</div>
     <div class="lbl">Vazby ${ROLE.org?'<button class="small" id="kindsEdit" style="margin-left:6px">Upravit druhy…</button>':''}</div><div class="leg col">${Object.values(LINK_KINDS).map(([n,c,d])=>`<span><i style="height:0;width:18px;border:0;border-top:3px ${d?'dashed':'solid'} ${c};vertical-align:3px"></i>${esc(n)}</span>`).join('')}</div>
@@ -657,7 +662,9 @@ function linksBlock(f){ const ls=LINKS.filter(l=>l.from===f.id||l.to===f.id);
   const all=Object.values(state.funcs).filter(x=>x.id!==f.id);
   const opts=og('Systémy',all.filter(x=>x.kind==='system'))+og('Aktéři',all.filter(x=>x.kind==='actor'))+og('Funkce',all.filter(x=>!x.kind));
   const def=f.kind==='system'?'data':(f.kind==='actor'?'zada':'pouziva');
-  return `<div class="lbl">Vazby (${ls.length})</div>${list}${ROLE.org?`<div class="ladd" data-f="${f.id}"><div class="lr"><select class="laDir" title="směr"><option value="out">→ k</option><option value="in">← od</option></select><select class="laEl"><option value="">— vyberte prvek —</option>${opts}</select></div>
+  const cross=!f.kind?envEls('system').filter(s=>s.allUsers&&s.period!=='2028'):[];
+  const crossHtml=cross.length?`<div class="muted" style="font-size:12px;margin-top:4px">Průřezové systémy (všichni zaměstnanci): ${cross.map(s=>`<a href="#" data-o="${s.id}">${esc(s.name)}</a>${s.allUse?' – '+esc(s.allUse):''}`).join('; ')}</div>`:'';
+  return `<div class="lbl">Vazby (${ls.length})</div>${list}${crossHtml}${ROLE.org?`<div class="ladd" data-f="${f.id}"><div class="lr"><select class="laDir" title="směr"><option value="out">→ k</option><option value="in">← od</option></select><select class="laEl"><option value="">— vyberte prvek —</option>${opts}</select></div>
     <div class="lr"><select class="laKind">${Object.entries(LINK_KINDS).map(([k,[n]])=>`<option value="${k}" ${k===def?'selected':''}>${esc(n)}</option>`).join('')}</select><input type="text" class="laLbl" placeholder="popisek (nepovinný)"><button class="small laAdd">Přidat vazbu</button></div></div>`:''}`; }
 document.addEventListener('click',e=>{ const b=e.target.closest('.ladd .laAdd'); if(!b) return; const box=b.closest('.ladd'); const f=F(box.dataset.f); const t=box.querySelector('.laEl').value; if(!f||!t) { toast('Vyberte prvek, ke kterému vazba vede.'); return; }
   const out=box.querySelector('.laDir').value==='out', kind=box.querySelector('.laKind').value, label=box.querySelector('.laLbl').value.trim(); const from=out?f.id:t, to=out?t:f.id;
@@ -683,7 +690,7 @@ function exportXlsx(){ const wb=XLSX.utils.book_new(); const gn=id=>(state.group
   const us=(f,r)=>f.assign.filter(a=>a.role===r).map(a=>U[a.unit]?U[a.unit].name:(a.name||a.unit)+' (zrušen)').join('; ');
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(leaves().map(f=>({'Oblast':gn(f.group),'Souhrn':f.parent&&F(f.parent)?F(f.parent).name:'','Funkce':f.name,'Typ':TYPES[f.type],'Platí od':f.period==='2028'?'2028':'1. 1. 2027','Stav diskuse':STATUS[f.status],'Rozhodnutí TOM':f.refs,'Potřeba FTE':f.fte??'','Lokality':f.locs.map(l=>LOC[l]).join(', '),'Vlastník':us(f,'own'),'Vykonává':us(f,'do'),'Podporuje':us(f,'sup'),'Popis':f.desc,'Poznámky':f.notes.map(n=>n.t+' '+n.text).join(' | ')}))),'Funkce');
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(envEls('actor').map(x=>({'Aktér':x.name,'Kategorie':ACAT[x.cat]||'','Kanály':(x.channels||[]).map(c=>CHANNELS[c]||c).join(', '),'Platí od':x.period==='2028'?'2028':'1. 1. 2027','Popis':x.desc||''})).concat(envEls('actor').length?[]:[{'Aktér':''}])),'Vnější okolí');
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(envEls('system').map(x=>({'Systém':x.name,'Typ':STYPE[x.stype]||'','Stav':SSTATE[x.sstate]||'','Správce / dodavatel':x.admin||'','Spravuje (funkce)':state.links.filter(l=>l.to===x.id&&l.kind==='spravuje').map(l=>(F(l.from)||{}).name).join('; '),'Používají':state.links.filter(l=>l.to===x.id&&l.kind==='pouziva').map(l=>(F(l.from)||{}).name).join('; '),'Popis':x.desc||''})).concat(envEls('system').length?[]:[{'Systém':''}])),'Systémy');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(envEls('system').map(x=>({'Systém':x.name,'Typ':STYPE[x.stype]||'','Stav':SSTATE[x.sstate]||'','Správce / dodavatel':x.admin||'','Používají všichni':x.allUsers?('ano'+(x.allUse?' – '+x.allUse:'')):'','Spravuje (funkce)':state.links.filter(l=>l.to===x.id&&l.kind==='spravuje').map(l=>(F(l.from)||{}).name).join('; '),'Používají':state.links.filter(l=>l.to===x.id&&l.kind==='pouziva').map(l=>(F(l.from)||{}).name).join('; '),'Popis':x.desc||''})).concat(envEls('system').length?[]:[{'Systém':''}])),'Systémy');
   const prow=[]; (state.processes||[]).forEach(p=>p.steps.slice().sort((x,y)=>x.row-y.row).forEach(s=>{ const l=p.lanes.find(x=>x.id===s.lane); prow.push({'Proces':p.name,'Pořadí':s.row+1,'Krok':s.name,'Kdo':l&&laneInfo(l)?laneInfo(l).name:'','Druh':STEP_KINDS[s.kind],'Systém':s.sys&&F(s.sys)?F(s.sys).name:'','Kanál':s.ch?CHANNELS[s.ch]:'','Pokračuje do':p.flows.filter(w=>w.from===s.id).map(w=>{ const t=p.steps.find(x=>x.id===w.to); return (t?t.name:'?')+(w.label?' ('+w.label+')':''); }).join('; '),'K ověření':s.note||''}); }));
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(prow.length?prow:[{'Proces':''}]),'Procesy');
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet((state.roles||[]).map(r=>({'Role':r.name,'Funkce':r.func&&F(r.func)?F(r.func).name:'','Útvar (vlastník funkce)':r.func&&F(r.func)?(F(r.func).sum?(sumOwner(F(r.func))?U[sumOwner(F(r.func))].name:''):F(r.func).assign.filter(x=>x.role==='own'&&U[x.unit]).map(x=>U[x.unit].name).join('; ')):''})).concat((state.roles||[]).length?[]:[{'Role':''}])),'Role');
