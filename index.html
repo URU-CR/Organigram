@@ -311,6 +311,8 @@ body.view-chart #tree{display:none} body.view-chart #chart{display:block}
 .box .pct{display:none;font-weight:700;color:var(--danger);font-variant-numeric:tabular-nums}
 .box.crit .pct{display:inline}
 body.critmode .box:not(.crit){opacity:.55}
+.treeonly{display:inline-flex;gap:4px} .treeonly button{font-size:12px;padding:4px 9px}
+body.view-chart .treeonly,body.view-loc .treeonly,body.view-sys .treeonly,body.view-it .treeonly,body.presenting .treeonly{display:none}
 .oc{transform-origin:0 0;display:inline-block;min-width:100%;position:relative}
 .oc svg.conn{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
 .oc-row>li::before,.oc-row>li::after,.oc-down::before,.oc-stack::before,.oc-stack>li::before{display:none!important}
@@ -384,13 +386,13 @@ table.ov td.z{color:#B6BEC9}
 </head>
 <body>
 <header>
-  <h1>Obsazení organigramu ÚRÚ ČR<small>návrh organizační struktury z 1. 10. 2026 · <span id="ver" title="verze app.js se doplní po načtení skriptu">index 2026-10-05.1</span></small><span class="apps">další aplikace: <a href="kraje/" title="návrh organigramu krajských ÚRÚ (soustava od 2028)">Krajské ÚRÚ</a> · <a href="tom-cr/" title="cílový provozní model ÚRÚ ČR – funkce, systémy, procesy">TOM ÚRÚ ČR</a></span></h1>
+  <h1>Obsazení organigramu ÚRÚ ČR<small>návrh organizační struktury z 1. 10. 2026 · <span id="ver" title="verze app.js se doplní po načtení skriptu">index 2026-10-05.2</span></small><span class="apps">další aplikace: <a href="kraje/" title="návrh organigramu krajských ÚRÚ (soustava od 2028)">Krajské ÚRÚ</a> · <a href="tom-cr/" title="cílový provozní model ÚRÚ ČR – funkce, systémy, procesy">TOM ÚRÚ ČR</a></span></h1>
   <div class="stats" id="stats"></div>
   <span class="user" id="user"><span class="dot" id="syncDot"></span><span id="userMail"></span></span>
   <div class="legend" id="legend"></div>
   <div class="gsearch"><input type="search" id="search" placeholder="Hledat všude – jméno, útvar, číslo místa…" autocomplete="off"><span class="cnt" id="scnt"></span><div id="sres"></div></div>
   <div class="wssw" role="group" aria-label="Organizace"><button id="wsCr" class="on">ÚRÚ ČR</button><button id="wsKr">Krajské ÚRÚ</button></div>
-  <div class="viewsw" role="group" aria-label="Pohled"><button id="vwTree" class="on">Strom</button><button id="vwChart">Diagram</button><button id="vwLoc">Lokality</button><button id="vwSys">Systemizace</button><button id="vwIT">IT</button></div>
+  <div class="viewsw" role="group" aria-label="Pohled"><button id="vwTree" class="on">Strom</button><button id="vwChart">Diagram</button><button id="vwLoc">Lokality</button><button id="vwSys">Systemizace</button><button id="vwIT">IT</button></div><span class="treeonly"><button id="btnExpandAll" title="Rozbalit všechny útvary">▾ Rozbalit vše</button><button id="btnCollapseAll" title="Sbalit všechny útvary pod nejvyšší úrovní">▸ Sbalit vše</button></span>
   <select id="chartRoot" hidden title="který organigram zobrazit"></select>
   <span class="zoom" id="zoomWrap" hidden>Zvětšení <input type="range" id="zoom" min="50" max="120" value="85"> <span id="zoomVal">85 %</span></span>
   <span class="zoom" id="critWrap" hidden title="Zvýrazní útvary s obsazeností v daném intervalu">Kritické <input type="range" class="crit" id="crit" min="0" max="3" step="1" value="0" list="critTicks"> <span id="critVal">vypnuto</span><datalist id="critTicks"><option value="0"></option><option value="1"></option><option value="2"></option><option value="3"></option></datalist></span>
@@ -407,7 +409,6 @@ table.ov td.z{color:#B6BEC9}
     <button id="btnOverview" class="adm">Přehled</button>
     <button id="btnLog">Historie</button>
     <button id="btnPresent">Prezentace</button>
-    <button id="btnCollapse" class="adm" title="Sbalit / rozbalit vše">Sbalit vše</button>
     <button id="btnReset" class="adm" title="Vrátí prázdný organigram">Vymazat vše</button>
     <button id="btnLogout">Odhlásit</button>
     <input type="file" id="fileXlsx" accept=".xlsx,.xlsm,.xls,.csv" hidden>
@@ -483,8 +484,8 @@ table.ov td.z{color:#B6BEC9}
 
 <script src="vendor/xlsx.full.min.js"></script>
 <script src="vendor/supabase.js"></script>
-<script src="config.js?v=2026-10-05.1"></script>
-<script src="structure.js?v=2026-10-05.1"></script>
-<script src="app.js?v=2026-10-05.1"></script>
+<script src="config.js?v=2026-10-05.2"></script>
+<script src="structure.js?v=2026-10-05.2"></script>
+<script src="app.js?v=2026-10-05.2"></script>
 </body
 </html>
