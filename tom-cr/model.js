@@ -56,6 +56,37 @@ window.TOM_SEED = {
     {id:'s4', g:'g7', name:'Řízení úřadu', children:['f19','f20','f21']},
     {id:'s5', g:'g8', name:'Podpůrné služby', children:['f22','f23','f24','f25','f26']}
   ],
+  // vnější okolí (aktéři) a systémy – doplněno 5. 10. 2026; vše k ověření
+  actors: [
+    {id:'a1', cat:'zad', name:'Stavebníci a žadatelé', ch:['portal','ds','email','osobne']},
+    {id:'a2', cat:'zad', name:'Účastníci řízení a veřejnost', ch:['ds','email','osobne','listinne']},
+    {id:'a3', cat:'sam', name:'Obce a obecní stavební úřady', ch:['ds']},
+    {id:'a4', cat:'stat', name:'Krajské úřady', ch:['ds']},
+    {id:'a5', cat:'stat', name:'Nezaintegrované dotčené orgány', ch:['ds']},
+    {id:'a6', cat:'stat', name:'Ministerstva (MMR, MD, MPO, MŽP)', ch:['ds','email']},
+    {id:'a7', cat:'kon', name:'Soudy a veřejný ochránce práv', ch:['ds']},
+    {id:'a8', cat:'sous', name:'Krajské ÚRÚ', p:'2028', ch:[]}
+  ],
+  systems: [
+    {id:'y1', st:'portal', ss:'prevzeti', name:'Portál stavebníka', admin:'k ověření'},
+    {id:'y2', st:'agenda', ss:'prevzeti', name:'ISSŘ', admin:'k ověření'},
+    {id:'y3', st:'registr', ss:'prevzeti', name:'Evidence stavebních záměrů (ESZ)', admin:'k ověření'},
+    {id:'y4', st:'agenda', ss:'stav', name:'VITA – agendový systém', admin:'dodavatel VITA'},
+    {id:'y5', st:'spis', ss:'stav', name:'ESPIS – spisová služba', admin:'ICZ'},
+    {id:'y6', st:'portal', ss:'prevzeti', name:'NGÚP', admin:'k ověření'},
+    {id:'y7', st:'externi', ss:'stav', name:'ISDS – datové schránky', admin:'Digitální a informační agentura'},
+    {id:'y8', st:'externi', ss:'stav', name:'Základní registry (ROB, ROS, RÚIAN)', admin:'Digitální a informační agentura'},
+    {id:'y9', st:'podpora', ss:'stav', name:'Ekonomický a personální systém', admin:'k ověření'}
+  ],
+  links2: [
+    ['a1','s1','zada'],['a1','f06','zada'],['a1','y1','zada','podání přes portál'],['a2','f08','odvolava','rozklad'],['a2','f09','odvolava'],
+    ['a5','s1','stanovisko'],['a7','s1','odvolani','soudní přezkum'],['f16','a3','metodika'],['f16','a4','metodika'],['f12','a3','podklad','ÚAP'],
+    ['f17','a6','podklad','návrhy předpisů'],['f30','a8','ridi'],
+    ['s1','y4','pouziva'],['s2','y4','pouziva','koordinované stanovisko'],['f06','y4','pouziva'],['f07','y4','pouziva'],['f08','y4','pouziva'],['f09','y2','pouziva'],
+    ['f12','y6','pouziva'],['f13','y6','pouziva'],['f27','y5','pouziva'],['f23','y9','pouziva'],
+    ['f26','y1','spravuje'],['f26','y2','spravuje'],['f26','y3','spravuje'],['f25','y4','spravuje'],['f25','y5','spravuje'],['f14','y6','spravuje'],['f24','y9','spravuje'],
+    ['y1','y2','data'],['y2','y3','data'],['y4','y3','data','zatím neúplně'],['y7','y5','data'],['y8','y2','data']
+  ],
   links: [
     ['f08','f01','odvolani'],['f08','f02','odvolani'],['f08','f05','odvolani'],
     ['f10','f05','podklad','stanovisko jako vnitřní podklad'],['f11','f01','podklad','stanovisko jako vnitřní podklad'],

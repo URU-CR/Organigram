@@ -96,13 +96,22 @@ body.connecting .fbox{cursor:crosshair}
 .fbox.ghost{background:#F7F8FA;border:1.5px dashed #B7C0CC;border-top-width:4px;opacity:.75;cursor:pointer;width:200px}
 .fbox.ghost .fn{font-weight:500;font-size:12px}
 .fbox.dim,.gframe.dim{opacity:.22}
-svg.links .lk.faint{opacity:.08}
+svg.links .lk.faint{opacity:.08} svg.links .lk.soft{opacity:.22}
 .gframe.drill{background:rgba(255,255,255,.55);border-style:solid;border-width:2px}
 .gframe.drill .gl{font-size:15px;cursor:pointer}
 body.drilling #btnAddG{display:none}
 #crumb{display:inline-flex;gap:8px;align-items:center;margin-right:10px} #crumb[hidden]{display:none}
 .leg i.sumi{border-color:#B7C0CC;box-shadow:3px 3px 0 -1px #fff,3px 3px 0 0 #B7C0CC}
 .arow.kid{grid-template-columns:1fr auto} .arow.kid a{text-decoration:none} .arow.kid .st{width:8px;height:8px;border-radius:50%;display:inline-block}
+.fbox.actor,.fbox.system{width:180px;padding:6px 8px 7px}
+.fbox.actor{border-radius:18px;border-top-width:2px;border-color:#94A3B8;background:#F8FAFC;border-top-color:#334155!important}
+.fbox.system{border-radius:3px;border-top-width:2px;border-color:#5EAAA0;background:#F0FDFA;border-top-color:#0F766E!important}
+.fbox.actor.sev-ok{border-color:#94A3B8} .fbox.system.sev-ok{border-color:#5EAAA0}
+.fbox.actor .fn,.fbox.system .fn{font-size:12.5px}
+.fbox .fu.ch .uchip{background:#fff;font-size:10px;padding:0 5px}
+.gframe.band{border-style:solid;border-width:1px;background:rgba(255,255,255,.25)}
+.gframe.band-actor{background:rgba(51,65,85,.04)} .gframe.band-system{background:rgba(15,118,110,.05)}
+.leg i.acti{border-radius:7px;border-color:#94A3B8;background:#F8FAFC} .leg i.sysi{border-radius:1px;border-color:#5EAAA0;background:#F0FDFA}
 .fbox.flash{animation:fl 1.4s} @keyframes fl{0%,60%{box-shadow:0 0 0 6px rgba(245,158,11,.6)}100%{box-shadow:none}}
 
 /* organigram */
@@ -142,6 +151,10 @@ dialog::backdrop{background:rgba(27,36,48,.4)}
 .dbody label{display:block;font-size:12px;color:var(--muted);margin:8px 0 3px}
 .flist{max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:6px;padding:4px 8px;font-size:13px}
 .flist label{display:flex;gap:6px;align-items:flex-start;color:var(--ink);margin:3px 0} .flist input{width:auto;margin-top:3px}
+.krow{display:grid;grid-template-columns:34px 1fr auto 34px 120px;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid #EEF0F3}
+.krow input[type=color]{width:30px;height:28px;padding:0;border:1px solid var(--line);border-radius:5px;background:#fff}
+.krow label{display:inline-flex;gap:4px;align-items:center;margin:0;color:var(--ink);font-size:12px;white-space:nowrap} .krow label input{width:auto}
+.krow select{font-size:12px;padding:3px 5px} .krow>button{justify-self:start}
 .loglist div{padding:5px 0;border-bottom:1px solid #EEF0F3;display:grid;grid-template-columns:130px 1fr;gap:10px;font-size:13px} .loglist time{color:var(--muted)}
 
 #auth{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:50}
@@ -162,7 +175,7 @@ body.presenting .fbox .cb.note{display:none}
 </head>
 <body>
 <header>
-  <h1>TOM ÚRÚ ČR<small><a href="../" title="organigram ÚRÚ ČR (samostatná aplikace)">← organigram ÚRÚ ČR</a>cílový provozní model od 1. 1. 2027 · <span id="ver">index 2026-10-05.3</span></small></h1>
+  <h1>TOM ÚRÚ ČR<small><a href="../" title="organigram ÚRÚ ČR (samostatná aplikace)">← organigram ÚRÚ ČR</a>cílový provozní model od 1. 1. 2027 · <span id="ver">index 2026-10-05.5</span></small></h1>
   <div class="stats" id="stats"></div>
   <span class="user"><span class="dot" id="syncDot"></span><span id="userMail"></span></span>
   <div class="viewsw" role="group" aria-label="Pohled"><button data-v="map" class="on">Mapa funkcí</button><button data-v="org">Organigram</button><button data-v="conf" id="tabConf">Rozpory</button><button data-v="prop">Návrhy změn</button><button data-v="ver">Verze</button></div>
@@ -184,10 +197,14 @@ body.presenting .fbox .cb.note{display:none}
       <span id="crumb" hidden><button id="crumbBack" title="Esc">← celá mapa</button> <b id="crumbName"></b></span>
       <button id="btnAddF" class="adm">+ funkce</button>
       <button id="btnAddG" class="adm">+ oblast</button>
+      <button id="btnAddA" class="adm" title="Přidat aktéra vnějšího okolí">+ aktér</button>
+      <button id="btnAddS" class="adm" title="Přidat systém">+ systém</button>
       <button id="btnConnect" class="adm" title="Vytvořit vazbu: klikněte na zdrojovou a pak na cílovou funkci">Spojit</button>
       <button id="btnLayout" class="adm">Uspořádat</button>
       <span id="connHint" hidden>Klikněte na funkci, ze které vazba vede.</span>
       <span style="margin-left:auto"></span>
+      <label title="vrstva vnějšího okolí"><input type="checkbox" id="showA"> okolí</label>
+      <label title="vrstva systémů"><input type="checkbox" id="showS"> systémy</label>
       <label><input type="checkbox" id="show2028"> výhled 2028</label>
       <label>Barvit podle <select id="colorBy"><option value="conf">rozporů</option><option value="status">stavu diskuse</option></select></label>
       <label>Zvětšení <input type="range" id="zoom" min="40" max="130" value="80"> <span id="zoomVal">80 %</span></label>
@@ -208,18 +225,21 @@ body.presenting .fbox .cb.note{display:none}
   <button id="authBtn" class="primary" style="margin-top:8px">Přihlásit</button><div class="msg" id="authMsg"></div></div></div>
 
 <dialog id="dlgLink"><div class="dhead"><h2>Vazba</h2><p class="muted" id="lkWhat"></p></div>
-  <div class="dbody"><label>Druh vazby</label><select id="lkKind"></select><label>Popisek (nepovinný)</label><input type="text" id="lkLabel" placeholder="např. stanovisko jako vnitřní podklad"></div>
+  <div class="dbody"><label>Druh vazby</label><div style="display:flex;gap:6px"><select id="lkKind"></select><button id="lkKinds" class="small" type="button" style="white-space:nowrap">Upravit druhy…</button></div><label>Popisek (nepovinný)</label><input type="text" id="lkLabel" placeholder="např. stanovisko jako vnitřní podklad"></div>
   <div class="dfoot"><button id="lkCancel">Zrušit</button><button id="lkOk" class="primary">Uložit</button></div></dialog>
 <dialog id="dlgRule"><div class="dhead"><h2>Pravidlo „oddělit“</h2><p class="muted">Funkce ze skupiny A a B nesmí vykonávat útvary pod stejným nadřízeným útvarem zvolené úrovně.</p></div>
   <div class="dbody"><label>Název</label><input type="text" id="ruName"><label>Zdůvodnění</label><input type="text" id="ruDesc"><label>Oddělit na úrovni</label><select id="ruLevel"></select>
     <label>Skupina A</label><div class="flist" id="ruA"></div><label>Skupina B</label><div class="flist" id="ruB"></div></div>
   <div class="dfoot"><button id="ruCancel">Zrušit</button><button id="ruOk" class="primary">Uložit</button></div></dialog>
+<dialog id="dlgKinds"><div class="dhead"><h2>Druhy vazeb</h2><p class="muted">Název, barva a styl čáry. Použitý druh lze sloučit do jiného – jeho vazby se převedou.</p></div>
+  <div class="dbody"><div id="kindsBody"></div><div class="krow" style="margin-top:10px"><span></span><input type="text" id="kindNew" placeholder="nový druh vazby, např. „konzultuje“"><button id="kindAdd" class="small">+ přidat</button></div></div>
+  <div class="dfoot"><button id="kindsClose" class="primary">Hotovo</button></div></dialog>
 <dialog id="dlgLog"><div class="dhead"><h2>Historie změn modelu</h2></div><div class="dbody loglist" id="logBody"></div><div class="dfoot"><button id="logClose" class="primary">Zavřít</button></div></dialog>
 
 <script src="../vendor/xlsx.full.min.js"></script>
 <script src="../vendor/supabase.js"></script>
-<script src="../config.js?v=2026-10-05.3"></script>
-<script src="model.js?v=2026-10-05.3"></script>
-<script src="app.js?v=2026-10-05.3"></script>
+<script src="../config.js?v=2026-10-05.5"></script>
+<script src="model.js?v=2026-10-05.5"></script>
+<script src="app.js?v=2026-10-05.5"></script>
 </body>
 </html>
