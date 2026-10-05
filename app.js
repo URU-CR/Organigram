@@ -1,4 +1,4 @@
-const APP_VERSION='2026-10-01.2';
+const APP_VERSION='2026-10-05.1';
 
 const STRUCTURE = window.STRUCTURE;
 const SOURCES = ['DESÚ','MMR','ÚÚR','MD','MPO','Nové','Jiný'];
@@ -94,7 +94,7 @@ function logChange(action,detail){ pendingLog.push({user_email:currentUser?curre
 async function loadRemote(){
   const {data,error}=await sb.from('organigram_state').select('data,version').eq('id',STATE_ID).maybeSingle();
   if(error) throw error;
-  if(data&&data.data&&data.data.units){ state=data.data; version=data.version||0; }
+  if(data&&data.data&&data.data.units){ state=forceCr(data.data); version=data.version||0; }
   else { state=freshState(); version=0; const r=await sb.from('organigram_state').upsert({id:STATE_ID,data:state,version:0,updated_by:currentUser.email}); if(r.error) throw r.error; }
   state.view=state.view||'tree'; if(!state.zoom) state.zoom=85;
   const mg=migrateActive(state); markBaseline(); if(mg){ logChange('aktualizace struktury','organigram v'+STRUCTURE_VERSION); persist(); setTimeout(()=>reportMigration(mg),300); }
@@ -270,6 +270,8 @@ function renderLegend(){
 
 // ---------- pracovní prostory: ÚRÚ ČR / krajské ÚRÚ ----------
 function isKraj(){ return state.ws==='kr'; }
+// uzavírací verze: krajské ÚRÚ se vyvíjejí v samostatné aplikaci (/kraje/); tato aplikace pracuje vždy s ÚRÚ ČR, krUnits zůstávají v datech nedotčené
+function forceCr(st){ if(st&&st.ws==='kr'){ [st.units,st.krUnits]=[st.krUnits||[],st.units||[]]; st.ws='cr'; } return st; }
 function allUnitsBoth(){ return [...state.units,...(state.krUnits||[])]; }
 function newUid(){ return 'u'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
 function newPid(){ return 'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
@@ -304,7 +306,6 @@ function structEditor(u,div,head){
     <button class="small" data-a="add" title="přidat podřízený útvar">+ útvar</button>
     <button class="small" data-a="up" title="posunout výš" ${idx<=0?'disabled':''}>↑</button><button class="small" data-a="down" title="posunout níž" ${idx>=sibs.length-1?'disabled':''}>↓</button>
     <select data-a="mv" title="přesunout pod jiný útvar"><option value="">⇄ přesunout pod…</option>${state.units.filter(x=>x!==u&&!isDesc(u,x)&&x.level!=='odd'&&x.level!=='up').map(x=>`<option value="${x.id}" ${x.id===u.parent?'disabled':''}>${esc(unitPath(x).slice(-1)[0])}</option>`).join('')}</select>
-    ${!u.parent?`<button class="small" data-a="clone" title="vytvořit kopie tohoto organigramu pro vybrané kraje">⧉ do krajů…</button>`:''}
     <button class="small" data-a="del" style="color:var(--danger)" title="zrušit útvar včetně podřízených">× zrušit</button>`;
   const chg=(action,detail)=>{ logChange&&logChange('struktura',detail); save(); render(); };
   bar.querySelector('[data-a=ren]').onclick=()=>{ const n=prompt('Název útvaru:',u.name); if(n!==null&&n.trim()){ const o=u.name; u.name=n.trim(); chg('ren',`${o} → ${u.name}`); } };
@@ -557,7 +558,7 @@ $('#btnExport').onclick=()=>{
 $('#btnSave').onclick=()=>download(new Blob([JSON.stringify(state,null,1)],{type:'application/json'}),`URU_obsazeni_${stamp()}.json`);
 $('#btnLoad').onclick=()=>$('#fileJson').click();
 $('#fileJson').onchange=async e=>{const f=e.target.files[0];if(!f)return;e.target.value='';
-  try{const s=JSON.parse(await f.text()); if(!s.units||!s.people) throw new Error('neplatný formát'); state=s; const mg=migrateActive(state); logChange('načtení','stav nahrazen ze souboru '+f.name); save(); render(); toast('Stav načten.'); reportMigration(mg); toast('Stav načten.');}catch(err){alert('Soubor se nepodařilo načíst: '+err.message);}};
+  try{const s=JSON.parse(await f.text()); if(!s.units||!s.people) throw new Error('neplatný formát'); state=forceCr(s); const mg=migrateActive(state); logChange('načtení','stav nahrazen ze souboru '+f.name); save(); render(); toast('Stav načten.'); reportMigration(mg); toast('Stav načten.');}catch(err){alert('Soubor se nepodařilo načíst: '+err.message);}};
 $('#btnReset').onclick=()=>{ if(confirm('Opravdu vymazat všechny lidi i úpravy míst a vrátit prázdný organigram? (Doporučuji nejdřív „Uložit stav“.)')){const v=state.view,z=state.zoom;state=freshState();state.view=v;state.zoom=z;logChange('vymazání','celý stav vymazán');save();render();} };
 let allCollapsed=false;
 $('#btnCollapse').onclick=()=>{allCollapsed=!allCollapsed; state.units.forEach(u=>{ if(u.level!=='predseda') state.collapsed[u.id]=allCollapsed; }); $('#btnCollapse').textContent=allCollapsed?'Rozbalit vše':'Sbalit vše'; render();};
@@ -994,7 +995,7 @@ async function start(){
   $('#zoom').value=state.zoom; $('#zoomVal').textContent=state.zoom+' %';
   document.body.classList.toggle('ws-kr',isKraj()); $('#wsCr').classList.toggle('on',!isKraj()); $('#wsKr').classList.toggle('on',isKraj()); setView(ROLE.org?(['chart','loc','sys','it'].includes(state.view)?state.view:'tree'):'it'); setDot('','připojeno');
   sb.channel('organigram').on('postgres_changes',{event:'UPDATE',schema:'public',table:'organigram_state',filter:'id=eq.'+STATE_ID},payload=>{
-    if(payload.new&&payload.new.version>version&&!dirty&&!saving){ const v=state.view,z=state.zoom,c=state.collapsed; state=payload.new.data; version=payload.new.version; state.view=v; state.zoom=z; state.collapsed=c; render(); toast('Stav aktualizován z jiného okna.'); } }).subscribe();
+    if(payload.new&&payload.new.version>version&&!dirty&&!saving){ const v=state.view,z=state.zoom,c=state.collapsed; state=forceCr(payload.new.data); version=payload.new.version; state.view=v; state.zoom=z; state.collapsed=c; render(); toast('Stav aktualizován z jiného okna.'); } }).subscribe();
   window.addEventListener('beforeunload',e=>{ if(dirty||saving){ flush(); e.preventDefault(); e.returnValue=''; } });
 }
 load(); boot();
