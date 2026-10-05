@@ -144,7 +144,7 @@ body.presenting .ptools{display:none!important}
 .verdict{border:2px solid;border-radius:10px;background:#fff;padding:12px 16px;margin:6px 0 12px} .verdict .vt{font-size:20px;font-weight:700;letter-spacing:.02em}
 .checks{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:8px}
 .chk{display:grid;grid-template-columns:28px 1fr;gap:8px;background:#fff;border:1px solid var(--line);border-left:4px solid;border-radius:6px;padding:8px 10px;font-size:13px}
-.chk.st-ok{border-left-color:var(--ok)} .chk.st-warn{border-left-color:#F79009} .chk.st-fail{border-left-color:var(--danger)}
+.chk.st-ok{border-left-color:var(--ok)} .chk.st-warnH{border-left-color:#C4320A;background:#FFF6F0} .sti.st-warnH{background:#C4320A;font-size:10.5px} .chk.st-info{border-left-color:var(--accent)} .sti.st-info{background:var(--accent)} .chk.st-warn{border-left-color:#F79009} .chk.st-fail{border-left-color:var(--danger)}
 .chk .cond{margin-top:4px;font-size:12px;color:var(--muted)}
 .sti{display:inline-flex;width:22px;height:22px;border-radius:50%;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:12px}
 .sti.st-ok{background:var(--ok)} .sti.st-warn{background:#F79009} .sti.st-fail{background:var(--danger)}
@@ -217,7 +217,7 @@ body.presenting .fbox .cb.note{display:none}
 </head>
 <body>
 <header>
-  <h1>TOM krajského ÚRÚ<small><a href="../kraje/" title="krajský organigram (samostatná aplikace)">← krajský organigram</a><a href="../tom-cr/" title="TOM ÚRÚ ČR">TOM ÚRÚ ČR</a>Kraj Vysočina · soustava od 2028 · <span id="ver">index 2026-10-05.5</span></small></h1>
+  <h1>TOM krajského ÚRÚ<small><a href="../kraje/" title="krajský organigram (samostatná aplikace)">← krajský organigram</a><a href="../tom-cr/" title="TOM ÚRÚ ČR">TOM ÚRÚ ČR</a>Kraj Vysočina · soustava od 2028 · <span id="ver">index 2026-10-05.9</span></small></h1>
   <div class="stats" id="stats"></div>
   <span class="user"><span class="dot" id="syncDot"></span><span id="userMail"></span></span>
   <div class="viewsw" role="group" aria-label="Pohled"><button data-v="map" class="on">Mapa funkcí</button><button data-v="org">Organigram</button><button data-v="proc">Procesy</button><button data-v="ws">Pracoviště a systémy</button><button data-v="conf" id="tabConf">Rozpory</button><button data-v="prop">Návrhy změn</button><button data-v="ver">Verze</button></div>
@@ -307,10 +307,10 @@ body.presenting .fbox .cb.note{display:none}
 
 <script src="../vendor/xlsx.full.min.js"></script>
 <script src="../vendor/supabase.js"></script>
-<script src="../config.js?v=2026-10-05.5"></script>
-<script src="model.js?v=2026-10-05.5"></script>
-<script src="process.js?v=2026-10-05.5"></script>
-<script src="kraj.js?v=2026-10-05.5"></script>
-<script src="app.js?v=2026-10-05.5"></script>
+<script src="../config.js?v=2026-10-05.9"></script>
+<script src="model.js?v=2026-10-05.9"></script>
+<script src="process.js?v=2026-10-05.9"></script>
+<script src="kraj.js?v=2026-10-05.9"></script>
+<script src="app.js?v=2026-10-05.9"></script>
 </body>
 </html>
