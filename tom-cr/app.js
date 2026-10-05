@@ -1,6 +1,6 @@
 // TOM ÚRÚ ČR – cílový provozní model úřadu od 1. 1. 2027.
 // Samostatná aplikace: model v organigram_state.id='tom-cr'; organigram ÚRÚ ČR ('main') se jen čte (živě).
-const APP_VERSION='2026-10-05.8';
+const APP_VERSION='2026-10-05.9';
 const APP_ID='tom-cr', STATE_ID='tom-cr', ORG_ID='main', LS_KEY='uru-tom-cr-v1';
 
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
@@ -132,7 +132,7 @@ async function loadRemote(){
   if(data&&data.data&&data.data.funcs){ state=data.data; version=data.version||0; }
   else { state=seedState(); version=0; const r=await sb.from('organigram_state').upsert({id:STATE_ID,data:state,version:0,updated_by:currentUser.email}); if(r.error) throw r.error;
     logChange('založení','model TOM ÚRÚ ČR založen z výchozího návrhu'); setTimeout(()=>toast('Model založen z výchozího návrhu. Vše je pracovní návrh k diskusi.'),400); }
-  normalize(); markBaseline();
+  normalize(); state.view='map'; drill=null; sel=null; markBaseline();   // po načtení vždy Mapa funkcí (pohled je věc okna, ne modelu)
 }
 function normalize(){ ['groups','links','rules','proposals','versions'].forEach(k=>state[k]=state[k]||[]); state.funcs=state.funcs||{}; state.ignored=state.ignored||{};
   if(!state.linkKinds||!Object.keys(state.linkKinds).length) state.linkKinds=JSON.parse(JSON.stringify(DEFAULT_KINDS)); LINK_KINDS=state.linkKinds;
