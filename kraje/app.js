@@ -1,6 +1,6 @@
 // Krajské ÚRÚ – organigram soustavy (2028). Samostatná aplikace, data v organigram_state.id='kraje'.
 // Organigram ÚRÚ ČR (řádek 'main') se odsud pouze jednou čte při prvním spuštění (převzetí rozpracovaných krajů).
-const APP_VERSION='2026-10-05.3';
+const APP_VERSION='2026-10-05.4';
 const APP_ID='kraje';
 
 const SOURCES = ['Obec','KÚ','ÚRÚ','Nové','Jiný'];
@@ -544,8 +544,9 @@ $('#btnLoad').onclick=()=>$('#fileJson').click();
 $('#fileJson').onchange=async e=>{const f=e.target.files[0];if(!f)return;e.target.value='';
   try{const s=JSON.parse(await f.text()); if(!s.units||!s.people) throw new Error('neplatný formát'); if(s.app!==APP_ID) throw new Error('soubor není uložený stav krajských ÚRÚ (organigram ÚRÚ ČR se sem nenačítá)'); state=s; const mg=migrateActive(state); logChange('načtení','stav nahrazen ze souboru '+f.name); save(); render(); toast('Stav načten.'); reportMigration(mg); toast('Stav načten.');}catch(err){alert('Soubor se nepodařilo načíst: '+err.message);}};
 $('#btnReset').onclick=()=>{ if(confirm('Opravdu vymazat všechny krajské útvary i lidi a začít znovu od vzoru? (Doporučuji nejdřív „Uložit stav“.)')){const v=state.view,z=state.zoom;state=freshState();state.view=v;state.zoom=z;logChange('vymazání','celý stav vymazán');save();render();} };
-let allCollapsed=false;
-$('#btnCollapse').onclick=()=>{allCollapsed=!allCollapsed; state.units.forEach(u=>{ if(u.level!=='predseda') state.collapsed[u.id]=allCollapsed; }); $('#btnCollapse').textContent=allCollapsed?'Rozbalit vše':'Sbalit vše'; render();};
+// Strom: sbalit / rozbalit vše (nejvyšší úroveň zůstává otevřená, aby bylo vidět, co je pod ní)
+$('#btnCollapseAll').onclick=()=>{ state.units.forEach(u=>{ if(u.parent) state.collapsed[u.id]=true; else delete state.collapsed[u.id]; }); render(); };
+$('#btnExpandAll').onclick=()=>{ state.collapsed={}; render(); };
 // ---------- global search ----------
 const matches=(p,q)=>[p.name,p.unit,p.role,p.posId,p.src].join(' ').toLowerCase().includes(q);
 function searchHits(){ const q=$('#search').value.trim().toLowerCase(); if(!q) return {q,hits:[]};
