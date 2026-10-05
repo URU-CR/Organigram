@@ -27,6 +27,10 @@ input[type=text],input[type=search],select{font:inherit;padding:6px 9px;border:1
 header{background:#fff;border-bottom:1px solid var(--line);padding:10px 18px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
 header h1{font-size:17px;margin:0;font-weight:600;white-space:nowrap}
 header h1 small{display:block;font-size:12px;font-weight:400;color:var(--muted)}
+header h1 .apps{display:block;font-size:12px;font-weight:400;color:var(--muted);margin-top:1px}
+header h1 .apps a{color:var(--accent);text-decoration:none} header h1 .apps a:hover{text-decoration:underline}
+body.presenting header h1 .apps{display:none}
+@media print{header h1 .apps{display:none}}
 .stats{display:flex;gap:16px;align-items:baseline;flex-wrap:wrap}
 .stat{white-space:nowrap}
 .stat b{font-size:18px;font-weight:600}
@@ -379,7 +383,7 @@ table.ov td.z{color:#B6BEC9}
 </head>
 <body>
 <header>
-  <h1>Obsazení organigramu ÚRÚ ČR<small>návrh organizační struktury z 1. 10. 2026 · <span id="ver" title="verze app.js se doplní po načtení skriptu">index 2026-10-05.1</span></small></h1>
+  <h1>Obsazení organigramu ÚRÚ ČR<small>návrh organizační struktury z 1. 10. 2026 · <span id="ver" title="verze app.js se doplní po načtení skriptu">index 2026-10-05.1</span></small><span class="apps">další aplikace: <a href="kraje/" title="návrh organigramu krajských ÚRÚ (soustava od 2028)">Krajské ÚRÚ</a> · <a href="tom-cr/" title="cílový provozní model ÚRÚ ČR – funkce, systémy, procesy">TOM ÚRÚ ČR</a></span></h1>
   <div class="stats" id="stats"></div>
   <span class="user" id="user"><span class="dot" id="syncDot"></span><span id="userMail"></span></span>
   <div class="legend" id="legend"></div>
