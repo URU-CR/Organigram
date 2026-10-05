@@ -8,31 +8,44 @@ let procSel=null, pConnect=null, pzoom=0.85;
 function seedProcesses(st){ const S=window.TOM_SEED; if(!st.roles||!st.roles.length) st.roles=(S.roles||[]).filter(r=>!r.func||st.funcs[r.func]).map(r=>({...r,desc:r.desc||''}));
   if(!st.processes||!st.processes.length) st.processes=(S.processes||[]).map(p=>({id:p.id,name:p.name,desc:p.desc||'',
     lanes:p.lanes.map(([id,ref,role])=>role?{id,role}:{id,ref}).filter(l=>l.role||st.funcs[l.ref]),
-    steps:p.steps.map(([id,lane,row,name,kind,sys,ch,note])=>({id,lane,row,name,kind:kind||'step',sys:sys||null,ch:ch||null,note:note||'',sub:''})),
+    steps:p.steps.map(([id,lane,row,name,kind,sys,ch,note])=>({id,lane,row,name,kind:kind||'step',sys:sys||null,chs:Array.isArray(ch)?ch:(ch?[ch]:[]),note:note||'',sub:''})),
     flows:p.flows.map(([a,b,l])=>({id:uid('w'),from:a,to:b,label:l||''}))})); }
 const roleOf=id=>(state.roles||[]).find(r=>r.id===id);
+// převod starších dat: kanál kroku -> seznam kanálů
+function normProcesses(st){ (st.processes||[]).forEach(p=>p.steps.forEach(s=>{ if(!Array.isArray(s.chs)){ s.chs=s.ch?[s.ch]:[]; } delete s.ch; })); }
+const chNames=s=>(s.chs||[]).map(c=>CHANNELS[c]||c).join(', ');
 function curProc(){ let p=(state.processes||[]).find(x=>x.id===state.proc); if(!p&&state.processes.length){ p=state.processes[0]; state.proc=p.id; } return p||null; }
 function laneInfo(l){ if(l.role){ const r=roleOf(l.role); return r?{type:'role',name:r.name,sub:r.func&&F(r.func)?F(r.func).name:'role bez funkce'}:null; }
   const f=F(l.ref); if(!f) return null; return {type:f.kind||'func',name:f.name,sub:f.kind==='actor'?'vnější okolí':f.kind==='system'?'systém':'funkce'}; }
 const LANE_TYPE={actor:'aktér',system:'systém',role:'role',func:'funkce'};
 // prvek modelu, který krok reprezentuje pro odvozené vazby
 function stepEl(p,s){ const l=p.lanes.find(x=>x.id===s.lane); if(!l) return null; if(l.role){ const r=roleOf(l.role); return s.sys||(r&&r.func)||null; } return l.ref; }
-function derivedLinks(p){ const out=[]; const add=(a,b,k,why)=>{ if(!a||!b||a===b||!F(a)||!F(b)||!LINK_KINDS[k]) return; if(out.some(x=>x.from===a&&x.to===b&&x.kind===k)) return; out.push({from:a,to:b,kind:k,why}); };
-  p.steps.forEach(s=>{ const l=p.lanes.find(x=>x.id===s.lane); if(l&&l.role&&s.sys){ const r=roleOf(l.role); if(r&&r.func) add(r.func,s.sys,'pouziva',s.name); } });
+function derivedLinks(p){ const out=[]; const add=(a,b,k,step,label)=>{ if(!a||!b||a===b||!F(a)||!F(b)||!LINK_KINDS[k]) return; const x=out.find(x=>x.from===a&&x.to===b&&x.kind===k);
+    if(x){ if(label&&!x.label.includes(label)) x.label=x.label?x.label+', '+label:label; return; } out.push({from:a,to:b,kind:k,step,label:label||''}); };
+  p.steps.forEach(s=>{ const l=p.lanes.find(x=>x.id===s.lane); if(l&&l.role&&s.sys){ const r=roleOf(l.role); if(r&&r.func) add(r.func,s.sys,'pouziva',s.id); } });
   p.flows.forEach(w=>{ const A=p.steps.find(s=>s.id===w.from), B=p.steps.find(s=>s.id===w.to); if(!A||!B) return; const a=stepEl(p,A), b=stepEl(p,B); if(!F(a)||!F(b)) return;
-    const ta=F(a).kind||'func', tb=F(b).kind||'func'; if(ta==='actor') add(a,b,'zada',A.name); else if(ta==='system'&&tb==='system') add(a,b,'data',A.name+' → '+B.name); });
+    const ta=F(a).kind||'func', tb=F(b).kind||'func'; if(ta==='actor') add(a,b,'zada',A.id,chNames(A)||A.sub||''); else if(ta==='system'&&tb==='system') add(a,b,'data',A.id); });
   return out; }
+// všechny vazby pro mapu a kontroly: ruční vazby + vazby odvozené z procesů (stejná vazba se sloučí, u ruční se doplní odkaz na proces)
+function allLinks(){ const out=state.links.map(l=>({...l,procs:[]})); const virt={};
+  (state.processes||[]).forEach(p=>derivedLinks(p).forEach(d=>{ const ref={p:p.id,step:d.step};
+    const hit=out.find(l=>!l.derived&&fam(d.from).includes(l.from)&&fam(d.to).includes(l.to)&&(l.kind===d.kind||(d.kind==='pouziva'&&l.kind==='spravuje')));
+    if(hit){ if(!hit.procs.some(x=>x.p===p.id)) hit.procs.push(ref); return; }
+    const k=d.from+'>'+d.to+':'+d.kind; if(!virt[k]){ virt[k]={id:'d:'+k,from:d.from,to:d.to,kind:d.kind,label:d.label,derived:true,procs:[]}; out.push(virt[k]); }
+    else if(d.label&&!virt[k].label.includes(d.label)) virt[k].label=virt[k].label?virt[k].label+'; '+d.label:d.label;
+    if(!virt[k].procs.some(x=>x.p===p.id)) virt[k].procs.push(ref); }));
+  return out; }
+function procButtons(l){ return (l.procs||[]).map(r=>{ const p=(state.processes||[]).find(x=>x.id===r.p); return p?`<button class="small pbtn" data-p="${p.id}" data-s="${r.step||''}" title="otevřít proces na příslušném kroku">▶ ${esc(p.name)}</button>`:''; }).join(''); }
+document.addEventListener('click',e=>{ const b=e.target.closest('button.pbtn'); if(!b) return; state.proc=b.dataset.p; procSel=b.dataset.s?{t:'step',id:b.dataset.s}:null; setView('proc'); });
 const fam=id=>{ const f=F(id); if(!f) return [id]; return [id,...(f.parent?[f.parent]:[]),...(f.sum?kidsOf(id).map(k=>k.id):[])]; };
-const inMap=d=>state.links.some(l=>fam(d.from).includes(l.from)&&fam(d.to).includes(l.to)&&(l.kind===d.kind||(d.kind==='pouziva'&&l.kind==='spravuje')));
+const manualIn=d=>state.links.some(l=>fam(d.from).includes(l.from)&&fam(d.to).includes(l.to)&&(l.kind===d.kind||(d.kind==='pouziva'&&l.kind==='spravuje')));
 function procsOf(id){ return (state.processes||[]).filter(p=>p.lanes.some(l=>l.ref===id||(l.role&&roleOf(l.role)&&fam(id).includes(roleOf(l.role).func)))||p.steps.some(s=>s.sys===id)); }
 // kontroly procesů (volá check() v app.js)
 function checkProcesses(add){
   (state.processes||[]).forEach(p=>{
     p.lanes.forEach(l=>{ if(!laneInfo(l)) add('err','plane',`Proces „${p.name}“: dráha odkazuje na prvek, který v modelu už není.`,{proc:p.id,step:l.id}); });
     p.steps.forEach(s=>{ const l=p.lanes.find(x=>x.id===s.lane); if(!l) return;
-      if(l.role){ const r=roleOf(l.role); if(r&&!r.func) return;
-        if(r&&s.sys&&F(r.func)&&F(s.sys)&&!state.links.some(x=>fam(r.func).includes(x.from)&&x.to===s.sys&&(x.kind==='pouziva'||x.kind==='spravuje')))
-          add('warn','procsys',`Proces „${p.name}“, krok „${s.name}“: ${r.name} pracuje v systému ${F(s.sys).name}, ale funkce „${F(r.func).name}“ ho v mapě nepoužívá.`,{proc:p.id,step:s.id,f:r.func}); } });
+      if(l.role&&s.sys&&!roleOf(l.role)) return; });
     p.steps.filter(s=>s.kind!=='end'&&!p.flows.some(w=>w.from===s.id)).forEach(s=>add('info','pdead',`Proces „${p.name}“: z kroku „${s.name}“ nic nevede.`,{proc:p.id,step:s.id}));
   });
   (state.roles||[]).forEach(r=>{ if(!r.func) add('info','rolefunc',`Role „${r.name}“ není přiřazena k žádné funkci, a tedy ani k útvaru.`,{}); });
@@ -55,7 +68,7 @@ function renderProc(){
   p.steps.forEach(s=>{ const q=pos(s); const b=document.createElement('div'); boxes[s.id]=b; const cs=L.filter(c=>c.proc===p.id&&c.step===s.id);
     b.className='pstep k-'+s.kind+(procSel&&procSel.t==='step'&&procSel.id===s.id?' sel':'')+(pConnect===s.id?' from':'')+(cs.some(c=>c.sev==='err')?' sev-err':cs.some(c=>c.sev==='warn')?' sev-warn':'');
     b.style.left=q.x+'px'; b.style.top=q.y+'px'; b.dataset.sid=s.id;
-    const meta=[s.sys&&F(s.sys)?'v '+F(s.sys).name:null, s.ch?(CHANNELS[s.ch]||s.ch):null].filter(Boolean).join(' · ');
+    const meta=[s.sys&&F(s.sys)?'v '+F(s.sys).name:null, chNames(s)||null].filter(Boolean).join(' · ');
     b.innerHTML=`<div class="pn">${esc(s.name)}</div>${meta?`<div class="pm">${esc(meta)}</div>`:''}${s.sub?`<div class="pm">${esc(s.sub)}</div>`:''}${s.note?`<span class="pnote" title="${esc(s.note)}">?</span>`:''}${cs.length?`<span class="cb ${cs.some(c=>c.sev==='err')?'err':'warn'}" title="${esc(cs.map(c=>c.text).join('\n'))}">!</span>`:''}`;
     b.addEventListener('pointerdown',e=>stepDown(e,p,s)); cv.appendChild(b); });
   // šipky (pravoúhlé)
@@ -109,7 +122,7 @@ function renderProcSide(s){ const ro=ROLE.org?'':'disabled'; const p=curProc();
     <div class="g2"><label>Dráha (kdo)<select id="psLane" ${ro}>${p.lanes.map(x=>`<option value="${x.id}" ${x.id===step.lane?'selected':''}>${esc((laneInfo(x)||{name:'?'}).name)}</option>`).join('')}</select></label>
     <label>Druh<select id="psKind" ${ro}>${Object.entries(STEP_KINDS).map(([k,v])=>`<option value="${k}" ${k===step.kind?'selected':''}>${v}</option>`).join('')}</select></label>
     <label>V systému<select id="psSys" ${ro}><option value="">—</option>${envEls('system').map(f=>`<option value="${f.id}" ${f.id===step.sys?'selected':''}>${esc(f.name)}</option>`).join('')}</select></label>
-    <label>Kanál<select id="psCh" ${ro}><option value="">—</option>${Object.entries(CHANNELS).map(([k,v])=>`<option value="${k}" ${k===step.ch?'selected':''}>${v}</option>`).join('')}</select></label></div>
+    </div><div class="lbl">Kanály podání <span class="muted">(propíšou se do popisku vazby v mapě)</span></div><div class="locs" id="psChs">${Object.entries(CHANNELS).map(([k,v])=>`<label><input type="checkbox" value="${k}" ${(step.chs||[]).includes(k)?'checked':''} ${ro}> ${v}</label>`).join('')}</div>
     <label>Upřesnění<input type="text" id="psSub" value="${esc(step.sub||'')}" placeholder="např. „DS, e-mail, osobně“" ${ro}></label>
     <label>Otevřená otázka / k ověření<textarea id="psNote" rows="2" ${ro}>${esc(step.note||'')}</textarea></label>
     <div class="lbl">Pokračuje do</div>${outs.map(w=>{ const t=p.steps.find(x=>x.id===w.to); return `<div class="arow"><span>→ ${esc(t?t.name:'?')}</span><input type="text" data-w="${w.id}" value="${esc(w.label)}" placeholder="popisek (např. ano)" ${ro} style="font-size:12px;padding:2px 5px">${ROLE.org?`<button class="small" data-x="${w.id}">×</button>`:''}</div>`; }).join('')||'<div class="muted">nikam</div>'}
@@ -122,12 +135,12 @@ function renderProcSide(s){ const ro=ROLE.org?'':'disabled'; const p=curProc();
     if(!ROLE.org) return; const ch=(fn,w)=>()=>{ fn(); save('proces',w+': '+step.name); };
     $('#psName').onchange=e=>{ step.name=e.target.value.trim()||step.name; save('proces','krok přejmenován: '+step.name); };
     $('#psLane').onchange=()=>{ const ln=$('#psLane').value; const o=p.steps.find(x=>x!==step&&x.lane===ln&&x.row===step.row); if(o){ o.lane=step.lane; } step.lane=ln; save('proces','krok přesunut: '+step.name); };
-    $('#psKind').onchange=ch(()=>step.kind=$('#psKind').value,'druh'); $('#psSys').onchange=ch(()=>step.sys=$('#psSys').value||null,'systém'); $('#psCh').onchange=ch(()=>step.ch=$('#psCh').value||null,'kanál');
+    $('#psKind').onchange=ch(()=>step.kind=$('#psKind').value,'druh'); $('#psSys').onchange=ch(()=>step.sys=$('#psSys').value||null,'systém'); s.querySelectorAll('#psChs input').forEach(i=>i.onchange=ch(()=>step.chs=[...s.querySelectorAll('#psChs input:checked')].map(x=>x.value),'kanály'));
     $('#psSub').onchange=ch(()=>step.sub=$('#psSub').value.trim(),'upřesnění'); $('#psNote').onchange=ch(()=>step.note=$('#psNote').value.trim(),'poznámka');
     s.querySelectorAll('input[data-w]').forEach(i=>i.onchange=()=>{ p.flows.find(w=>w.id===i.dataset.w).label=i.value.trim(); save('proces','popisek šipky'); });
     s.querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{ p.flows=p.flows.filter(w=>w.id!==b.dataset.x); save('proces','šipka smazána'); });
     $('#psNextAdd').onclick=()=>{ const v=$('#psNext').value; if(!v) return; let to=v;
-      if(v==='__new'){ const n=prompt('Název nového kroku:'); if(!n||!n.trim()) return; p.steps.forEach(x=>{ if(x.row>step.row) x.row++; }); const ns={id:uid('s'),lane:step.lane,row:step.row+1,name:n.trim(),kind:'step',sys:step.sys||null,ch:null,note:'',sub:''}; p.steps.push(ns); to=ns.id; }
+      if(v==='__new'){ const n=prompt('Název nového kroku:'); if(!n||!n.trim()) return; p.steps.forEach(x=>{ if(x.row>step.row) x.row++; }); const ns={id:uid('s'),lane:step.lane,row:step.row+1,name:n.trim(),kind:'step',sys:step.sys||null,chs:[],note:'',sub:''}; p.steps.push(ns); to=ns.id; }
       if(!p.flows.some(w=>w.from===step.id&&w.to===to)) p.flows.push({id:uid('w'),from:step.id,to,label:''}); save('proces','pokračování: '+step.name); };
     $('#psDel').onclick=()=>{ if(!confirm(`Smazat krok „${step.name}“ včetně jeho šipek?`)) return; p.steps=p.steps.filter(x=>x!==step); p.flows=p.flows.filter(w=>w.from!==step.id&&w.to!==step.id); procSel=null; save('proces','krok smazán: '+step.name); };
     return; }
@@ -152,19 +165,17 @@ function renderProcSide(s){ const ro=ROLE.org?'':'disabled'; const p=curProc();
     $('#plDel').onclick=()=>{ if(n&&!confirm(`Dráha obsahuje ${n} kroků – smazat i je?`)) return; const ids=new Set(p.steps.filter(x=>x.lane===lane.id).map(x=>x.id)); p.steps=p.steps.filter(x=>!ids.has(x.id)); p.flows=p.flows.filter(w=>!ids.has(w.from)&&!ids.has(w.to)); p.lanes=p.lanes.filter(x=>x!==lane); procSel=null; save('proces','dráha smazána'); };
     return; }
   // proces jako celek
-  const dl=derivedLinks(p), miss=dl.filter(d=>!inMap(d)); const cs=conflicts.filter(c=>c.proc===p.id&&!c.ignored);
+  const dl=derivedLinks(p); const cs=conflicts.filter(c=>c.proc===p.id&&!c.ignored);
   s.innerHTML=`<div class="sh"><span class="muted">Proces</span></div>
     <label>Název<input type="text" id="ppName" value="${esc(p.name)}" ${ro}></label><label>Popis<textarea id="ppDesc" rows="3" ${ro}>${esc(p.desc||'')}</textarea></label>
     <p class="muted" style="font-size:12px">${p.lanes.length} drah · ${p.steps.length} kroků · ${p.steps.filter(x=>x.note).length} otevřených otázek</p>
-    <div class="lbl">Vazby odvozené z procesu (${dl.length})</div>
-    ${dl.map(d=>`<div class="arow kid"><span style="font-size:12px">${esc(F(d.from).name)} → ${esc(F(d.to).name)} <span class="muted">(${esc(KIND(d.kind)[0])})</span></span><span>${inMap(d)?'<span class="okc" title="v mapě je">✓</span>':'<span class="warnc" title="v mapě chybí">chybí</span>'}</span></div>`).join('')||'<div class="muted">žádné</div>'}
-    ${miss.length&&ROLE.org?`<button id="ppSync" class="primary" style="margin-top:8px">Doplnit ${miss.length} vazeb do mapy</button>`:''}
+    <div class="lbl">Vazby, které proces vytváří v mapě (${dl.length})</div><p class="muted" style="font-size:12px;margin:0 0 4px">Promítají se do mapy automaticky; při změně procesu se změní i mapa.</p>
+    ${dl.map(d=>`<div class="arow kid"><span style="font-size:12px">${esc(F(d.from).name)} → ${esc(F(d.to).name)} <span class="muted">(${esc(KIND(d.kind)[0])}${d.label?': '+esc(d.label):''})</span></span><span class="muted" style="font-size:11px">${manualIn(d)?'i ručně':''}</span></div>`).join('')||'<div class="muted">žádné</div>'}
     ${cs.length?`<div class="lbl">Rozpory procesu</div>${cs.map(c=>`<div class="mini sev-${c.sev}">${esc(c.text)}</div>`).join('')}`:''}
     <p class="muted" style="font-size:12px;margin-top:14px">Klikněte na krok, šipku nebo záhlaví dráhy. Kroky se přesouvají tažením do jiné dráhy nebo řádku; obsazené místo se prohodí.</p>
     ${ROLE.org?'<div class="row" style="margin-top:10px"><button id="ppDup">Duplikovat proces</button><button id="ppDel" style="color:var(--danger)">Smazat proces</button></div>':''}`;
   if(!ROLE.org) return;
   $('#ppName').onchange=e=>{ p.name=e.target.value.trim()||p.name; save('proces','přejmenován: '+p.name); }; $('#ppDesc').onchange=e=>{ p.desc=e.target.value; save('proces','popis: '+p.name); };
-  if($('#ppSync')) $('#ppSync').onclick=()=>{ miss.forEach(d=>state.links.push({id:uid('l'),from:d.from,to:d.to,kind:d.kind,label:''})); save('proces',`do mapy doplněno ${miss.length} vazeb z procesu ${p.name}`); toast(`Do mapy doplněno ${miss.length} vazeb.`); };
   $('#ppDup').onclick=()=>{ const c=JSON.parse(JSON.stringify(p)); c.id=uid('p'); c.name=p.name+' (kopie)'; state.processes.push(c); state.proc=c.id; save('proces','duplikován: '+p.name); };
   $('#ppDel').onclick=()=>{ if(!confirm(`Smazat proces „${p.name}“?`)) return; state.processes=state.processes.filter(x=>x!==p); state.proc=null; procSel=null; save('proces','smazán: '+p.name); };
 }
@@ -187,7 +198,7 @@ function wireProc(){
   $('#pBtnStep').onclick=()=>{ const p=curProc(); if(!p) return; if(!p.lanes.length){ toast('Nejdřív přidejte dráhu.'); return; } const n=prompt('Název kroku:'); if(!n||!n.trim()) return;
     const sel0=procSel&&procSel.t==='step'&&p.steps.find(x=>x.id===procSel.id); const lane=procSel&&procSel.t==='lane'?procSel.id:(sel0?sel0.lane:p.lanes[0].id);
     const row=sel0?sel0.row+1:Math.max(-1,...p.steps.map(x=>x.row))+1; if(sel0) p.steps.forEach(x=>{ if(x.row>=row) x.row++; });
-    const s={id:uid('s'),lane,row,name:n.trim(),kind:'step',sys:null,ch:null,note:'',sub:''}; p.steps.push(s); if(sel0) p.flows.push({id:uid('w'),from:sel0.id,to:s.id,label:''}); procSel={t:'step',id:s.id}; save('proces','nový krok: '+s.name); };
+    const s={id:uid('s'),lane,row,name:n.trim(),kind:'step',sys:null,chs:[],note:'',sub:''}; p.steps.push(s); if(sel0) p.flows.push({id:uid('w'),from:sel0.id,to:s.id,label:''}); procSel={t:'step',id:s.id}; save('proces','nový krok: '+s.name); };
   $('#pBtnConnect').onclick=()=>setPConnect(!document.body.classList.contains('pconnecting'));
   $('#pBtnRoles').onclick=openRolesDlg;
   $('#pzoom').oninput=e=>{ pzoom=+e.target.value/100; $('#pzoomVal').textContent=e.target.value+' %'; $('#pCanvas').style.transform=`scale(${pzoom})`; };

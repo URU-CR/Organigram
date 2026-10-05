@@ -103,7 +103,7 @@ window.TOM_SEED = {
      flows:[['s1','s2'],['s2','s3'],['s3','s4'],['s4','s5'],['s5','s6'],['s6','s7'],['s7','s8']]},
     {id:'p2', name:'Příjem žádosti – DS, e-mail, osobně', desc:'Podání mimo Portál; žádost přijímá podatelna do ESPIS a referent ji předává do VITA.',
      lanes:[['L1','a1'],['L2',null,'r_pod'],['L3',null,'r_ved'],['L4',null,'r_ref'],['L5','y4']],
-     steps:[['s1','L1',0,'Podá žádost','start',null,'ds'],['s2','L2',1,'Příjem do ESPIS',null,'y5',null,'Osobní podání: konverze listin na podatelně – k ověření'],
+     steps:[['s1','L1',0,'Podá žádost','start',null,['ds','email','osobne']],['s2','L2',1,'Příjem do ESPIS',null,'y5',null,'Osobní podání: konverze listin na podatelně – k ověření'],
        ['s3','L2',2,'Spis už existuje?','decision','y5'],['s4','L3',3,'Přidělí referentovi',null,'y5'],['s5','L4',4,'Převezme dokument',null,'y5'],
        ['s6','L4',5,'Předá do VITA',null,'y5'],['s7','L5',6,'Řízení vedeno ve VITA','end',null,null,'Zapisuje VITA řízení zpětně do ESZ? – k ověření']],
      flows:[['s1','s2'],['s2','s3'],['s3','s4','ne – nový spis'],['s3','s5','ano'],['s4','s5'],['s5','s6'],['s6','s7']]}
