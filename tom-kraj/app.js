@@ -1,6 +1,6 @@
 // TOM krajského ÚRÚ – cílový provozní model kraje v soustavě ÚRÚ (od 2028), modelový kraj Vysočina.
 // Odvozeno z TOM ÚRÚ ČR. Model v organigram_state.id='tom-kraj'; krajský organigram ('kraje') se jen čte (živě). Pracoviště, scénáře a posouzení: kraj.js.
-const APP_VERSION='2026-10-06.2';
+const APP_VERSION='2026-10-06.4';
 const APP_ID='tom-kraj', STATE_ID='tom-kraj', ORG_ID='kraje', LS_KEY='uru-tom-kraj-v1';
 const KRAJ=(window.TOM_KRAJ||{}).kraj||'Kraj Vysočina';
 

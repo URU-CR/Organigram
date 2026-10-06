@@ -40,7 +40,7 @@ window.TOM_SEED = {
   ],
   systems: [
     {id:'y1', st:'portal', ss:'stav', name:'Portál stavebníka', admin:'ÚRÚ ČR (centrálně)'},
-    {id:'y2', st:'agenda', ss:'stav', name:'ISSŘ', admin:'ÚRÚ ČR (centrálně)', desc:'Není napojené na spisovou službu – vlastní evidence (ESZ a správa dokumentací = ořezaný GINIS), samo přiděluje spisové značky a č. j. Nemá funkcionalitu integrovaných DO; jako agendový systém nedosahuje funkčnosti VITA.'},
+    {id:'y2', st:'agenda', ss:'stav', name:'ISSŘ', admin:'ÚRÚ ČR (centrálně)', desc:'Není napojené na spisovou službu – vlastní evidence (ESZ a správa dokumentací = ořezaný GINIS), samo přiděluje spisové značky a č. j. Nemá funkcionalitu integrovaných DO; jako agendový systém nedosahuje funkčnosti VITA. Funkce Postoupení spisu: ze všech dokumentů spisu (vč. příloh) vytvoří jeden přijatý dokument, který lze načíst ve VITA, zapsat do spisové služby a založit nad ním nové řízení – jen směrem ISSŘ → VITA; nejde o předání řízení (spisu). Specifická datová schránka napojená na GINIS v ISSŘ: žádosti z ní se ručně třídí a přidělují SÚ a zobrazí se v doručených k vyřízení jako žádosti z Portálu, ale bez datové provazby na záměr a dokumentaci.'},
     {id:'y3', st:'registr', ss:'stav', name:'Evidence stavebních záměrů (ESZ)', admin:'ÚRÚ ČR (centrálně)'},
     {id:'y4', st:'agenda', ss:'stav', name:'VITA', admin:'dodavatel VITA; instance u obcí'},
     {id:'y6', st:'spis', ss:'novy', name:'Spisová služba ÚRÚ (ESPIS)', admin:'ÚRÚ ČR (centrálně)', all:'evidence a oběh dokumentů, spisy'},
@@ -57,6 +57,8 @@ window.TOM_SEED = {
     ['a4','k03','metodika','metodika, řízení soustavy'],['a4','s2','ridi','sdílené služby řízené centrálně (R5)'],['k07','a3','sluzba','pořízení ÚPD za obec'],['a3','k07','zada','žádost o převzetí pořizování'],
     ['k01','y4','pouziva','všechna pracoviště (VERA převedena do VITA)'],['k01','y2','pouziva','částečně'],['k02','y4','pouziva'],['s1','y4','pouziva','koordinované stanovisko jen ve VITA'],
     ['k03','y13','pouziva','vytíženost pracovišť, přidělování a přesun věcí',1],['k11','y13','pouziva','řízení výkonu',1],['y4','y13','data','stav řízení, lhůty',1],['y2','y13','data','stav řízení, lhůty',1],
+    ['y2','y4','spis','Postoupení spisu: jen ISSŘ → VITA, jako přijatý dokument → nové řízení'],
+    ['y8','y2','data','specifická DS napojená na GINIS v ISSŘ (bez provazby na záměr)'],
     ['k07','y10','pouziva'],['k08','y10','pouziva'],['k09','y6','pouziva'],['k14','y4','spravuje','podpora uživatelů'],
     ['a4','y1','spravuje'],['a4','y2','spravuje'],['a4','y3','spravuje'],['a4','y6','spravuje'],['a4','y10','spravuje'],['a4','y11','spravuje'],['a4','y12','spravuje'],
     ['y1','y2','data'],['y2','y3','data'],['y4','y3','data','zatím neúplně'],['y8','y6','data'],['y4','y6','data','napojení – k ověření'],['y6','y2','data','integrace eSSL → ISSŘ (předávání podání)',1],
@@ -124,7 +126,23 @@ window.TOM_SEED = {
        ['s6','L5',5,'Sestaví a podepíše koordinované vyjádření','step','y6'],
        ['s7','L2',6,'Předá vyjádření pracovišti (č. j. ESPIS)'],
        ['s8','L1',7,'Převezme vyjádření jako podklad','end','y4']],
-     flows:[['s1','s2'],['s2','s3'],['s3','s4'],['s4','s5'],['s5','s6'],['s6','s7'],['s7','s8']]}
+     flows:[['s1','s2'],['s2','s3'],['s3','s4'],['s4','s5'],['s5','s6'],['s6','s7'],['s7','s8']]},
+    {id:'p6', name:'Předání žádosti z ÚP v ISSŘ na ÚP ve VITA (Postoupení spisu)', desc:'Např. žádost z Portálu přidělená ÚP pracujícímu v ISSŘ, která patří ÚP pracujícímu ve VITA (kombinace). Postoupení spisu v ISSŘ vytvoří ze všech dokumentů jeden přijatý dokument (ostatní jako přílohy); ve VITA vzniká nové řízení. Funguje jen směrem ISSŘ → VITA a není to předání rozpracovaného řízení (spisu).',
+     lanes:[['L1',null,'r_rupA'],['L2','y2'],['L3',null,'r_rupB'],['L4','y4'],['L5','y6']],
+     steps:[['s1','L1',0,'Zjistí, že žádost patří ÚP ve VITA','start','y2'],
+       ['s2','L2',1,'Postoupení spisu – přijatý dokument (ostatní dokumenty jako přílohy)','step','y2'],
+       ['s3','L3',2,'Načte přijatý dokument ve VITA','step','y4'],
+       ['s4','L5',3,'Zapíše dokument do spisové služby ÚRÚ','step','y6'],
+       ['s5','L4',4,'Založí nové řízení ve VITA','end','y4',null,'Jen ISSŘ → VITA a jen pro žádost; opačný směr neexistuje a rozpracované řízení takto předat nelze (správně nejde o předání spisu).']],
+     flows:[['s1','s2'],['s2','s3'],['s3','s4'],['s4','s5']]},
+    {id:'p7', name:'Podání datovou schránkou do ISSŘ přes specifickou DS (GINIS)', desc:'Na „spisovou službu“ GINIS integrovanou v ISSŘ je napojená specifická datová schránka. Žadatel na ni může podávat přímo, nebo podatelna přeposílá zprávy ze standardní DS úřadu. Zprávy se ručně třídí a přidělují pracovištím; v ISSŘ se zobrazí v doručených k vyřízení, ale bez datové provazby na záměr a dokumentaci.',
+     lanes:[['L1','a1'],['L2',null,'r_pod'],['L3','y8'],['L4','y2'],['L5',null,'r_rup']],
+     steps:[['s1','L1',0,'Podá žádost datovou schránkou','start',null,['ds']],
+       ['s2','L2',1,'Zprávu ze standardní DS úřadu přepošle na specifickou DS ISSŘ','step','y6',null,'Jen při podání na standardní DS; příjem zůstává evidován i ve spisové službě ÚRÚ. Podání přímo na specifickou DS tento krok vynechá.'],
+       ['s3','L3',2,'Doručení do specifické DS (GINIS v ISSŘ)','step','y8'],
+       ['s4','L2',3,'Ručně roztřídí a přidělí pracovišti','step','y2',null,'Dnes ruční třídění – riziko přetížení třídicího týmu.'],
+       ['s5','L5',4,'Převezme v doručených k vyřízení a připojí k řízení','end','y2',null,'Bez datové provazby na záměr a dokumentaci – párování s řízením ručně.']],
+     flows:[['s1','s2','přes DS úřadu'],['s1','s3','přímo'],['s2','s3'],['s3','s4'],['s4','s5']]}
   ]
 };
 // Pracoviště kraje – stav systémů podle tabulky URU_prehled_ORP_ver1.xlsx (MMR, data z území 2026).
