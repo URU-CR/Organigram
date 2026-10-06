@@ -49,12 +49,14 @@ window.TOM_SEED = {
     {id:'y9', st:'externi', ss:'stav', name:'Základní registry', admin:'Digitální a informační agentura'},
     {id:'y10', st:'portal', ss:'stav', name:'NGÚP', admin:'ÚRÚ ČR (centrálně)'},
     {id:'y11', st:'podpora', ss:'stav', name:'Personální systém (VEMA)', admin:'ÚRÚ ČR (centrálně)', all:'docházka, dovolené, výplatní pásky'},
-    {id:'y12', st:'podpora', ss:'stav', name:'Ekonomický systém (MÚZO)', admin:'ÚRÚ ČR (centrálně)'}
+    {id:'y12', st:'podpora', ss:'stav', name:'Ekonomický systém (MÚZO)', admin:'ÚRÚ ČR (centrálně)'},
+    {id:'y13', st:'podpora', ss:'novy', name:'Manažerská nadstavba (vytíženost, přidělování věcí)', admin:'ÚRÚ ČR (centrálně) – k vývoji', desc:'Žádný z agendových systémů (VITA, ISSŘ) dnes nemá použitelnou manažerskou nadstavbu. Má sloužit ke zjištění vytíženosti pracovišť a efektivnímu přidělování věcí – jedna z hlavních výhod centrálního úřadu. Nutno vyvinout.'}
   ],
   links2: [
     ['a1','k09','zada'],['a1','y1','zada','podání přes portál'],['a2','a4','odvolava','odvolání míří na ÚRÚ ČR (R2)'],['a5','k01','stanovisko'],['a5','k02','stanovisko'],
     ['a4','k03','metodika','metodika, řízení soustavy'],['a4','s2','ridi','sdílené služby řízené centrálně (R5)'],['k07','a3','sluzba','pořízení ÚPD za obec'],['a3','k07','zada','žádost o převzetí pořizování'],
     ['k01','y4','pouziva','všechna pracoviště (VERA převedena do VITA)'],['k01','y2','pouziva','částečně'],['k02','y4','pouziva'],['s1','y4','pouziva','koordinované stanovisko jen ve VITA'],
+    ['k03','y13','pouziva','vytíženost pracovišť, přidělování a přesun věcí',1],['k11','y13','pouziva','řízení výkonu',1],['y4','y13','data','stav řízení, lhůty',1],['y2','y13','data','stav řízení, lhůty',1],
     ['k07','y10','pouziva'],['k08','y10','pouziva'],['k09','y6','pouziva'],['k14','y4','spravuje','podpora uživatelů'],
     ['a4','y1','spravuje'],['a4','y2','spravuje'],['a4','y3','spravuje'],['a4','y6','spravuje'],['a4','y10','spravuje'],['a4','y11','spravuje'],['a4','y12','spravuje'],
     ['y1','y2','data'],['y2','y3','data'],['y4','y3','data','zatím neúplně'],['y8','y6','data'],['y4','y6','data','napojení – k ověření'],['y6','y2','data','integrace eSSL → ISSŘ (předávání podání)',1],
@@ -111,6 +113,17 @@ window.TOM_SEED = {
        ['s6','L4',5,'Sestaví a podepíše KV','step','y4'],
        ['s7','L3',6,'KV zpět jako dokument'],
        ['s8','L1',7,'Ručně vloží KV do ISSŘ jako podklad','end','y2',null,'Řešení: obousměrná integrace VITA ↔ ISSŘ, nebo řízení v jednom systému.']],
+     flows:[['s1','s2'],['s2','s3'],['s3','s4'],['s4','s5'],['s5','s6'],['s6','s7'],['s7','s8']]},
+    {id:'p5', name:'Vyjádření DO přes spisovou službu ÚRÚ (model DESÚ)', desc:'Pracoviště vede řízení ve své instanci VITA (nebo v ISSŘ), DO na centrále kraje pracují nad dokumenty v jednotné spisové službě ÚRÚ a s dokumentací v ISSŘ; vyjádření se vrací přes spisovou službu. Ověřeno na DESÚ s integrovanou hygienou. Koordinaci mezi veřejnými zájmy systémy nepodporují.',
+     lanes:[['L1',null,'r_rup'],['L2','y6'],['L3',null,'r_ido'],['L4','y2'],['L5',null,'r_kdo']],
+     steps:[['s1','L1',0,'Požádá o vyjádření DO (dokument)','start','y4'],
+       ['s2','L2',1,'Doručí žádost úsekům DO'],
+       ['s3','L4',2,'Dokumentace k nahlédnutí v ISSŘ','step','y2'],
+       ['s4','L3',3,'Zpracuje vyjádření za svůj úsek','step','y6'],
+       ['s5','L5',4,'Koordinace mezi veřejnými zájmy mimo systémy','decision',null,null,'Systémy koordinaci nepodporují – např. sdílený dokument; lhůty a rozpory sledovat mimo AIS.'],
+       ['s6','L5',5,'Sestaví a podepíše koordinované vyjádření','step','y6'],
+       ['s7','L2',6,'Předá vyjádření pracovišti (č. j. ESPIS)'],
+       ['s8','L1',7,'Převezme vyjádření jako podklad','end','y4']],
      flows:[['s1','s2'],['s2','s3'],['s3','s4'],['s4','s5'],['s5','s6'],['s6','s7'],['s7','s8']]}
   ]
 };
