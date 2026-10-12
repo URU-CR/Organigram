@@ -356,7 +356,13 @@ body.view-chart .treeonly,body.view-loc .treeonly,body.view-sys .treeonly,body.v
 .box .bp{padding:4px 6px 6px;border-top:1px solid #EEF0F3;display:flex;flex-direction:column;gap:3px}
 .box .person{padding:2px 6px;font-size:11px;gap:4px;border-radius:4px;cursor:grab}
 .box .person .meta{display:none}
-.box .person.lead{border-width:2px}
+/* vedoucí: jemné, ale patrné odlišení od řadových míst (strom, diagram, lokality) */
+.person.lead{border:2px solid rgba(27,36,48,.55)}
+.person.lead .nm{font-weight:700}
+.box .person.lead{border-width:2px;box-shadow:inset 4px 0 0 rgba(27,36,48,.55)}
+.pos.head{background:linear-gradient(90deg,#EEF2FA,transparent 70%);border-radius:6px;box-shadow:inset 3px 0 0 var(--accent)}
+.pos.head .plabel{color:var(--ink);font-weight:700;padding-left:6px}
+.pos.head .plabel .t{font-weight:700}
 .box .free{font-size:11px;color:#9AA5B3;padding:1px 6px;border:1px dashed var(--line);border-radius:4px}
 .box.sekce{width:230px}.box.sekce .bn{font-size:13px}
 .box.predseda{width:260px}
