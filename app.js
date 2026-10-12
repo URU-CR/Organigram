@@ -1,4 +1,4 @@
-const APP_VERSION='2026-10-12.3';
+const APP_VERSION='2026-10-12.4';
 
 const STRUCTURE = window.STRUCTURE;
 const SOURCES = ['DESÚ','MMR','ÚÚR','MD','MPO','Nové','Jiný'];
@@ -112,6 +112,9 @@ function buildRoster(units,people){
       (pos.persons||[]).forEach(pid=>{
         const person=people[pid]; if(!person) return;
         const locId=person.loc||unitLocIn(units,u);
+        // Stejná logika jako sysOf() v systemizaci: typ místa je buď explicitně nastavený (pos.typ),
+        // jinak asistentská místa jsou 'prac' (pracovní poměr), ostatní (vedoucí, referent) 'sluz'.
+        const typCode = pos.typ || (pos.kind==='asst' ? 'prac' : 'sluz');
         rows.push({
           person_id: pid,
           name: person.name||'',
@@ -119,6 +122,7 @@ function buildRoster(units,people){
           unit_path: unitPathIn(units,u).join(' / '),
           position_label: pos.label||'',
           position_kind: pos.kind||'',
+          employment_type: typCode==='sluz' ? 'Služební poměr' : 'Pracovní poměr',
           location_id: locId||null,
           location_name: locId&&LOC[locId]?LOC[locId].name:null,
           supervisor_name: supervisorNameIn(units,people,u,pid,pos.kind==='head'),
