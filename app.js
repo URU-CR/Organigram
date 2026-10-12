@@ -87,7 +87,7 @@ async function flush(){
     if(!data||!data.length){ setDot('err','konflikt verzí – načítám aktuální stav'); toast('Stav byl mezitím změněn jinde – načítám aktuální verzi.'); await loadRemote(); render(); saving=false; return; }
     version=data[0].version; setDot('', 'uloženo '+new Date().toLocaleTimeString('cs-CZ'));
     if(pendingLog.length){ const rows=pendingLog.splice(0); const r=await sb.from('organigram_log').insert(rows); if(r.error) console.warn(r.error); }
-    publishRoster();
+    publishRoster(true);
   }catch(e){ console.error(e); setDot('err','uložení selhalo: '+(e.message||e)); toast('Uložení do databáze selhalo. Zkuste to znovu, nebo použijte „Uložit stav (json)“.'); dirty=true; }
   saving=false; if(dirty){ clearTimeout(saveTimer); saveTimer=setTimeout(flush,1500); }
 }
@@ -134,7 +134,7 @@ function buildRoster(units,people){
   });
   return rows;
 }
-async function publishRoster(){
+async function publishRoster(silent){
   if(!sb) return;
   try{
     const units = isKraj()?state.krUnits:state.units;
@@ -142,7 +142,15 @@ async function publishRoster(){
     const del = await sb.from('organigram_roster').delete().not('person_id','is',null);
     if(del.error) throw del.error;
     if(rows.length){ const ins = await sb.from('organigram_roster').insert(rows); if(ins.error) throw ins.error; }
-  }catch(e){ console.warn('publikace seznamu osob (organigram_roster) selhala', e); }
+  }catch(e){
+    console.warn('publikace seznamu osob (organigram_roster) selhala', e);
+    // Po automatické publikaci (při každém uložení) chybu jen logujeme, ať nezahltí uživatele toastem
+    // při každém uložení stavu. Při ručním kliknutí na „Publikovat seznam osob“ (silent=false) ji ale
+    // musíme probublat nahoru, jinak appka tiše smaže starý seznam a nenahraje nový beze stopy (viz.
+    // incident s chybějícím sloupcem employment_type — delete proběhl, insert selhal, tabulka zůstala
+    // prázdná a uživatel přesto viděl „publikováno ✓“).
+    if(!silent) throw e;
+  }
 }
 async function loadRemote(){
   const {data,error}=await sb.from('organigram_state').select('data,version').eq('id',STATE_ID).maybeSingle();
