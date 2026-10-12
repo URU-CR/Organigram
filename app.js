@@ -1,4 +1,4 @@
-const APP_VERSION='2026-10-12.4';
+const APP_VERSION='2026-10-12.5';
 
 const STRUCTURE = window.STRUCTURE;
 const SOURCES = ['DESÚ','MMR','ÚÚR','MD','MPO','Nové','Jiný'];
@@ -1078,4 +1078,51 @@ async function start(){
     if(payload.new&&payload.new.version>version&&!dirty&&!saving){ const v=state.view,z=state.zoom,c=state.collapsed; state=forceCr(payload.new.data); version=payload.new.version; state.view=v; state.zoom=z; state.collapsed=c; render(); toast('Stav aktualizován z jiného okna.'); } }).subscribe();
   window.addEventListener('beforeunload',e=>{ if(dirty||saving){ flush(); e.preventDefault(); e.returnValue=''; } });
 }
+/* ====== NÁPOVĚDA ======
+   Vysouvá se zleva (tlačítko „? Nápověda“ nebo klávesa ?). Obsah je ručně udržovaný v poli HELP níže.
+   KAŽDOU NOVOU FUNKCI NEBO ZMĚNU CHOVÁNÍ DOPLNIT SEM (a zvýšit APP_VERSION + ?v= v index.html). */
+const HELP=[
+ {g:'Začínáme',items:[
+  ['🔐','Přihlášení a role','Přihlašujete se e-mailem (odkaz nebo heslo). Podle role vidíte různé možnosti: <b>správce</b> upravuje vše, <b>IT</b> upravuje jen IT vybavení, <b>personální</b> pracuje s lidmi (nahrávání, umisťování, úpravy osob), ale nemění strukturu. Role se zobrazuje vedle e-mailu vpravo nahoře.'],
+  ['💾','Ukládání','Změny se ukládají automaticky do databáze. Více lidí může pracovat současně – cizí změny se načtou samy, pokud nemáte rozdělanou vlastní úpravu. Při zavření okna s neuloženou změnou vás prohlížeč upozorní.'],
+  ['↶','Zpět / Znovu','Tlačítka ↶ a ↷ nebo <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd> vrací a opakují poslední úpravy.'],
+  ['❓','Nápověda','Otevře se tlačítkem <b>? Nápověda</b> nebo klávesou <kbd>?</kbd>, zavře <kbd>Esc</kbd>. Políčko nahoře filtruje témata.']]},
+ {g:'Pohledy',items:[
+  ['🌳','Strom','Základní pohled: sekce → odbory → oddělení → útvary s jednotlivými místy a lidmi. Skupiny lze sbalovat a rozbalovat.'],
+  ['🗺️','Diagram','Grafický organigram vybraného útvaru. Kořen vyberete v rozbalovací nabídce, velikost posuvníkem <b>Zvětšení</b>.'],
+  ['📍','Lokality','Rozdělení lidí podle pracovišť. Osobu přetažením přesunete do jiné lokality.'],
+  ['📊','Systemizace','Návrh systemizace služebních a pracovních míst (včetně platových tříd a stupňů řízení) podle formuláře MV. <b>Pozor:</b> výchozí platové třídy jsou orientační a je nutné je ověřit.'],
+  ['💻','IT','Přehled a úpravy IT vybavení osob (dostupné správci a roli IT).'],
+  ['🏛️','ÚRÚ ČR / Krajské ÚRÚ','Přepínač organizace nahoře. Role personální pracuje jen s ÚRÚ ČR.']]},
+ {g:'Lidé a místa',items:[
+  ['🧑','Vedoucí a řadová místa','Vedoucí místa jsou ve stromu i diagramu graficky odlišena od řadových (zvýrazněný proužek a tučné jméno).'],
+  ['➕','Obsazení a umístění osoby','Kliknutím na osobu nebo místo otevřete popover: změna úvazku, kategorie, třídy, lokality, přesun na jiné místo nebo uvolnění. Kapacita místa se hlídá podle úvazků (FTE).'],
+  ['🟥','Kritická obsazenost','Posuvník <b>Kritické</b> zvýrazní útvary s obsazeností v daném intervalu.'],
+  ['🔎','Hledání','Pole nahoře hledá napříč vším – jméno, útvar i číslo místa. Kliknutím na výsledek se na položku přeskočí.']]},
+ {g:'Úpravy struktury',items:[
+  ['✏️','Upravit strukturu','Tlačítko zapne úpravy ve stromu: přejmenování útvarů, přidávání a rušení, počty míst a přesuny. Dostupné správci.'],
+  ['🗑️','Vymazat vše','Vrátí prázdný organigram. Před použitím si uložte stav do JSON; operaci lze vrátit tlačítkem Zpět.']]},
+ {g:'Import a export',items:[
+  ['📥','Nahrát Excel s lidmi','Načte seznam osob z .xlsx/.csv a přiřadí je k místům. Sloupce se mapují podle hlaviček.'],
+  ['📤','Exporty (xlsx)','<b>Exportovat obsazení</b>, <b>Volná místa</b> (pro personální oddělení) a <b>Systemizace</b> (formulář MV).'],
+  ['🗂️','Uložit / Načíst stav (json)','Záloha celého organigramu do souboru a její obnovení.']]},
+ {g:'Propojení s Onboardingem',items:[
+  ['📡','Publikovat seznam osob','Seznam obsazených osob (včetně vedoucí pozice, platové třídy a stupně řízení) se do tabulky pro Onboarding zapisuje <b>automaticky při každém uložení</b>. Tlačítko <b>Publikovat seznam osob</b> ho přepočítá ručně a ukáže případnou chybu.']]},
+ {g:'Historie a prezentace',items:[
+  ['🕘','Historie','Záznam, kdo a kdy co změnil.'],
+  ['📈','Přehled','Souhrnné počty a obsazenost.'],
+  ['🖥️','Prezentace','Režim vhodný pro promítání bez ovládacích prvků.']]}
+];
+const hd=document.createElement('div');hd.id='help';document.body.appendChild(hd);
+function openHelp(){hd.classList.toggle('open');if(hd.classList.contains('open')){renderHelp('');setTimeout(()=>{const i=$('#hq');if(i)i.focus()},0)}}
+function renderHelp(q){q=(q||'').trim().toLowerCase();const strip=h=>h.replace(/<[^>]+>/g,' ').toLowerCase();
+ let h=`<div class="hh"><b>Nápověda</b><span class="hint">verze ${APP_VERSION}</span><span class="sp"></span><button data-hx title="Zavřít">✕</button></div><div class="hs"><input id="hq" placeholder="Hledat… (název funkce, slovo)" value="${esc(q)}" autocomplete="off"></div><div class="hb">`;
+ for(const g of HELP){const items=g.items.filter(([i,t,d])=>!q||(t+' '+strip(d)).toLowerCase().includes(q));if(!items.length)continue;
+  h+=`<details ${q?'open':''}><summary>${esc(g.g)} <span class="hint">${items.length}</span></summary>${items.map(([i,t,d])=>`<div class="hi"><span class="ic">${i}</span><div><b>${esc(t)}</b><p>${d}</p></div></div>`).join('')}</details>`}
+ h+=`</div>`;hd.innerHTML=h;const inp=$('#hq');inp.addEventListener('input',()=>{const v=inp.value,pos=inp.selectionStart;renderHelp(v);const i2=$('#hq');i2.focus();i2.setSelectionRange(pos,pos)})}
+hd.addEventListener('click',e=>{if(e.target.closest('[data-hx]'))hd.classList.remove('open')});
+document.addEventListener('keydown',e=>{if(e.key==='?'&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)&&!$('dialog[open]')){e.preventDefault();openHelp()}
+ if(e.key==='Escape'&&hd.classList.contains('open')&&!$('dialog[open]'))hd.classList.remove('open')});
+document.addEventListener('click',e=>{if(e.target.closest('#btnHelp'))openHelp()});
+
 load(); boot();
