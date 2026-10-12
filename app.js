@@ -1,4 +1,4 @@
-const APP_VERSION='2026-10-12.1';
+const APP_VERSION='2026-10-12.2';
 
 const STRUCTURE = window.STRUCTURE;
 const SOURCES = ['DESÚ','MMR','ÚÚR','MD','MPO','Nové','Jiný'];
@@ -87,10 +87,59 @@ async function flush(){
     if(!data||!data.length){ setDot('err','konflikt verzí – načítám aktuální stav'); toast('Stav byl mezitím změněn jinde – načítám aktuální verzi.'); await loadRemote(); render(); saving=false; return; }
     version=data[0].version; setDot('', 'uloženo '+new Date().toLocaleTimeString('cs-CZ'));
     if(pendingLog.length){ const rows=pendingLog.splice(0); const r=await sb.from('organigram_log').insert(rows); if(r.error) console.warn(r.error); }
+    publishRoster();
   }catch(e){ console.error(e); setDot('err','uložení selhalo: '+(e.message||e)); toast('Uložení do databáze selhalo. Zkuste to znovu, nebo použijte „Uložit stav (json)“.'); dirty=true; }
   saving=false; if(dirty){ clearTimeout(saveTimer); saveTimer=setTimeout(flush,1500); }
 }
 function logChange(action,detail){ pendingLog.push({user_email:currentUser?currentUser.email:null,action,detail}); }
+// ---------- publikace zjednodušeného seznamu osob (pro onboarding) ----------
+// Vždy publikuje ÚRÚ ČR (ne krajský pracovní prostor) bez ohledu na to, co má admin právě rozkliknuté.
+function unitPathIn(units,u){ const m=Object.fromEntries(units.map(x=>[x.id,x])); const out=[]; let c=u; while(c){ out.unshift(c.name); c=m[c.parent]; } return out; }
+function unitLocIn(units,u){ const m=Object.fromEntries(units.map(x=>[x.id,x])); let c=u; while(c){ if(c.loc) return c.loc; c=m[c.parent]; } return null; }
+function supervisorNameIn(units,people,u,selfPersonId,isHead){
+  const m=Object.fromEntries(units.map(x=>[x.id,x])); let c=isHead?m[u.parent]:u;
+  while(c){
+    const headPos=(c.positions||[]).find(p=>p.kind==='head'&&(p.persons||[]).some(pid=>pid!==selfPersonId&&people[pid]));
+    if(headPos){ const pid=headPos.persons.find(pid=>pid!==selfPersonId&&people[pid]); if(pid) return people[pid].name||''; }
+    c=m[c.parent];
+  }
+  return '';
+}
+function buildRoster(units,people){
+  const rows=[];
+  (units||[]).forEach(u=>{
+    (u.positions||[]).forEach(pos=>{
+      (pos.persons||[]).forEach(pid=>{
+        const person=people[pid]; if(!person) return;
+        const locId=person.loc||unitLocIn(units,u);
+        rows.push({
+          person_id: pid,
+          name: person.name||'',
+          src: person.src||'',
+          unit_path: unitPathIn(units,u).join(' / '),
+          position_label: pos.label||'',
+          position_kind: pos.kind||'',
+          location_id: locId||null,
+          location_name: locId&&LOC[locId]?LOC[locId].name:null,
+          supervisor_name: supervisorNameIn(units,people,u,pid,pos.kind==='head'),
+          fte: personFte(person),
+          updated_at: new Date().toISOString()
+        });
+      });
+    });
+  });
+  return rows;
+}
+async function publishRoster(){
+  if(!sb) return;
+  try{
+    const units = isKraj()?state.krUnits:state.units;
+    const rows = buildRoster(units||[], state.people||{});
+    const del = await sb.from('organigram_roster').delete().not('person_id','is',null);
+    if(del.error) throw del.error;
+    if(rows.length){ const ins = await sb.from('organigram_roster').insert(rows); if(ins.error) throw ins.error; }
+  }catch(e){ console.warn('publikace seznamu osob (organigram_roster) selhala', e); }
+}
 async function loadRemote(){
   const {data,error}=await sb.from('organigram_state').select('data,version').eq('id',STATE_ID).maybeSingle();
   if(error) throw error;
