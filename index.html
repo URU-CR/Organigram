@@ -147,6 +147,9 @@ body.presenting .gsearch{display:none}
 body.role-it .adm,body.role-it #vwTree,body.role-it #vwSys,body.role-it .box .bopen,body.role-it .addpos,body.role-it .pos .del,body.role-it #btnAddPerson{display:none!important}
 body.role-it .person{cursor:default}
 body.role-it select.locsel{pointer-events:none;opacity:.7;border-color:transparent;background:transparent}
+/* role personalista: smí přidávat/nahrávat/upravovat osoby a umísťovat je; nesmí měnit organizační strukturu ani lokality */
+body.role-personalista .adm,body.role-personalista #wsKr,body.role-personalista #vwSys,body.role-personalista #vwIT,body.role-personalista .addpos,body.role-personalista .pos .del{display:none!important}
+body.role-personalista select.locsel{pointer-events:none;opacity:.7;border-color:transparent;background:transparent}
 /* IT view */
 #itview{overflow:auto;padding:0 0 60px;display:none;background:#fff}
 body.view-it #tree{display:none} body.view-it #itview{display:block}
@@ -486,8 +489,8 @@ table.ov td.z{color:#B6BEC9}
 
 <script src="vendor/xlsx.full.min.js"></script>
 <script src="vendor/supabase.js"></script>
-<script src="config.js?v=2026-10-05.3"></script>
-<script src="structure.js?v=2026-10-05.3"></script>
-<script src="app.js?v=2026-10-05.3"></script>
+<script src="config.js?v=2026-10-12.1"></script>
+<script src="structure.js?v=2026-10-12.1"></script>
+<script src="app.js?v=2026-10-12.1"></script>
 </body
 </html>
