@@ -1,4 +1,4 @@
-const APP_VERSION='2026-10-12.2';
+const APP_VERSION='2026-10-12.3';
 
 const STRUCTURE = window.STRUCTURE;
 const SOURCES = ['DESÚ','MMR','ÚÚR','MD','MPO','Nové','Jiný'];
@@ -618,6 +618,7 @@ $('#btnExport').onclick=()=>{
   XLSX.writeFile(wb,`URU_obsazeni_${stamp()}.xlsx`);
 };
 $('#btnSave').onclick=()=>download(new Blob([JSON.stringify(state,null,1)],{type:'application/json'}),`URU_obsazeni_${stamp()}.json`);
+$('#btnPublishRoster').onclick=async()=>{ const b=$('#btnPublishRoster'); const t=b.textContent; b.disabled=true; b.textContent='Publikuji…'; try{ await publishRoster(); toast('Seznam osob publikován do organigram_roster.'); }catch(e){ alert('Publikace se nezdařila: '+(e.message||e)); } b.disabled=false; b.textContent=t; };
 $('#btnLoad').onclick=()=>$('#fileJson').click();
 $('#fileJson').onchange=async e=>{const f=e.target.files[0];if(!f)return;e.target.value='';
   try{const s=JSON.parse(await f.text()); if(!s.units||!s.people) throw new Error('neplatný formát'); state=forceCr(s); const mg=migrateActive(state); logChange('načtení','stav nahrazen ze souboru '+f.name); save(); render(); toast('Stav načten.'); reportMigration(mg); toast('Stav načten.');}catch(err){alert('Soubor se nepodařilo načíst: '+err.message);}};
