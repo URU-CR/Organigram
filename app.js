@@ -1,4 +1,4 @@
-const APP_VERSION='2026-10-12.5';
+const APP_VERSION='2026-10-12.6';
 
 const STRUCTURE = window.STRUCTURE;
 const SOURCES = ['DESÚ','MMR','ÚÚR','MD','MPO','Nové','Jiný'];
@@ -1086,6 +1086,7 @@ const HELP=[
   ['🔐','Přihlášení a role','Přihlašujete se e-mailem (odkaz nebo heslo). Podle role vidíte různé možnosti: <b>správce</b> upravuje vše, <b>IT</b> upravuje jen IT vybavení, <b>personální</b> pracuje s lidmi (nahrávání, umisťování, úpravy osob), ale nemění strukturu. Role se zobrazuje vedle e-mailu vpravo nahoře.'],
   ['💾','Ukládání','Změny se ukládají automaticky do databáze. Více lidí může pracovat současně – cizí změny se načtou samy, pokud nemáte rozdělanou vlastní úpravu. Při zavření okna s neuloženou změnou vás prohlížeč upozorní.'],
   ['↶','Zpět / Znovu','Tlačítka ↶ a ↷ nebo <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd> vrací a opakují poslední úpravy.'],
+  ['☰','Lišta s nástroji','Tlačítka akcí (úpravy, import, exporty, historie…) a posuvníky <b>Zvětšení</b> a <b>Kritické</b> jsou ve výchozím stavu sbalené. Rozbalíte je tlačítkem <b>☰ Nástroje</b> vpravo nahoře; volba se v prohlížeči pamatuje. Nápověda a Odhlásit zůstávají vždy vidět.'],
   ['❓','Nápověda','Otevře se tlačítkem <b>? Nápověda</b> nebo klávesou <kbd>?</kbd>, zavře <kbd>Esc</kbd>. Políčko nahoře filtruje témata.']]},
  {g:'Pohledy',items:[
   ['🌳','Strom','Základní pohled: sekce → odbory → oddělení → útvary s jednotlivými místy a lidmi. Skupiny lze sbalovat a rozbalovat.'],
@@ -1124,5 +1125,13 @@ hd.addEventListener('click',e=>{if(e.target.closest('[data-hx]'))hd.classList.re
 document.addEventListener('keydown',e=>{if(e.key==='?'&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)&&!$('dialog[open]')){e.preventDefault();openHelp()}
  if(e.key==='Escape'&&hd.classList.contains('open')&&!$('dialog[open]'))hd.classList.remove('open')});
 document.addEventListener('click',e=>{if(e.target.closest('#btnHelp'))openHelp()});
+
+/* Lišta s tlačítky a posuvníky: ve výchozím stavu sbalená, volba se pamatuje v prohlížeči */
+(function(){
+  let c=true; try{ if(localStorage.getItem('organigram:bar')==='open') c=false; }catch(e){}
+  const apply=()=>{ document.body.classList.toggle('bar-collapsed',c); const b=$('#btnBar'); if(b) b.setAttribute('aria-pressed',String(!c)); };
+  apply();
+  document.addEventListener('click',e=>{ if(e.target.closest('#btnBar')){ c=!c; apply(); try{ localStorage.setItem('organigram:bar',c?'closed':'open'); }catch(_){} } });
+})();
 
 load(); boot();

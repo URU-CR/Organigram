@@ -43,7 +43,10 @@ body.presenting header h1 .apps{display:none}
 .stat span{color:var(--muted);font-size:12px;margin-left:4px}
 .legend{display:flex;gap:8px;flex-wrap:wrap;font-size:12px}
 .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px;margin-right:4px;border:1px solid rgba(0,0,0,.15)}
-.actions{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+.barfix{margin-left:auto;display:flex;gap:6px}
+body.bar-collapsed header .actions,body.bar-collapsed header .zoom{display:none!important}
+#btnBar[aria-pressed=true]{background:var(--ink);color:#fff}
+.actions{display:flex;gap:6px;flex-wrap:wrap}
 
 /* layout */
 main{flex:1;display:grid;grid-template-columns:1fr 330px;min-height:0}
@@ -432,6 +435,7 @@ table.ov td.z{color:#B6BEC9}
   <select id="chartRoot" hidden title="který organigram zobrazit"></select>
   <span class="zoom" id="zoomWrap" hidden>Zvětšení <input type="range" id="zoom" min="50" max="120" value="85"> <span id="zoomVal">85 %</span></span>
   <span class="zoom" id="critWrap" hidden title="Zvýrazní útvary s obsazeností v daném intervalu">Kritické <input type="range" class="crit" id="crit" min="0" max="3" step="1" value="0" list="critTicks"> <span id="critVal">vypnuto</span><datalist id="critTicks"><option value="0"></option><option value="1"></option><option value="2"></option><option value="3"></option></datalist></span>
+  <div class="barfix"><button id="btnBar" title="Zobrazit / skrýt lištu s tlačítky a posuvníky">☰ Nástroje</button><button id="btnHelp" title="Nápověda (klávesa ?)">? Nápověda</button><button id="btnLogout">Odhlásit</button></div>
   <div class="actions">
     <button id="btnEdit" class="adm" title="Zapne úpravy struktury ve stromu: přejmenování, přidávání a rušení útvarů, počty míst, přesuny">Upravit strukturu</button>
     <button id="btnImport" class="primary">Nahrát Excel s lidmi</button>
@@ -447,9 +451,7 @@ table.ov td.z{color:#B6BEC9}
     <button id="btnLog">Historie</button>
     <button id="btnPresent">Prezentace</button>
     <button id="btnReset" class="adm" title="Vrátí prázdný organigram">Vymazat vše</button>
-    <button id="btnHelp" title="Nápověda (klávesa ?)">? Nápověda</button>
-    <button id="btnLogout">Odhlásit</button>
-    <input type="file" id="fileXlsx" accept=".xlsx,.xlsm,.xls,.csv" hidden>
+        <input type="file" id="fileXlsx" accept=".xlsx,.xlsm,.xls,.csv" hidden>
     <input type="file" id="fileJson" accept=".json" hidden>
   </div>
 </header>
@@ -522,8 +524,8 @@ table.ov td.z{color:#B6BEC9}
 
 <script src="vendor/xlsx.full.min.js"></script>
 <script src="vendor/supabase.js"></script>
-<script src="config.js?v=2026-10-12.5"></script>
-<script src="structure.js?v=2026-10-12.5"></script>
-<script src="app.js?v=2026-10-12.5"></script>
+<script src="config.js?v=2026-10-12.6"></script>
+<script src="structure.js?v=2026-10-12.6"></script>
+<script src="app.js?v=2026-10-12.6"></script>
 </body
 </html>
