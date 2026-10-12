@@ -123,6 +123,8 @@ function buildRoster(units,people){
           position_label: pos.label||'',
           position_kind: pos.kind||'',
           employment_type: typCode==='sluz' ? 'Služební poměr' : 'Pracovní poměr',
+          pay_grade: sysOf(u,pos).cls||null,
+          management_level: stupen(u,pos)||null,
           location_id: locId||null,
           location_name: locId&&LOC[locId]?LOC[locId].name:null,
           supervisor_name: supervisorNameIn(units,people,u,pid,pos.kind==='head'),
@@ -253,12 +255,12 @@ function renderUnit(u){
 
   const body=document.createElement('div'); body.className='ubody';
   u.positions.forEach(p=>{
-    const row=document.createElement('div'); row.className='pos'; row.dataset.pid=p.id;
+    const row=document.createElement('div'); row.className='pos'+(p.kind==='head'?' head':''); row.dataset.pid=p.id;
     const lab=document.createElement('div'); lab.className='plabel';
     lab.innerHTML=`<span class="cat ${p.cat==='nad'?'nad':''}" title="${p.cat==='nad'?'nadpožadavek (nové místo)':'delimitace'}"></span><span class="t" title="Dvojklik: přejmenovat">${esc(p.label)}</span>${(()=>{const c=sysOf(u,p).cls;return c?`<span class="clsb" title="platová třída místa">${c}</span>`:'';})()}`;
     lab.querySelector('.t').ondblclick=()=>{const n=prompt('Označení místa:',p.label);if(n!==null&&n.trim()){p.label=n.trim();save();render();}};
     const slot=document.createElement('div'); const cap=posCap(u,p), free=posFree(u,p); slot.className='slot'+(p.persons.length?' filled':'')+(free<-0.005?' overb':'');
-    posPersons(p).forEach(id=>slot.appendChild(personChip(state.people[id])));
+    posPersons(p).forEach(id=>{ const ch=personChip(state.people[id]); if(p.kind==='head') ch.classList.add('lead'); slot.appendChild(ch); });
     if(!p.persons.length) slot.innerHTML=`<span class="empty">volné místo${cap!==1?' ('+fmtF(cap)+' úv.)':''}</span>`;
     else if(free>0.005){ const e=document.createElement('span'); e.className='empty'; e.textContent='volných '+fmtF(free)+' úv.'; slot.appendChild(e); }
     else if(free<-0.005){ const e=document.createElement('span'); e.className='empty ov'; e.textContent='překročeno o '+fmtF(-free)+' úv.'; slot.appendChild(e); }
