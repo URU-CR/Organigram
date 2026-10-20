@@ -1,4 +1,4 @@
-const APP_VERSION='2026-10-12.6';
+const APP_VERSION='2026-10-20.1';
 
 const STRUCTURE = window.STRUCTURE;
 const SOURCES = ['DESÚ','MMR','ÚÚR','MD','MPO','Nové','Jiný'];
@@ -57,7 +57,7 @@ let pidCounter = 1;
 function freshState(){
   let n=1;
   return { structureVersion:STRUCTURE_VERSION, ws:'cr', krUnits:[],
-    units: STRUCTURE.map(u=>({...u, loc:guessUnitLoc(u.name), positions:u.positions.map(p=>({id:'p'+(n++), ...p, person:null}))})),
+    units: STRUCTURE.map(u=>({...u, loc:u.loc||guessUnitLoc(u.name), positions:u.positions.map(p=>({id:'p'+(n++), ...p, person:null}))})),
     people:{}, collapsed:{}, nextPid:1
   };
 }
@@ -160,6 +160,8 @@ async function loadRemote(){
   if(data&&data.data&&data.data.units){ state=forceCr(data.data); version=data.version||0; }
   else { state=freshState(); version=0; const r=await sb.from('organigram_state').upsert({id:STATE_ID,data:state,version:0,updated_by:currentUser.email}); if(r.error) throw r.error; }
   state.view=state.view||'tree'; if(!state.zoom) state.zoom=85;
+  if(data&&data.data&&(state.structureVersion||1)<STRUCTURE_VERSION){ // záloha stavu před aktualizací struktury (řádek main-zaloha-vN)
+    try{ const r=await sb.from('organigram_state').upsert({id:STATE_ID+'-zaloha-v'+(state.structureVersion||1),data:JSON.parse(JSON.stringify(state)),version:0,updated_by:currentUser.email}); if(r.error) console.warn('záloha',r.error); }catch(e){ console.warn('záloha',e); } }
   const mg=migrateActive(state); markBaseline(); if(mg){ logChange('aktualizace struktury','organigram v'+STRUCTURE_VERSION); persist(); setTimeout(()=>reportMigration(mg),300); }
   try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){}
 }
@@ -171,14 +173,15 @@ function unitPath(u){ const m=Object.fromEntries(allUnitsBoth().map(x=>[x.id,x])
 
 
 // ---------- structure versioning / migration ----------
-const STRUCTURE_VERSION = 4; // 4 = organigram ÚRÚ z 1. 10. 2026 (říjen)
+const STRUCTURE_VERSION = 5; // 5 = schválená systemizace od 1. 1. 2027 (organigram + migrační data ISoSS, Ext. ID OJ)
+const STRUCTURE_LABEL = 'schválenou systemizaci od 1. 1. 2027';
 const RENAMES = {
   'Odbor stavebně správní':'Odbor odvolací a přezkumné agendy I','Odbor odvolací a přezkumné agendy':'Odbor odvolací a přezkumné agendy I',
   'Oddělení územně a stavebně správní I':'Oddělení odvolací a přezkumné agendy I','Oddělení územně a stavebně správní II':'Oddělení odvolací a přezkumné agendy II','Oddělení územně a stavebně správní III':'Oddělení odvolací a přezkumné agendy III',
   'Místopředseda – sekce legislativní, metodická a ochrany veřejných zájmů':'Vrchní ředitel sekce – sekce metodická, legislativní a ochrany veřejných zájmů',
   'Místopředseda – sekce vyhrazených staveb':'Vrchní ředitel sekce – sekce vyhrazených staveb',
   'Odbor pořizování územně plánovací dokumentace':'Odbor zpracování územně plánovací dokumentace',
-  'Odbor metodiky územního plánování a rozvoje':'Odbor plánování a správy NGÚP',
+  'Odbor metodiky územního plánování a rozvoje':'Odbor územního plánování','Odbor plánování a správy NGÚP':'Odbor územního plánování',
   'Oddělení koncepční a metodické':'Samostatné oddělení koncepční a metodické',
   'Odbor legislativní a právní':'Odbor legislativní','Oddělení legislativní':'Oddělení národní legislativy','Oddělení právní (zastupování před soudy)':'Samostatné oddělení právní',
   'Oddělení staveb pro bydlení ???Plzeň/ČB':'Oddělení staveb pro bydlení Plzeň/ČB','Samostatné oddělení odvolacích řízení - dopravní stavby':'Samostatné oddělení odvolacích řízení – dopravní stavby','Samostatné oddělení odvolacích řízení - energetické stavby':'Samostatné oddělení odvolacích řízení – energetické stavby',
@@ -193,27 +196,38 @@ function reconcilePositions(oldPos,tplPos,newId){
 function migrateStructure(st){
   st.units.forEach(u=>u.positions.forEach(p=>{ if(!Array.isArray(p.persons)){ const d=Object.getOwnPropertyDescriptor(p,'person'); p.persons=(d&&!d.get&&d.value)?[d.value]:[]; if(d&&!d.get) delete p.person; } }));
   if((st.structureVersion||1)>=STRUCTURE_VERSION) return null;
-  const oldByName={}; st.units.forEach(u=>oldByName[RENAMES[u.name]||u.name]=u);
-  let n=1; const usedOld=new Set(); const newUnits=STRUCTURE.map(tpl=>{
+  const tplNames=new Set(STRUCTURE.map(t=>t.name)); const oldByName={}; st.units.forEach(u=>{ const k=tplNames.has(u.name)?u.name:(RENAMES[u.name]||u.name); if(!oldByName[k]||tplNames.has(u.name)) oldByName[k]=u; });
+  let n=1, extra=0; const usedOld=new Set(); const newUnits=STRUCTURE.map(tpl=>{
     const old=oldByName[tpl.name];
-    if(old){ usedOld.add(old); const pos=reconcilePositions(old.positions,tpl.positions,()=>'p'+Date.now().toString(36)+(n++)); return {...tpl, loc:old.loc||guessUnitLoc(tpl.name), positions:pos}; }
-    return {...tpl, loc:guessUnitLoc(tpl.name), positions:tpl.positions.map(p=>({id:'p'+Date.now().toString(36)+(n++), ...p, person:null}))};
+    if(old){ usedOld.add(old); const pos=reconcilePositions(old.positions,tpl.positions,()=>'p'+Date.now().toString(36)+(n++)); extra+=applySysTpl(pos,tpl.positions,st); return {...tpl, loc:old.loc||tpl.loc||guessUnitLoc(tpl.name), positions:pos}; }
+    return {...tpl, loc:tpl.loc||guessUnitLoc(tpl.name), positions:tpl.positions.map(p=>({id:'p'+Date.now().toString(36)+(n++), ...p, person:null}))};
   });
   const removed=st.units.filter(u=>!usedOld.has(u)); const freed=[];
   removed.forEach(u=>u.positions.forEach(p=>(p.persons||[]).forEach(id=>{ if(st.people[id]) freed.push(st.people[id].name); })));
   const added=STRUCTURE.filter(t=>!oldByName[t.name]).map(t=>t.name);
-  const renamed=st.units.filter(u=>RENAMES[u.name]).map(u=>u.name+' → '+RENAMES[u.name]);
+  const renamed=st.units.filter(u=>!tplNames.has(u.name)&&RENAMES[u.name]&&usedOld.has(u)).map(u=>u.name+' → '+RENAMES[u.name]);
   const oldTotal=st.units.reduce((a,u)=>a+u.positions.length,0);
   st.units=newUnits; st.collapsed={}; st.structureVersion=STRUCTURE_VERSION;
   const newTotal=newUnits.reduce((a,u)=>a+u.positions.length,0);
-  return {removed:removed.map(u=>u.name),added,renamed,freed,oldTotal,newTotal};
+  return {removed:removed.map(u=>u.name),added,renamed,freed,oldTotal,newTotal,extra};
 }
+// parametry systemizace z šablony (migrační data ISoSS) na místa útvaru; obsazená místa dostanou přednostně místo se stejnou platovou třídou jako osoba
+const SYS_KEYS=['extId','typ','fte','cls','obor','kod','kody','stup','utaj','sniz'];
+function applySysTpl(pos,tplPos,st){ let extra=0;
+  ['head','asst','ref'].forEach(k=>{ const P=pos.filter(p=>p.kind===k), T=tplPos.filter(p=>p.kind===k).slice(), done=new Set();
+    const take=(p,t)=>{ SYS_KEYS.forEach(f=>{ if(t&&t[f]!==undefined) p[f]=t[f]; else delete p[f]; }); if(!t){ p.mimoSys=true; extra++; } else delete p.mimoSys; done.add(p); };
+    P.filter(p=>(p.persons||[]).length).forEach(p=>{ const h=st.people&&st.people[p.persons[0]]; const pc=h?personCls(h):null; const i=pc===null?-1:T.findIndex(t=>t.cls===pc); if(i>=0) take(p,T.splice(i,1)[0]); });
+    P.filter(p=>!done.has(p)&&(p.persons||[]).length).forEach(p=>take(p,T.shift()));
+    P.filter(p=>!done.has(p)).forEach(p=>take(p,T.shift())); });
+  return extra; }
 function reportMigration(m){ if(!m) return; const parts=[];
   if(m.renamed.length) parts.push('Přejmenováno: '+m.renamed.join('; '));
   if(m.removed.length) parts.push('Zrušeno: '+m.removed.join('; ')+(m.freed.length?' (do nezařazených: '+m.freed.join(', ')+')':''));
   if(m.added.length) parts.push('Nově: '+m.added.join('; '));
   if(m.oldTotal!==undefined) parts.push(`Počet míst: ${m.oldTotal} → ${m.newTotal} (obsazená místa zůstala, volná se dorovnala na nové počty)`);
-  alert('Organigram byl aktualizován na verzi z 1. 10. 2026. Obsazení míst zůstalo zachováno.\n\n'+parts.join('\n')); }
+  if(m.extra) parts.push(`Obsazená místa nad rámec systemizace: ${m.extra} (označena „mimo systemizaci“ – osoby přesuňte na volná místa)`);
+  parts.push('Místa převzala parametry systemizace (Ext. ID místa, typ, úvazek, platová třída, obor služby, kód činností, stupeň řízení); útvary mají Ext. ID OJ.');
+  alert('Organigram byl aktualizován na '+STRUCTURE_LABEL+'. Obsazení míst zůstalo zachováno.\n\n'+parts.join('\n')); }
 
 // ---------- rendering ----------
 const $ = s=>document.querySelector(s);
@@ -242,7 +256,7 @@ function renderUnit(u){
   const head=document.createElement('div'); head.className='uhead';
   head.innerHTML=`<span class="bar" style="background:${SRC_DARK[u.src]||'#999'}"></span>
     <button class="tog" aria-label="Sbalit/rozbalit">${state.collapsed[u.id]?'▸':'▾'}</button>
-    <span class="uname" title="${u.head?'v organigramu uveden/a: '+esc(u.head):''}">${esc(u.name)}<span class="lvl">${LEVEL_LBL[u.level]||''}</span>${u.head?`<span class="lvl" style="font-style:italic">${esc(u.head)}</span>`:''}</span>
+    <span class="uname" title="${u.head?'v organigramu uveden/a: '+esc(u.head):''}">${esc(u.name)}<span class="lvl">${LEVEL_LBL[u.level]||''}</span>${u.extId?`<span class="lvl extid" title="Ext. ID organizační jednotky (ISoSS)">OJ ${esc(u.extId)}</span>`:''}${u.head?`<span class="lvl" style="font-style:italic">${esc(u.head)}</span>`:''}</span>
     <span class="srcbadge" style="background:${SRC_COLOR[u.src]}">${esc(u.src)}</span>
     <span class="fill ${filled===total&&total?'full':''}" title="obsazeno / míst · FTE obsazeno / kapacita${sub.total!==total?' (v závorce včetně podřízených)':''}">${filled}/${total}${sub.total!==total?` <span style="opacity:.7">(${sub.filled}/${sub.total})</span>`:''} <span class="ftec">${fmtF(sub.total!==total?FD.occ:F.occ)}/${fmtF(sub.total!==total?FD.cap:F.cap)}&nbsp;FTE</span></span>`;
   head.querySelector('.fill').before(locSelect(u));
@@ -362,7 +376,7 @@ function structEditor(u,div,head){
   const m=byId(); const par=m[u.parent]; const sibs=state.units.filter(x=>x.parent===u.parent); const idx=sibs.indexOf(u);
   const bar=document.createElement('div'); bar.className='sedit';
   const cnt=k=>u.positions.filter(p=>p.kind===k).length;
-  bar.innerHTML=`<button class="small" data-a="ren" title="přejmenovat">✎ název</button>
+  bar.innerHTML=`<button class="small" data-a="ren" title="přejmenovat">✎ název</button><button class="small" data-a="ext" title="Ext. ID organizační jednotky (ISoSS)">Ext. ID${u.extId?' '+esc(u.extId):''}</button>
     <select data-a="lvl" title="úroveň útvaru">${Object.entries(LEVEL_LBL).map(([k,v])=>`<option value="${k}" ${u.level===k?'selected':''}>${v}</option>`).join('')}</select>
     <select data-a="src" title="zdrojový úřad / barva">${SOURCES.filter(s=>s!=='Jiný').map(s=>`<option ${u.src===s?'selected':''}>${s}</option>`).join('')}</select>
     <span class="cnts" title="počet míst: vedoucí + asistenti + referenti (obsazená místa se neodebírají)">místa <input type="number" min="0" max="9" data-k="head" value="${cnt('head')}"> + <input type="number" min="0" max="9" data-k="asst" value="${cnt('asst')}"> + <input type="number" min="0" max="99" data-k="ref" value="${cnt('ref')}"></span>
@@ -372,6 +386,7 @@ function structEditor(u,div,head){
     <button class="small" data-a="del" style="color:var(--danger)" title="zrušit útvar včetně podřízených">× zrušit</button>`;
   const chg=(action,detail)=>{ logChange&&logChange('struktura',detail); save(); render(); };
   bar.querySelector('[data-a=ren]').onclick=()=>{ const n=prompt('Název útvaru:',u.name); if(n!==null&&n.trim()){ const o=u.name; u.name=n.trim(); chg('ren',`${o} → ${u.name}`); } };
+  bar.querySelector('[data-a=ext]').onclick=()=>{ const n=prompt('Ext. ID OJ (ISoSS):',u.extId||''); if(n===null) return; const v=n.trim(); if(v) u.extId=v; else delete u.extId; chg('ext',`${u.name}: Ext. ID OJ ${v||'–'}`); };
   bar.querySelector('[data-a=lvl]').onchange=e=>{ u.level=e.target.value; u.positions.filter(p=>p.kind==='head').forEach(p=>p.label=u.head_lbl||HEAD_LBL[u.level]); chg('lvl',`${u.name}: úroveň ${LEVEL_LBL[u.level]}`); };
   bar.querySelector('[data-a=src]').onchange=e=>{ u.src=e.target.value; chg('src',`${u.name}: zdroj ${u.src}`); };
   bar.querySelectorAll('.cnts input').forEach(inp=>inp.onchange=()=>{ const counts=['head','asst','ref'].map(k=>+bar.querySelector(`.cnts input[data-k=${k}]`).value||0);
@@ -607,7 +622,7 @@ $('#btnVacant').onclick=()=>{
   const m=byId(); const rows=[];
   for(const u of state.units){ const path=unitPath(u); const loc=unitLoc(u);
     u.positions.filter(p=>posFree(u,p)>0.005).forEach(p=>rows.push({'Volná kapacita (úv.)':posFree(u,p),'Sekce':path[1]||'', 'Odbor':u.level==='odbor'?u.name:(m[u.parent]&&m[u.parent].level==='odbor'?m[u.parent].name:''), 'Útvar':u.name,'Úroveň':LEVEL_LBL[u.level],'Lokalita':loc?LOC[loc].name:'','Místo':p.label,'Druh':KIND_LBL[p.kind],'Kategorie':p.cat==='nad'?'nadpožadavek':'delimitace','Zdroj útvaru':u.src})); }
-  const byUnit=state.units.map(u=>{const f=u.positions.filter(p=>posFree(u,p)>0.005); const loc=unitLoc(u); return {'Útvar':u.name,'Úroveň':LEVEL_LBL[u.level],'Lokalita':loc?LOC[loc].name:'','Volných míst':f.length,'Volná kapacita (úv.)':Math.round(f.reduce((a,p)=>a+posFree(u,p),0)*100)/100,'z toho vedoucí':f.filter(p=>p.kind==='head').length,'z toho delimitace':f.filter(p=>p.cat==='delim').length,'z toho nadpožadavek':f.filter(p=>p.cat==='nad').length,'Míst celkem':u.positions.length};}).filter(r=>r['Volných míst']);
+  const byUnit=state.units.map(u=>{const f=u.positions.filter(p=>posFree(u,p)>0.005); const loc=unitLoc(u); return {'Ext. ID OJ':u.extId||'','Útvar':u.name,'Úroveň':LEVEL_LBL[u.level],'Lokalita':loc?LOC[loc].name:'','Volných míst':f.length,'Volná kapacita (úv.)':Math.round(f.reduce((a,p)=>a+posFree(u,p),0)*100)/100,'z toho vedoucí':f.filter(p=>p.kind==='head').length,'z toho delimitace':f.filter(p=>p.cat==='delim').length,'z toho nadpožadavek':f.filter(p=>p.cat==='nad').length,'Míst celkem':u.positions.length};}).filter(r=>r['Volných míst']);
   const cols=[...LOCATIONS,{id:null,name:'Neurčeno'}].map(l=>{const f=rows.filter(r=>r['Lokalita']===(l.id?l.name:'')); return {'Lokalita':l.name,'Volných míst':f.length,'z toho vedoucí':f.filter(r=>r['Druh']==='vedoucí').length,'delimitace':f.filter(r=>r['Kategorie']==='delimitace').length,'nadpožadavek':f.filter(r=>r['Kategorie']==='nadpožadavek').length};}).filter(r=>r['Volných míst']);
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows.length?rows:[{'Útvar':'žádná volná místa'}]),'Volná místa');
@@ -619,12 +634,12 @@ $('#btnExport').onclick=()=>{
   const rows=[]; const m=byId();
   for(const u of state.units){ const path=unitPath(u);
     for(const p of u.positions){ const hs=posPersons(p).map(id=>state.people[id]); (hs.length?hs:[null]).forEach(h=>{
-      rows.push({'Sekce':path[1]||'', 'Odbor':u.level==='odbor'?u.name:(m[u.parent]&&m[u.parent].level==='odbor'?m[u.parent].name:''), 'Útvar':u.name,'Úroveň':LEVEL_LBL[u.level],'Zdroj útvaru':u.src,
+      rows.push({'Ext. ID OJ':u.extId||'','Ext. ID místa':p.extId||'','Sekce':path[1]||'', 'Odbor':u.level==='odbor'?u.name:(m[u.parent]&&m[u.parent].level==='odbor'?m[u.parent].name:''), 'Útvar':u.name,'Úroveň':LEVEL_LBL[u.level],'Zdroj útvaru':u.src,
         'Místo':p.label,'Druh':KIND_LBL[p.kind],'Kategorie místa':p.cat==='nad'?'nadpožadavek':'delimitace',
         'Lokalita':(()=>{const l=h?personLoc(h).id:unitLoc(u);return l?LOC[l].name:'';})(),'Jméno':h?h.name:'','Zdrojový úřad':h?h.src:'','Současný útvar':h?h.unit:'','Současné označení místa':h?h.role:'','Číslo místa':h?h.posId:'','Kategorie':h?h.cat:'','Obory služby':h?h.fields:'','Platová třída':h?h.cls:'','Úvazek':h?personFte(h):'','Kapacita místa (úv.)':posCap(u,p),'Poznámka':h?h.note:''}); }); } }
   const assigned=new Set(allPositions().flatMap(x=>x.p.persons));
   const un=Object.values(state.people).filter(p=>!assigned.has(p.id)).map(p=>({'Jméno':p.name,'Lokalita':p.loc?LOC[p.loc].name:'','Zdrojový úřad':p.src,'Současný útvar':p.unit,'Označení místa':p.role,'Číslo místa':p.posId,'Kategorie':p.cat,'Obory služby':p.fields,'Platová třída':p.cls,'Úvazek':p.fte,'Poznámka':p.note}));
-  const sum=state.units.map(u=>({'Útvar':u.name,'Úroveň':LEVEL_LBL[u.level],'Zdroj':u.src,'Míst':u.positions.length,'Obsazeno':u.positions.filter(p=>p.persons.length).length,'Volných':u.positions.filter(p=>!p.persons.length).length,'z toho nadpožadavek volných':u.positions.filter(p=>!p.persons.length&&p.cat==='nad').length,'FTE obsazeno':Math.round(unitFte(u,false).occ*100)/100,'FTE kapacita':Math.round(unitFte(u,false).cap*100)/100}));
+  const sum=state.units.map(u=>({'Ext. ID OJ':u.extId||'','Útvar':u.name,'Úroveň':LEVEL_LBL[u.level],'Zdroj':u.src,'Míst':u.positions.length,'Obsazeno':u.positions.filter(p=>p.persons.length).length,'Volných':u.positions.filter(p=>!p.persons.length).length,'z toho nadpožadavek volných':u.positions.filter(p=>!p.persons.length&&p.cat==='nad').length,'FTE obsazeno':Math.round(unitFte(u,false).occ*100)/100,'FTE kapacita':Math.round(unitFte(u,false).cap*100)/100}));
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'Obsazení');
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(un.length?un:[{'Jméno':''}]),'Nezařazení');
@@ -873,7 +888,7 @@ function exportIT(){ const cat=catById();
   XLSX.writeFile(wb,`URU_IT_vybaveni_${stamp()}.xlsx`); }
 // ---------- systemizace ----------
 const SYS_TYP={sluz:'služební',prac:'pracovní'};
-function stupen(u,p){ if(p.kind!=='head') return 0; return {predseda:isKraj()?3:4,sekce:3,odbor:2,odd:1,up:1}[u.level]||0; }
+function stupen(u,p){ if(p.stup!==undefined&&p.stup!==null&&p.stup!=='') return +p.stup||0; if(p.kind!=='head') return 0; return {predseda:isKraj()?3:4,sekce:3,odbor:2,odd:1,up:1}[u.level]||0; }
 function defaultOzn(u,p){ if(p.kind==='asst') return 'ORef/VRef'; if(p.kind==='ref') return 'ORa';
   return {predseda:'vedoucí služebního úřadu',sekce:'VRa/'+p.label+'/'+u.name.replace(/^(Místopředseda|Vrchní ředitel sekce) – /,''),odbor:'VRa/ředitel odboru/'+u.name.replace(/^Odbor /,'odbor '),odd:'ORa/vedoucí oddělení/'+u.name.replace(/^(Samostatné )?[Oo]ddělení /,m=>m.toLowerCase()),up:'ORa/vedoucí územního pracoviště/'+u.name.replace(/^Územní pracoviště /,'')}[u.level]||p.label; }
 function defaultCls(u,p){ if(p.kind==='asst') return 9; if(p.kind==='ref') return 13; return {predseda:isKraj()?15:16,sekce:15,odbor:14,odd:13,up:13}[u.level]||13; }
@@ -888,9 +903,9 @@ function renderSys(){
   const c=$('#sysview'); const st=c.scrollTop; c.innerHTML='<div style="padding:20px;color:var(--muted)">Sestavuji tabulku…</div>';
   const all=sysRows(); const q=sysFilter.q.toLowerCase();
   const rows=all.filter(r=>(!q||unitPath(r.u).join(' ').toLowerCase().includes(q)||r.sys.ozn.toLowerCase().includes(q))&&(!sysFilter.free||posFree(r.u,r.p)>0.005)&&(!sysFilter.mis||clsMismatch(r.u,r.p)));
-  const sluz=all.filter(r=>r.sys.typ==='sluz').length, prac=all.length-sluz, mis=all.filter(r=>clsMismatch(r.u,r.p)).length, fte=all.reduce((a,r)=>a+(+r.sys.fte||0),0);
+  const sluz=all.filter(r=>r.sys.typ==='sluz').length, prac=all.length-sluz, mimo=all.filter(r=>r.p.mimoSys).length, mis=all.filter(r=>clsMismatch(r.u,r.p)).length, fte=all.reduce((a,r)=>a+(+r.sys.fte||0),0);
   const bar=document.createElement('div'); bar.className='sysbar';
-  bar.innerHTML=`<span class="sum"><b>${all.length}</b> míst · <b>${sluz}</b> služebních · <b>${prac}</b> pracovních · úvazky <b>${fte.toLocaleString('cs-CZ')}</b>${mis?` · <b style="color:var(--danger)">${mis}</b> nesoulad tříd`:''}</span>
+  bar.innerHTML=`<span class="sum"><b>${all.length}</b> míst · <b>${sluz}</b> služebních · <b>${prac}</b> pracovních · úvazky <b>${fte.toLocaleString('cs-CZ')}</b>${mis?` · <b style="color:var(--danger)">${mis}</b> nesoulad tříd`:''}${mimo?` · <b style="color:var(--danger)">${mimo}</b> mimo systemizaci`:''}</span>
     <input type="search" id="sysQ" placeholder="filtr útvaru / označení…" value="${esc(sysFilter.q)}" style="width:220px">
     <label><input type="checkbox" id="sysFree" ${sysFilter.free?'checked':''}> jen neobsazená</label>
     <label><input type="checkbox" id="sysMis" ${sysFilter.mis?'checked':''}> jen nesoulad třídy</label>
@@ -900,29 +915,29 @@ function renderSys(){
       <input type="text" id="bkVal" placeholder="hodnota" style="width:120px"><button class="small primary" id="bkApply">Nastavit</button><button class="small" id="bkClear">Zrušit výběr</button></div>`;
   c.appendChild(bar);
   const t=document.createElement('table'); t.className='sys';
-  t.innerHTML=`<thead><tr><th></th><th>#</th><th title="stupeň řízení (4 = vedoucí úřadu … 1 = vedoucí oddělení)">St.</th><th>Typ</th><th style="min-width:260px">Funkční a služební označení</th><th>Úvazek</th><th>Obor služby</th><th>Kód činn.</th><th>Odb. pož.</th><th>Tř.</th><th title="požadavek na státní občanství ČR">Obč.</th><th title="zákaz konkurence">Z.k.</th><th>Zánik</th><th>Obsazeno</th></tr></thead>`;
+  t.innerHTML=`<thead><tr><th></th><th>#</th><th title="Ext. ID služebního/pracovního místa (ISoSS)">Ext. ID</th><th title="stupeň řízení (4 = vedoucí úřadu … 1 = vedoucí oddělení)">St.</th><th>Typ</th><th style="min-width:260px">Funkční a služební označení</th><th>Úvazek</th><th>Obor služby</th><th>Kód činn.</th><th>Odb. pož.</th><th>Tř.</th><th title="požadavek na státní občanství ČR">Obč.</th><th title="zákaz konkurence">Z.k.</th><th>Zánik</th><th>Obsazeno</th></tr></thead>`;
   const tb=document.createElement('tbody'); let lastU=null, lastClicked=null; const visIds=rows.map(r=>r.p.id);
   const bind=(el,r,field,conv)=>{ el.onchange=()=>{ let v=conv?conv(el):el.value; if(v===''||v===null||v===undefined) delete r.p[field]; else r.p[field]=v; logChange&&logChange('systemizace',`${r.u.name} / ${r.sys.ozn}: ${field} = ${v}`); save(); render(); }; };
   rows.forEach(r=>{
     if(r.u!==lastU){ lastU=r.u; const tr=document.createElement('tr'); tr.className='ug'; const uid=r.u.id;
       const ids=rows.filter(x=>x.u===r.u).map(x=>x.p.id); const allSel=ids.every(i=>sysSel.has(i));
-      tr.innerHTML=`<td><input type="checkbox" ${allSel?'checked':''} title="vybrat celý útvar"></td><td colspan="13"><span class="bar" style="background:${SRC_DARK[r.u.src]}"></span>${esc(unitPath(r.u).slice(1).join(' › ')||r.u.name)}<span class="lv">${LEVEL_LBL[r.u.level]} · ${r.u.positions.length} míst · ${esc(r.u.src)}</span></td>`;
+      tr.innerHTML=`<td><input type="checkbox" ${allSel?'checked':''} title="vybrat celý útvar"></td><td colspan="14"><span class="bar" style="background:${SRC_DARK[r.u.src]}"></span>${esc(unitPath(r.u).slice(1).join(' › ')||r.u.name)}<span class="lv">${LEVEL_LBL[r.u.level]} · ${r.u.positions.length} míst · ${esc(r.u.src)}${r.u.extId?' · Ext. ID OJ '+esc(r.u.extId):''}</span></td>`;
       tr.querySelector('input').onchange=e=>{ ids.forEach(i=>e.target.checked?sysSel.add(i):sysSel.delete(i)); renderSys(); };
       tb.appendChild(tr); }
     const tr=document.createElement('tr'); const S=r.sys; const mis=clsMismatch(r.u,r.p); tr.className=(sysSel.has(r.p.id)?'sel ':'')+(r.p.cat==='nad'?'nad ':'')+(mis?'mis':''); tr.dataset.pid=r.p.id;
     const hs=posPersons(r.p).map(id=>state.people[id]); const h=hs[0]||null; const stp=stupen(r.u,r.p);
-    tr.innerHTML=`<td><input type="checkbox" ${sysSel.has(r.p.id)?'checked':''}></td><td class="num">${r.n}</td><td class="st">${stp?`<b>${stp}</b>`:'ost.'}</td>
+    tr.innerHTML=`<td><input type="checkbox" ${sysSel.has(r.p.id)?'checked':''}></td><td class="num">${r.n}</td><td><input type="text" value="${esc(r.p.extId||'')}" style="width:84px" title="${r.p.mimoSys?'místo mimo systemizaci':'Ext. ID místa'}"${r.p.mimoSys?' placeholder="mimo syst."':''}></td><td class="st">${stp?`<b>${stp}</b>`:'ost.'}</td>
       <td><select><option value="sluz" ${S.typ==='sluz'?'selected':''}>služ.</option><option value="prac" ${S.typ==='prac'?'selected':''}>prac.</option></select></td>
       <td><input type="text" value="${esc(S.ozn)}" title="${esc(r.p.label)} · ${r.p.cat==='nad'?'nadpožadavek':'delimitace'}"></td>
       <td><input type="number" step="0.1" min="0" max="1" value="${S.fte}"></td>
       <td><input type="text" value="${esc(S.obor)}" placeholder="např. 41, 63" style="width:90px"></td>
-      <td><input type="text" value="${esc(S.kod)}" placeholder="1.00.13" style="width:70px"></td>
+      <td><input type="text" value="${esc(S.kod)}" placeholder="2.37.14.01" style="width:100px" title="${esc((r.p.kody||[]).join(' | ')||S.kod)}"></td>
       <td><input type="text" value="${esc(S.odb)}" style="width:110px"></td>
       <td class="cls"><input type="number" min="1" max="16" value="${S.cls}"></td>
       <td><input type="checkbox" ${S.obc?'checked':''}></td><td><input type="checkbox" ${S.zk?'checked':''}></td>
       <td><input type="date" value="${esc(S.zanik)}" style="width:125px"></td>
       <td class="who ${mis?'mis':''}">${hs.length?hs.map(x=>`<span class="pc">${esc(x.name)}</span> <span class="m">${esc(x.src)}${x.cls?' · tř. '+esc(x.cls):''}${personFte(x)!==1?' · úv. '+fmtF(personFte(x)):''}</span>`).join('<br>')+(posFree(r.u,r.p)>0.005?` <span class="m">(volných ${fmtF(posFree(r.u,r.p))} úv.)</span>`:''):'<span class="m">volné</span>'}</td>`;
-    const [chk,sel,ozn,fte,obor,kod,odb,cls,obc,zk,zanik]=tr.querySelectorAll('input,select');
+    const [chk,ext,sel,ozn,fte,obor,kod,odb,cls,obc,zk,zanik]=tr.querySelectorAll('input,select'); bind(ext,r,'extId',e=>e.value.trim());
     chk.onclick=e=>{ if(e.shiftKey&&lastClicked){ const a=visIds.indexOf(lastClicked),b=visIds.indexOf(r.p.id); const [lo,hi]=[Math.min(a,b),Math.max(a,b)]; for(let i=lo;i<=hi;i++) chk.checked?sysSel.add(visIds[i]):sysSel.delete(visIds[i]); } else { chk.checked?sysSel.add(r.p.id):sysSel.delete(r.p.id); } lastClicked=r.p.id; renderSys(); };
     bind(sel,r,'typ'); bind(ozn,r,'ozn',e=>e.value.trim()); bind(fte,r,'fte',e=>e.value===''?'':Math.max(0,Math.min(1,+e.value))); bind(obor,r,'obor',e=>e.value.trim()); bind(kod,r,'kod',e=>e.value.trim()); bind(odb,r,'odb',e=>e.value.trim());
     bind(cls,r,'cls',e=>e.value===''?'':parseInt(e.value)); bind(obc,r,'obc',e=>e.checked); bind(zk,r,'zk',e=>e.checked); bind(zanik,r,'zanik');
@@ -965,7 +980,7 @@ $('#btnSys').onclick=()=>{
   ws['!cols']=[4.3,5.7,5.7,5.7,5.7,5.5,46,5.2,4.7,6.2,8,7.7,12.7,6.5,5.8,6,6.5,3.8,6,5.8,10].map(w=>({wch:w}));
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Systemizace');
   // second sheet: same data with unit names, for work
-  const flat=sysRows().map(r=>{const hs=posPersons(r.p).map(id=>state.people[id]); const h=hs.length?{name:hs.map(x=>x.name).join('; '),src:[...new Set(hs.map(x=>x.src))].join('; '),cls:hs.map(x=>x.cls||'').join('; '),fte:Math.round(hs.reduce((a,x)=>a+personFte(x),0)*100)/100,id:hs[0].id,loc:hs[0].loc}:null; return {'Pořad. č.':r.n,'Sekce':unitPath(r.u)[1]||'','Útvar':r.u.name,'Stupeň řízení':stupen(r.u,r.p)||'','Typ':SYS_TYP[r.sys.typ],'Funkční označení':r.sys.ozn,'Úvazek':+r.sys.fte,'Obor služby':r.sys.obor,'Kód činností':r.sys.kod,'Odb. požadavky':r.sys.odb,'Platová třída':r.sys.cls,'Občanství ČR':r.sys.obc?'ano':'','Zákaz konkurence':r.sys.zk?'ano':'','Datum zániku':r.sys.zanik,'Kategorie':r.p.cat==='nad'?'nadpožadavek':'delimitace','Lokalita':(()=>{const l=h?personLoc(h).id:unitLoc(r.u);return l?LOC[l].name:'';})(),'Obsazeno':h?h.name:'','Zdrojový úřad':h?h.src:'','Třída zaměstnance':h?h.cls:''};});
+  const flat=sysRows().map(r=>{const hs=posPersons(r.p).map(id=>state.people[id]); const h=hs.length?{name:hs.map(x=>x.name).join('; '),src:[...new Set(hs.map(x=>x.src))].join('; '),cls:hs.map(x=>x.cls||'').join('; '),fte:Math.round(hs.reduce((a,x)=>a+personFte(x),0)*100)/100,id:hs[0].id,loc:hs[0].loc}:null; return {'Pořad. č.':r.n,'Ext. ID OJ':r.u.extId||'','Ext. ID místa':r.p.extId||(r.p.mimoSys?'mimo systemizaci':''),'Sekce':unitPath(r.u)[1]||'','Útvar':r.u.name,'Stupeň řízení':stupen(r.u,r.p)||'','Typ':SYS_TYP[r.sys.typ],'Funkční označení':r.sys.ozn,'Úvazek':+r.sys.fte,'Obor služby':r.sys.obor,'Kód činností':r.sys.kod,'Odb. požadavky':r.sys.odb,'Platová třída':r.sys.cls,'Občanství ČR':r.sys.obc?'ano':'','Zákaz konkurence':r.sys.zk?'ano':'','Datum zániku':r.sys.zanik,'Kategorie':r.p.cat==='nad'?'nadpožadavek':'delimitace','Lokalita':(()=>{const l=h?personLoc(h).id:unitLoc(r.u);return l?LOC[l].name:'';})(),'Obsazeno':h?h.name:'','Zdrojový úřad':h?h.src:'','Třída zaměstnance':h?h.cls:''};});
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(flat),'Podle útvarů');
   XLSX.writeFile(wb,`URU_systemizace_${stamp()}.xlsx`);
 };
@@ -1092,7 +1107,8 @@ const HELP=[
   ['🌳','Strom','Základní pohled: sekce → odbory → oddělení → útvary s jednotlivými místy a lidmi. Skupiny lze sbalovat a rozbalovat.'],
   ['🗺️','Diagram','Grafický organigram vybraného útvaru. Kořen vyberete v rozbalovací nabídce, velikost posuvníkem <b>Zvětšení</b>.'],
   ['📍','Lokality','Rozdělení lidí podle pracovišť. Osobu přetažením přesunete do jiné lokality.'],
-  ['📊','Systemizace','Návrh systemizace služebních a pracovních míst (včetně platových tříd a stupňů řízení) podle formuláře MV. <b>Pozor:</b> výchozí platové třídy jsou orientační a je nutné je ověřit.'],
+  ['📊','Systemizace','Systemizace služebních a pracovních míst podle formuláře MV. Od verze 2026-10-20 odpovídá <b>schválené systemizaci od 1. 1. 2027</b> (404 míst: 361 služebních, 43 pracovních) – místa mají z migračních dat ISoSS <b>Ext. ID místa</b>, typ, úvazek, platovou třídu, obor služby, kód činností a stupeň řízení. Místo obsazené nad rámec systemizace je označeno „mimo systemizaci“.'],
+  ['🔢','Ext. ID OJ','Útvary mají číslo <b>Ext. ID OJ</b> z ISoSS – zobrazuje se ve stromu u názvu, v Systemizaci a v exportech. V režimu <b>Upravit strukturu</b> ho změníte tlačítkem <b>Ext. ID</b>.'],
   ['💻','IT','Přehled a úpravy IT vybavení osob (dostupné správci a roli IT).'],
   ['🏛️','ÚRÚ ČR / Krajské ÚRÚ','Přepínač organizace nahoře. Role personální pracuje jen s ÚRÚ ČR.']]},
  {g:'Lidé a místa',items:[

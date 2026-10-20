@@ -48,6 +48,12 @@ přihlásit do onboardingu.
 - **Uložit stav (json)** je záloha mimo databázi – doporučuji občas stáhnout.
 
 ## Aktualizace organizační struktury
-Změní-li se organigram, upravte `structure.js` (nebo mi pošlete nový dokument a soubor vygeneruji).
-Nová struktura se použije jen po **Vymazat vše**; do té doby běží uložený stav. Drobné změny
-(přidat/odebrat místo, přejmenovat) jdou dělat přímo v aplikaci.
+Struktura je v `structure.js` (útvary s Ext. ID OJ a místa s parametry systemizace). Při změně se zvýší
+`STRUCTURE_VERSION` v `app.js` a uložený stav se při prvním načtení převede: obsazení míst zůstane,
+volná místa se dorovnají na nové počty a místa převezmou parametry systemizace (Ext. ID místa, typ,
+úvazek, platová třída, obor služby, kód činností, stupeň řízení). Před převodem se stav zazálohuje
+do řádku `main-zaloha-vN` v tabulce `organigram_state`. Drobné změny (přidat/odebrat místo,
+přejmenovat, Ext. ID OJ) jdou dělat přímo v aplikaci.
+
+Verze 5 (20. 10. 2026) = schválená systemizace od 1. 1. 2027: organigram + migrační data ISoSS
+(404 míst, 361 služebních, 43 pracovních).
