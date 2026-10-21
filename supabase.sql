@@ -78,3 +78,15 @@ create policy "roster: anon read" on organigram_roster
   for select to anon using (true);
 create policy "roster: authenticated full access" on organigram_roster
   for all to authenticated using (true) with check (true);
+
+-- 6) Explicitní oprávnění pro Data API (supabase-js / PostgREST)
+--    Od 30. 10. 2026 Supabase u nově založených tabulek ve schématu public už nepřiděluje přístup
+--    automaticky. Stávající tabulky to nemění; tento blok je potřeba při založení nového projektu,
+--    obnově schématu nebo na preview větvi. Spuštění na existujícím projektu nic nerozbije.
+--    Kdo co smí, dál určují RLS politiky výše; anon dostává jen čtení organigram_roster (onboarding).
+grant select, insert, update, delete on public.organigram_state  to authenticated, service_role;
+grant select, insert, update, delete on public.organigram_log    to authenticated, service_role;
+grant select, insert, update, delete on public.organigram_roles  to authenticated, service_role;
+grant select, insert, update, delete on public.organigram_roster to authenticated, service_role;
+grant select on public.organigram_roster to anon;
+grant usage, select on all sequences in schema public to authenticated, service_role;
