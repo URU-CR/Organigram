@@ -1,6 +1,6 @@
 // Krajské ÚRÚ – organigram soustavy (2028). Samostatná aplikace, data v organigram_state.id='kraje'.
 // Organigram ÚRÚ ČR (řádek 'main') se odsud pouze jednou čte při prvním spuštění (převzetí rozpracovaných krajů).
-const APP_VERSION='2026-11-16.3';
+const APP_VERSION='2026-11-16.4';
 const APP_ID='kraje';
 
 const SOURCES = ['Obec','KÚ','ÚRÚ','Nové','Jiný'];
@@ -46,7 +46,7 @@ const CR_STATE_ID = 'main'; // organigram ÚRÚ ČR – jen ke čtení
 
 // ---------- state ----------
 
-const ROLE={name:'admin',org:true};  // org = úpravy organigramu/lidí (role 'it' má v krajích jen čtení)
+const ROLE={name:'admin',org:false,canOrg:false};  // org = úpravy organigramu/lidí (role 'it' má v krajích jen čtení)
 let state = null;   // {units:[{id,parent,name,level,src,positions:[{id,kind,label,cat,person}]}], people:{id:{...}}, collapsed:{}}
 let people = {};    // id -> person
 let pidCounter = 1;
@@ -111,13 +111,13 @@ function save(){
   updateUndoBtns(); persist();
 }
 function applySnap(j){ const o=JSON.parse(j); restoring=true; state.units=o.units||[]; state.people=o.people; state.nextPid=o.nextPid; baseline=snap(); restoring=false; persist(); render(); }
-function undo(){ if(!undoStack.length) return; redoStack.push(snap()); applySnap(undoStack.pop()); logChange&&logChange('zpět','vrácena poslední změna'); toast('Změna vrácena'); updateUndoBtns(); }
-function redo(){ if(!redoStack.length) return; undoStack.push(snap()); applySnap(redoStack.pop()); logChange&&logChange('znovu','obnovena vrácená změna'); updateUndoBtns(); }
+function undo(){ if(!ROLE.org||!undoStack.length) return; redoStack.push(snap()); applySnap(undoStack.pop()); logChange&&logChange('zpět','vrácena poslední změna'); toast('Změna vrácena'); updateUndoBtns(); }
+function redo(){ if(!ROLE.org||!redoStack.length) return; undoStack.push(snap()); applySnap(redoStack.pop()); logChange&&logChange('znovu','obnovena vrácená změna'); updateUndoBtns(); }
 function updateUndoBtns(){ const u=$('#btnUndo'),r=$('#btnRedo'); if(u){u.disabled=!undoStack.length; r.disabled=!redoStack.length;} }
 document.addEventListener('keydown',e=>{ const t=e.target; if(t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.tagName==='SELECT')) return; if(document.querySelector('dialog[open]')) return;
   if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key.toLowerCase()==='z'){e.preventDefault();undo();} else if((e.ctrlKey||e.metaKey)&&(e.key.toLowerCase()==='y'||(e.shiftKey&&e.key.toLowerCase()==='z'))){e.preventDefault();redo();} });
 // ---------- persistence: Supabase (single shared state row) ----------
-let sb=null, currentUser=null, version=0, saveTimer=null, saving=false, dirty=false, pendingLog=[];
+let accessToken=null; let sb=null, currentUser=null, version=0, saveTimer=null, saving=false, dirty=false, pendingLog=[];
 function setDot(cls,title){ const d=$('#syncDot'); d.className='dot '+(cls||''); d.title=title||''; }
 async function flush(){
   if(!sb||!currentUser||saving||!dirty) return; saving=true; dirty=false;
@@ -127,7 +127,7 @@ async function flush(){
     if(!data||!data.length){ setDot('err','konflikt verzí – načítám aktuální stav'); toast('Stav byl mezitím změněn jinde – načítám aktuální verzi.'); await loadRemote(); render(); saving=false; return; }
     version=data[0].version; setDot('', 'uloženo '+new Date().toLocaleTimeString('cs-CZ'));
     if(pendingLog.length){ const rows=pendingLog.splice(0); const r=await sb.from('organigram_log').insert(rows); if(r.error) console.warn(r.error); }
-  }catch(e){ console.error(e); setDot('err','uložení selhalo: '+(e.message||e)); toast('Uložení do databáze selhalo. Zkuste to znovu, nebo použijte „Uložit stav (json)“.'); dirty=true; }
+  }catch(e){ console.error(e); if(/právě upravuje/i.test(e.message||'')){ saving=false; dirty=false; toast('Organigram mezitím převzal k úpravám jiný uživatel – vaše poslední změna se neuložila.'); setEditing(false,true); await loadRemote(); render(); return; } setDot('err','uložení selhalo: '+(e.message||e)); toast('Uložení do databáze selhalo. Zkuste to znovu, nebo použijte „Uložit stav (json)“.'); dirty=true; }
   saving=false; if(dirty){ clearTimeout(saveTimer); saveTimer=setTimeout(flush,1500); }
 }
 function logChange(action,detail){ pendingLog.push({app:logApp(),user_email:currentUser?currentUser.email:null,action,detail}); }
@@ -369,7 +369,27 @@ function openCloneDialog(root){ const dlg=$('#dlgClone'); const existing=new Set
   $('#cloneAll').onclick=()=>$('#cloneList').querySelectorAll('input:not(:disabled)').forEach(i=>i.checked=true);
   $('#cloneOk').onclick=()=>{ const sel=[...$('#cloneList').querySelectorAll('input:checked')].map(i=>i.value); if(!sel.length) return; let n=0; sel.forEach(k=>{ state.units.push(...cloneSubtree(root.id,state.units,k)); n++; }); dlg.close(); logChange&&logChange('struktura',`vzor zkopírován do ${n} krajů`); save(); render(); toast(`Vytvořeno ${n} krajských ÚRÚ.`); };
   $('#cloneCancel').onclick=()=>dlg.close(); dlg.showModal(); }
-$('#btnEdit').onclick=()=>{ editing=!editing; document.body.classList.toggle('editing',editing); $('#btnEdit').classList.toggle('on',editing); if(editing&&state.view!=='tree') setView('tree'); else render(); };
+// ---------- zámek úprav: upravovat smí vždy jen jeden uživatel (tlačítko Upravit; vyprší 3 min bez obnovení) ----------
+const LOCK={by:null,at:null,stale:true,mine:false}; let lockBeat=null, lockPoll=null, lastAct=Date.now(); const IDLE_MS=20*60*1000;
+async function lockCall(action){ try{ const {data,error}=await sb.rpc('organigram_lock',{p_id:STATE_ID,p_action:action}); if(error) throw error; const r=(data&&data[0])||{};
+    LOCK.by=r.lock_by||null; LOCK.at=r.lock_at||null; LOCK.stale=!!r.stale||!r.lock_by; LOCK.mine=!LOCK.stale&&!!LOCK.by&&LOCK.by.toLowerCase()===(currentUser.email||'').toLowerCase(); }
+  catch(e){ console.warn('zámek',e); } showLock(); return LOCK.mine; }
+function lockedByOther(){ return !!LOCK.by&&!LOCK.stale&&!LOCK.mine; }
+function showLock(){ const el=$('#lockInfo'); if(!el) return; const t=LOCK.at?new Date(LOCK.at).toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit'}):'';
+  if(editing&&LOCK.mine){ el.textContent='✎ upravujete vy – ostatní mají jen náhled'; el.className='lockinfo mine'; }
+  else if(lockedByOther()){ el.textContent='🔒 upravuje '+LOCK.by+(t?' (od '+t+')':'')+' – zatím jen náhled'; el.className='lockinfo other'; }
+  else { el.textContent=''; el.className='lockinfo'; }
+  const b=$('#btnEdit'); if(b){ b.textContent=editing?'Ukončit úpravy':'Upravit'; b.classList.toggle('on',editing); } }
+function applyEditFlags(){ ROLE.org=!!ROLE.canOrg&&editing; document.body.classList.toggle('editing',editing); document.body.classList.toggle('view-only',!ROLE.org); }
+async function setEditing(on,silent){
+  if(on){ if(!ROLE.canOrg) return; let ok=await lockCall('acquire');
+    if(!ok&&lockedByOther()&&ROLE.name!=='kraj'&&ROLE.name!=='it'&&confirm(`Organigram právě upravuje ${LOCK.by}. Převzít úpravy? (Jeho neuložené změny se mohou ztratit.)`)) ok=await lockCall('force');
+    if(!ok){ if(!silent) toast(lockedByOther()?`Organigram právě upravuje ${LOCK.by} – zkuste to později.`:'Úpravy se nepodařilo zahájit.'); return; }
+    await loadRemote(); editing=true; lastAct=Date.now(); clearInterval(lockBeat); lockBeat=setInterval(async()=>{ if(Date.now()-lastAct>IDLE_MS){ toast('Úpravy ukončeny po 20 minutách nečinnosti.'); setEditing(false); return; } const still=await lockCall('acquire'); if(!still){ toast('Úpravy převzal jiný uživatel.'); setEditing(false,true); await loadRemote(); render(); } },60000);
+  } else { const was=editing; editing=false; clearInterval(lockBeat); if(was){ await flush(); await lockCall('release'); } }
+  applyEditFlags(); showLock(); render(); }
+['mousedown','keydown','touchstart'].forEach(ev=>document.addEventListener(ev,()=>{ lastAct=Date.now(); },{passive:true}));
+$('#btnEdit').onclick=()=>setEditing(!editing);
 // ---------- úvazky / vícenásobné obsazení ----------
 const fmtF=v=>(+v).toLocaleString('cs-CZ',{maximumFractionDigits:2});
 function personFte(h){ const v=parseFloat(String(h&&h.fte!==undefined&&h.fte!==''?h.fte:'1').replace(',','.')); return isNaN(v)||v<=0?1:Math.min(v,1); }
@@ -638,7 +658,7 @@ let chartFresh=true;
 const CRIT_STEPS=[null,25,50,75]; let critLevel=0;
 function isCrit(u){ const v=CRIT_STEPS[critLevel]; if(!v) return false; const c=childrenOf(u.id).length?subtreeCount(u):{total:u.positions.length,filled:u.positions.filter(p=>p.person).length}; if(!c.total) return false; return 100*c.filled/c.total<=v; }
 $('#crit').oninput=()=>{ critLevel=+$('#crit').value; const v=CRIT_STEPS[critLevel]; $('#critVal').textContent=v?`obsazeno 0–${v} %`:'vypnuto'; document.body.classList.toggle('critmode',!!v); render(); };
-function setView(v){ if(!['tree','chart','loc'].includes(v)) v='tree'; if(editing&&v!=='tree'){ editing=false; document.body.classList.remove('editing'); $('#btnEdit').classList.remove('on'); } state.view=v; if(v==='chart') chartFresh=true; document.body.classList.toggle('view-chart',v==='chart'); document.body.classList.toggle('view-loc',v==='loc'); document.body.classList.toggle('view-sys',v==='sys');
+function setView(v){ if(!['tree','chart','loc'].includes(v)) v='tree'; state.view=v; if(v==='chart') chartFresh=true; document.body.classList.toggle('view-chart',v==='chart'); document.body.classList.toggle('view-loc',v==='loc'); document.body.classList.toggle('view-sys',v==='sys');
   $('#vwTree').classList.toggle('on',!['chart','loc','sys','it'].includes(v)); $('#vwSys').classList.toggle('on',v==='sys'); $('#vwChart').classList.toggle('on',v==='chart'); $('#vwLoc').classList.toggle('on',v==='loc'); $('#zoomWrap').hidden=v!=='chart'; $('#critWrap').hidden=v!=='chart'; render(); }
 $('#vwTree').onclick=()=>setView('tree'); $('#vwChart').onclick=()=>setView('chart'); $('#vwLoc').onclick=()=>setView('loc'); $('#vwSys').onclick=()=>setView('sys');
 $('#zoom').oninput=()=>{ state.zoom=+$('#zoom').value; $('#zoomVal').textContent=state.zoom+' %'; const oc=$('#chart .oc'); if(oc) oc.style.transform='scale('+state.zoom/100+')'; };
@@ -887,27 +907,28 @@ async function boot(){
   if(!window.supabase||!window.CONFIG||!/^https:\/\/[a-z0-9-]+\.supabase\.co/.test(String(CONFIG.SUPABASE_URL).trim())){ $('#authMsg').className='msg err'; $('#authMsg').textContent='Aplikace není nakonfigurována – doplňte config.js.'; return; }
   const url=String(CONFIG.SUPABASE_URL).trim().replace(/\/(rest|auth|storage|realtime)\/v1.*$/,'').replace(/\/+$/,'');
   const key=String(CONFIG.SUPABASE_ANON_KEY).trim();
-  sb=supabase.createClient(url,key);
+  sb=supabase.createClient(url,key); sb.auth.onAuthStateChange((ev,ses)=>{ accessToken=ses&&ses.access_token||accessToken; });
   $('#authBtn').onclick=async()=>{ const email=$('#authMail').value.trim(); const pass=$('#authPass').value; if(!email) return; $('#authMsg').className='msg'; $('#authMsg').textContent=pass?'Přihlašuji…':'Odesílám odkaz…';
     if(pass){ const {error}=await sb.auth.signInWithPassword({email,password:pass});
       if(error){ $('#authMsg').className='msg err'; $('#authMsg').textContent='Nepodařilo se: '+(error.message==='Invalid login credentials'?'nesprávný e-mail nebo heslo':error.message); } return; }
     const {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin+location.pathname,shouldCreateUser:false}});
     if(error){ $('#authMsg').className='msg err'; $('#authMsg').textContent='Nepodařilo se: '+(error.message.includes('rate limit')?'vyčerpán hodinový limit odeslaných e-mailů – zkuste to později, nebo se přihlaste heslem':error.message); } else { $('#authMsg').textContent='Hotovo – zkontrolujte e-mail a klikněte na odkaz.'; } };
   ['#authMail','#authPass'].forEach(id=>$(id).addEventListener('keydown',e=>{ if(e.key==='Enter') $('#authBtn').click(); }));
-  $('#btnLogout').onclick=async()=>{ await flush(); await sb.auth.signOut(); location.reload(); };
+  $('#btnLogout').onclick=async()=>{ await flush(); if(editing) await lockCall('release'); await sb.auth.signOut(); location.reload(); };
   sb.auth.onAuthStateChange(async(ev,session)=>{ if(session&&!currentUser){ currentUser=session.user; await start(); } });
-  const {data:{session}}=await sb.auth.getSession();
+  const {data:{session}}=await sb.auth.getSession(); if(session) accessToken=session.access_token;
   if(session){ currentUser=session.user; await start(); }
 }
 async function loadRole(){
   try{ const {data,error}=await sb.from('organigram_roles').select('role,scope').eq('email',(currentUser.email||'').toLowerCase()).maybeSingle(); if(error) throw error;
-    const r=(data&&data.role)||'admin'; ROLE.name=r; ROLE.org=r==='admin'||r==='kraj';
+    const r=(data&&data.role)||'admin'; ROLE.name=r; ROLE.canOrg=r==='admin'||r==='kraj';
     if(r==='kraj'){ ROLE.scope=data.scope; if(!SHARED_WS[data.scope]) throw new Error('neznámý rozsah přístupu'); STATE_ID=data.scope; LS_KEY='uru-kraje-v1-'+data.scope; }
-  }catch(e){ console.warn('role',e); if(ROLE.name==='kraj'){ ROLE.org=false; } else { ROLE.name='admin'; ROLE.org=true; } }
+  }catch(e){ console.warn('role',e); if(ROLE.name==='kraj'){ ROLE.canOrg=false; } else { ROLE.name='admin'; ROLE.canOrg=true; } }
+  applyEditFlags();
   document.body.classList.toggle('ws-shared',isShared()); document.body.classList.toggle('role-kraj',ROLE.name==='kraj');
   { const t=$('#wsTitle'); if(t) t.textContent=isShared()?'sdílený organigram '+SHARED_WS[STATE_ID].title:''; }
-  document.body.classList.toggle('role-ro',!ROLE.org);
-  $('#userMail').textContent=currentUser.email+(!ROLE.org?' · jen čtení':'');
+  document.body.classList.toggle('role-ro',!ROLE.canOrg);
+  $('#userMail').textContent=currentUser.email+(!ROLE.canOrg?' · jen čtení':'');
 }
 async function start(){
   $('#userMail').textContent=currentUser.email; $('#btnUndo').onclick=undo; $('#btnRedo').onclick=redo;
@@ -916,8 +937,12 @@ async function start(){
   $('#auth').style.display='none';
   $('#zoom').value=state.zoom; $('#zoomVal').textContent=state.zoom+' %';
   document.body.classList.toggle('ws-kr',isKraj()); { const vr=state.units.find(u=>!u.parent&&u.vzor)||state.units.find(u=>!u.parent); if(vr) state.chartRoot=vr.id; } setView('chart'); setDot('','připojeno');
+  await lockCall('status'); clearInterval(lockPoll); lockPoll=setInterval(()=>{ if(!editing) lockCall('status'); },30000);
   sb.channel('organigram-'+STATE_ID).on('postgres_changes',{event:'UPDATE',schema:'public',table:'organigram_state',filter:'id=eq.'+STATE_ID},payload=>{
+    if(payload.new&&'lock_by' in payload.new&&!editing) lockCall('status');
     if(payload.new&&payload.new.version>version&&!dirty&&!saving){ const v=state.view,z=state.zoom,c=state.collapsed; state=payload.new.data; migrateActive(state); version=payload.new.version; state.view=v; state.zoom=z; state.collapsed=c; render(); toast('Stav aktualizován z jiného okna.'); } }).subscribe();
   window.addEventListener('beforeunload',e=>{ if(dirty||saving){ flush(); e.preventDefault(); e.returnValue=''; } });
+  // při zavření okna uvolnit zámek úprav (best effort; jinak vyprší sám po 3 minutách)
+  window.addEventListener('pagehide',()=>{ if(!editing||!accessToken) return; try{ fetch(window.CONFIG.SUPABASE_URL+'/rest/v1/rpc/organigram_lock',{method:'POST',keepalive:true,headers:{'apikey':window.CONFIG.SUPABASE_ANON_KEY,'Authorization':'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify({p_id:STATE_ID,p_action:'release'})}); }catch(_){} });
 }
 load(); boot();

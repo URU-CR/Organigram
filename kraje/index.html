@@ -75,6 +75,12 @@ body:not(.role-ro) .uhead .uname .unote:hover{color:var(--ink);background:rgba(0
 .wssw button.on{background:var(--accent);color:#fff}
 .wssw{display:none} /* krajské ÚRÚ přesunuty do samostatné aplikace */
 #btnEdit.on{background:#FFF1C2;border-color:#E8C960}
+.lockinfo{font-size:12px;padding:3px 8px;border-radius:6px;margin-right:8px;white-space:nowrap}
+.lockinfo:empty{display:none}
+.lockinfo.mine{background:#FFF1C2;color:#7a5b00}
+.lockinfo.other{background:#FDE2E1;color:#9b1c1c;font-weight:600}
+body.view-only .adm:not(#btnEdit),body.view-only #btnImport,body.view-only #btnUndo,body.view-only #btnRedo,body.view-only .addpos,body.view-only .pos .del,body.view-only #btnAddPerson{display:none!important}
+body.view-only .person{cursor:default}
 #chartRoot{font:inherit;padding:4px 8px;border:1px solid var(--line);border-radius:6px;max-width:320px}
 #chartRoot[hidden]{display:none}
 #cloneList{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px}
@@ -398,7 +404,7 @@ table.ov td.z{color:#B6BEC9}
 <header>
   <h1>Krajské ÚRÚ<small><a class="back noscope" href="../" title="organigram ÚRÚ ČR (samostatná aplikace)">← ÚRÚ ČR</a><a class="back noscope onlyws" href="./" title="všechny kraje (hlavní krajský organigram)">← všechny kraje</a><a class="back noscope nows" href="?ws=kraj-vysocina-2" title="samostatně sdílený organigram – přístup mají i uživatelé s rolí kraj">Vysočina 2 (sdílená) →</a><b id="wsTitle" style="margin-right:8px"></b>pracovní model soustavy od roku 2028 · <span id="ver">index 2026-10-05.6</span></small></h1>
   <div class="stats" id="stats"></div>
-  <span class="user" id="user"><span class="dot" id="syncDot"></span><span id="userMail"></span></span>
+  <span class="lockinfo" id="lockInfo"></span><span class="user" id="user"><span class="dot" id="syncDot"></span><span id="userMail"></span></span>
   <div class="legend" id="legend"></div>
   <div class="gsearch"><input type="search" id="search" placeholder="Hledat – jméno, útvar, číslo místa…" autocomplete="off"><span class="cnt" id="scnt"></span><div id="sres"></div></div>
   <div class="viewsw" role="group" aria-label="Pohled"><button id="vwTree" class="on">Strom</button><button id="vwChart">Diagram</button><button id="vwLoc">Lokality</button><button id="vwSys" hidden>Systemizace</button></div><span class="treeonly"><button id="btnExpandAll" title="Rozbalit všechny útvary">▾ Rozbalit vše</button><button id="btnCollapseAll" title="Sbalit všechny útvary pod nejvyšší úrovní">▸ Sbalit vše</button></span>
@@ -406,7 +412,7 @@ table.ov td.z{color:#B6BEC9}
   <span class="zoom" id="zoomWrap" hidden>Zvětšení <input type="range" id="zoom" min="50" max="120" value="85"> <span id="zoomVal">85 %</span></span>
   <span class="zoom" id="critWrap" hidden title="Zvýrazní útvary s obsazeností v daném intervalu">Kritické <input type="range" class="crit" id="crit" min="0" max="3" step="1" value="0" list="critTicks"> <span id="critVal">vypnuto</span><datalist id="critTicks"><option value="0"></option><option value="1"></option><option value="2"></option><option value="3"></option></datalist></span>
   <div class="actions">
-    <button id="btnEdit" class="adm" title="Zapne úpravy struktury ve stromu: přejmenování, přidávání a rušení útvarů, počty míst, přesuny">Upravit strukturu</button>
+    <button id="btnEdit" class="adm" title="Zahájí úpravy (struktura i obsazení). Upravovat může vždy jen jeden uživatel – ostatní mají po tu dobu jen náhled.">Upravit</button>
     <button id="btnImport" class="primary">Nahrát Excel s lidmi</button>
     <button id="btnUndo" class="adm" title="Zpět (Ctrl+Z)" disabled>↶ Zpět</button>
     <button id="btnRedo" class="adm" title="Znovu (Ctrl+Y)" disabled>↷</button>
@@ -486,8 +492,8 @@ table.ov td.z{color:#B6BEC9}
 
 <script src="../vendor/xlsx.full.min.js"></script>
 <script src="../vendor/supabase.js"></script>
-<script src="../config.js?v=2026-11-16.3"></script>
-<script src="template.js?v=2026-11-16.3"></script>
-<script src="app.js?v=2026-11-16.3"></script>
+<script src="../config.js?v=2026-11-16.4"></script>
+<script src="template.js?v=2026-11-16.4"></script>
+<script src="app.js?v=2026-11-16.4"></script>
 </body
 </html>

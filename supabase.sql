@@ -126,3 +126,40 @@ create policy "roles: authenticated read (bez omezení)" on organigram_roles for
 drop policy if exists "roster: authenticated full access" on organigram_roster;
 create policy "roster: authenticated full access (bez omezení)" on organigram_roster for all to authenticated
   using (private.uru_scope() is null) with check (private.uru_scope() is null);
+
+-- 8) Zámek úprav (krajská aplikace): upravovat smí vždy jen jeden uživatel. Zámek se drží po dobu režimu
+--    „Upravit“ (obnovuje se každou minutu, bez obnovení vyprší za 3 minuty); uložení cizí změny dat při
+--    platném zámku jiného uživatele odmítne trigger.
+alter table organigram_state add column if not exists lock_by text, add column if not exists lock_at timestamptz;
+create or replace function public.organigram_lock(p_id text, p_action text)
+returns table(lock_by text, lock_at timestamptz, srv_now timestamptz, stale boolean)
+language plpgsql security invoker set search_path = public as $$
+declare me text := lower(auth.jwt() ->> 'email');
+begin
+  if p_action = 'acquire' then
+    update organigram_state s set lock_by = me, lock_at = now()
+     where s.id = p_id and (s.lock_by is null or lower(s.lock_by) = me or s.lock_at < now() - interval '3 minutes');
+  elsif p_action = 'force' then
+    update organigram_state s set lock_by = me, lock_at = now() where s.id = p_id and private.uru_scope() is null;
+  elsif p_action = 'release' then
+    update organigram_state s set lock_by = null, lock_at = null where s.id = p_id and lower(s.lock_by) = me;
+  end if;
+  return query select s.lock_by, s.lock_at, now(), (s.lock_at is null or s.lock_at < now() - interval '3 minutes')
+    from organigram_state s where s.id = p_id;
+end $$;
+revoke all on function public.organigram_lock(text,text) from public, anon;
+grant execute on function public.organigram_lock(text,text) to authenticated;
+create or replace function private.organigram_lock_guard() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if new.data is distinct from old.data and old.lock_by is not null
+     and old.lock_at > now() - interval '3 minutes'
+     and lower(old.lock_by) <> lower(coalesce(auth.jwt() ->> 'email',''))
+     and coalesce(auth.role(),'') = 'authenticated' then
+    raise exception 'Organigram právě upravuje %', old.lock_by using errcode = 'P0001';
+  end if;
+  return new;
+end $$;
+drop trigger if exists organigram_lock_guard on organigram_state;
+create trigger organigram_lock_guard before update on organigram_state
+  for each row execute function private.organigram_lock_guard();

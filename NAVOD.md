@@ -69,3 +69,8 @@ Organigram Kraj Vysočina 2 je v samostatném řádku `kraj-vysocina-2` (admin h
 v hlavičce krajské aplikace, tj. `kraje/?ws=kraj-vysocina-2`). Přístup jen do něj dostane uživatel záznamem
 `insert into organigram_roles(email,role,scope) values ('e-mail','kraj','kraj-vysocina-2');` – po přihlášení ho
 každá aplikace přesměruje do tohoto organigramu a databáze (RLS) mu jiná data nevydá. Viz `supabase.sql`, oddíl 7.
+
+### Zámek úprav v krajské aplikaci
+Organigram se otevírá v náhledu. Tlačítkem **Upravit** si uživatel organigram zamkne – ostatní ho mezitím vidí jen
+v náhledu s informací, kdo upravuje. **Ukončit úpravy** zámek uvolní; po zavření okna nebo 20 minutách nečinnosti se
+uvolní sám (nejpozději do 3 minut). Admin (ne role kraj) může zámek po potvrzení převzít.
