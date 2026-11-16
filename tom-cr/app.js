@@ -1,6 +1,6 @@
 // TOM ÚRÚ ČR – cílový provozní model úřadu od 1. 1. 2027.
 // Samostatná aplikace: model v organigram_state.id='tom-cr'; organigram ÚRÚ ČR ('main') se jen čte (živě).
-const APP_VERSION='2026-10-05.17';
+const APP_VERSION='2026-11-16.1';
 const APP_ID='tom-cr', STATE_ID='tom-cr', ORG_ID='main', LS_KEY='uru-tom-cr-v1';
 
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
@@ -754,7 +754,7 @@ async function boot(){
   const {data:{session}}=await sb.auth.getSession(); if(session){ currentUser=session.user; await start(); }
 }
 async function start(){
-  try{ const {data}=await sb.from('organigram_roles').select('role').eq('email',(currentUser.email||'').toLowerCase()).maybeSingle(); ROLE.name=(data&&data.role)||'admin'; }catch(e){ ROLE.name='admin'; }
+  try{ const {data}=await sb.from('organigram_roles').select('role').eq('email',(currentUser.email||'').toLowerCase()).maybeSingle(); ROLE.name=(data&&data.role)||'admin'; if(ROLE.name==='kraj'){ location.replace('../kraje/'); return; } }catch(e){ ROLE.name='admin'; }
   ROLE.org=ROLE.name==='admin'; document.body.classList.toggle('role-ro',!ROLE.org);
   $('#userMail').textContent=currentUser.email+(ROLE.org?'':' · jen čtení');
   try{ await loadOrg(); await loadRemote(); }catch(e){ $('#authMsg').className='msg err'; $('#authMsg').textContent='Načtení dat selhalo: '+(e.message||e); return; }

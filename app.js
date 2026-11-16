@@ -1,4 +1,4 @@
-const APP_VERSION='2026-10-20.1';
+const APP_VERSION='2026-11-16.1';
 
 const STRUCTURE = window.STRUCTURE;
 const SOURCES = ['DESÚ','MMR','ÚÚR','MD','MPO','Nové','Jiný'];
@@ -1075,7 +1075,7 @@ async function boot(){
 }
 async function loadRole(){
   try{ const {data,error}=await sb.from('organigram_roles').select('role').eq('email',(currentUser.email||'').toLowerCase()).maybeSingle(); if(error) throw error;
-    const r=(data&&data.role)||'admin'; ROLE.name=r; ROLE.org=r==='admin'; ROLE.it=(r==='admin'||r==='it'); ROLE.people=(r==='admin'||r==='personalista');
+    const r=(data&&data.role)||'admin'; if(r==='kraj'){ ROLE.redirect=true; location.replace('kraje/'); return; } ROLE.name=r; ROLE.org=r==='admin'; ROLE.it=(r==='admin'||r==='it'); ROLE.people=(r==='admin'||r==='personalista');
   }catch(e){ console.warn('role',e); ROLE.name='admin'; ROLE.org=true; ROLE.it=true; ROLE.people=true; }
   document.body.classList.toggle('role-it',ROLE.name==='it');
   document.body.classList.toggle('role-personalista',ROLE.name==='personalista');
@@ -1084,7 +1084,7 @@ async function loadRole(){
 }
 async function start(){
   $('#userMail').textContent=currentUser.email; $('#btnUndo').onclick=undo; $('#btnRedo').onclick=redo;
-  await loadRole();
+  await loadRole(); if(ROLE.redirect) return;
   try{ await loadRemote(); }catch(e){ $('#authMsg').className='msg err'; $('#authMsg').textContent='Načtení dat selhalo: '+(e.message||e)+' (zkontrolujte tabulky a RLS)'; return; }
   $('#auth').style.display='none';
   $('#zoom').value=state.zoom; $('#zoomVal').textContent=state.zoom+' %';
@@ -1108,6 +1108,7 @@ const HELP=[
   ['🗺️','Diagram','Grafický organigram vybraného útvaru. Kořen vyberete v rozbalovací nabídce, velikost posuvníkem <b>Zvětšení</b>.'],
   ['📍','Lokality','Rozdělení lidí podle pracovišť. Osobu přetažením přesunete do jiné lokality.'],
   ['📊','Systemizace','Systemizace služebních a pracovních míst podle formuláře MV. Od verze 2026-10-20 odpovídá <b>schválené systemizaci od 1. 1. 2027</b> (404 míst: 361 služebních, 43 pracovních) – místa mají z migračních dat ISoSS <b>Ext. ID místa</b>, typ, úvazek, platovou třídu, obor služby, kód činností a stupeň řízení. Místo obsazené nad rámec systemizace je označeno „mimo systemizaci“.'],
+  ['🔒','Omezený přístup','Uživatel s rolí <b>kraj</b> (v tabulce organigram_roles s vyplněným rozsahem <code>scope</code>) vidí jen svůj sdílený krajský organigram (např. Kraj Vysočina 2) – do ÚRÚ ČR a TOM se nedostane, aplikace ho přesměruje. Omezení hlídá i databáze (RLS).'],
   ['🔢','Ext. ID OJ','Útvary mají číslo <b>Ext. ID OJ</b> z ISoSS – zobrazuje se ve stromu u názvu, v Systemizaci a v exportech. V režimu <b>Upravit strukturu</b> ho změníte tlačítkem <b>Ext. ID</b>.'],
   ['💻','IT','Přehled a úpravy IT vybavení osob (dostupné správci a roli IT).'],
   ['🏛️','ÚRÚ ČR / Krajské ÚRÚ','Přepínač organizace nahoře. Role personální pracuje jen s ÚRÚ ČR.']]},

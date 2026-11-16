@@ -148,6 +148,10 @@ header h1 a.back{font-size:12px;font-weight:400;margin-right:8px;color:var(--acc
 /* role IT */
 body.role-ro .adm,body.role-ro #btnImport,body.role-ro #vwSys,body.role-ro .addpos,body.role-ro .pos .del,body.role-ro #btnAddPerson{display:none!important}
 body.role-ro .person{cursor:default}
+body.role-kraj .noscope{display:none!important}
+body.role-kraj #btnReset,body.role-kraj #btnLoad{display:none!important}
+body:not(.ws-shared) .onlyws{display:none!important}
+body.ws-shared .nows{display:none!important}
 body.role-it select.locsel{pointer-events:none;opacity:.7;border-color:transparent;background:transparent}
 /* IT view */
 #itview{overflow:auto;padding:0 0 60px;display:none;background:#fff}
@@ -390,7 +394,7 @@ table.ov td.z{color:#B6BEC9}
 </head>
 <body class="ws-kr">
 <header>
-  <h1>Krajské ÚRÚ<small><a class="back" href="../" title="organigram ÚRÚ ČR (samostatná aplikace)">← ÚRÚ ČR</a>pracovní model soustavy od roku 2028 · <span id="ver">index 2026-10-05.6</span></small></h1>
+  <h1>Krajské ÚRÚ<small><a class="back noscope" href="../" title="organigram ÚRÚ ČR (samostatná aplikace)">← ÚRÚ ČR</a><a class="back noscope onlyws" href="./" title="všechny kraje (hlavní krajský organigram)">← všechny kraje</a><a class="back noscope nows" href="?ws=kraj-vysocina-2" title="samostatně sdílený organigram – přístup mají i uživatelé s rolí kraj">Vysočina 2 (sdílená) →</a><b id="wsTitle" style="margin-right:8px"></b>pracovní model soustavy od roku 2028 · <span id="ver">index 2026-10-05.6</span></small></h1>
   <div class="stats" id="stats"></div>
   <span class="user" id="user"><span class="dot" id="syncDot"></span><span id="userMail"></span></span>
   <div class="legend" id="legend"></div>
@@ -477,8 +481,8 @@ table.ov td.z{color:#B6BEC9}
 
 <script src="../vendor/xlsx.full.min.js"></script>
 <script src="../vendor/supabase.js"></script>
-<script src="../config.js?v=2026-11-16.1"></script>
-<script src="template.js?v=2026-11-16.1"></script>
-<script src="app.js?v=2026-11-16.1"></script>
+<script src="../config.js?v=2026-11-16.2"></script>
+<script src="template.js?v=2026-11-16.2"></script>
+<script src="app.js?v=2026-11-16.2"></script>
 </body
 </html>

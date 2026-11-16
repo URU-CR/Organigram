@@ -1,6 +1,6 @@
 // Krajské ÚRÚ – organigram soustavy (2028). Samostatná aplikace, data v organigram_state.id='kraje'.
 // Organigram ÚRÚ ČR (řádek 'main') se odsud pouze jednou čte při prvním spuštění (převzetí rozpracovaných krajů).
-const APP_VERSION='2026-11-16.1';
+const APP_VERSION='2026-11-16.2';
 const APP_ID='kraje';
 
 const SOURCES = ['Obec','KÚ','ÚRÚ','Nové','Jiný'];
@@ -35,8 +35,13 @@ const LEVEL_LBL = {predseda:'úřad',sekce:'sekce',odbor:'odbor',odd:'oddělení
 const HEAD_LBL = {predseda:'ředitel/ka',sekce:'místopředseda',odbor:'ředitel odboru',odd:'vedoucí oddělení',up:'vedoucí územního pracoviště'};
 const KRAJE=window.KRAJE, KRAJ_TEMPLATE=window.KRAJ_TEMPLATE, KRAJ_VZOR=window.KRAJ_VZOR||null, ORP_VZOR=window.ORP_VYSOCINA||[]; // template.js
 const KIND_LBL = {head:'vedoucí',asst:'asistent/ka',ref:'referent'};
-const LS_KEY = 'uru-kraje-v1';
-const STATE_ID = 'kraje';
+// samostatně sdílené organigramy (vlastní řádek v DB, přístup omezený rolí 'kraj' + scope v organigram_roles)
+const SHARED_WS={'kraj-vysocina-2':{title:'Kraj Vysočina 2',variant:'Kraj Vysočina 2'}};
+const WS_PARAM=(()=>{ const w=new URLSearchParams(location.search).get('ws'); return w&&SHARED_WS[w]?w:null; })();
+let STATE_ID = WS_PARAM||'kraje';
+let LS_KEY = 'uru-kraje-v1'+(WS_PARAM?'-'+WS_PARAM:'');
+function logApp(){ return STATE_ID==='kraje'?APP_ID:STATE_ID; }
+function isShared(){ return STATE_ID!=='kraje'; }
 const CR_STATE_ID = 'main'; // organigram ÚRÚ ČR – jen ke čtení
 
 // ---------- state ----------
@@ -48,7 +53,7 @@ let pidCounter = 1;
 
 function freshState(){ const units=buildFromTemplate(KRAJ_TEMPLATE,KRAJ_VZOR); const root=units.find(u=>!u.parent); root.vzor=true; units.push(...orpUnits(root,KRAJ_VZOR,ORP_VZOR));
   const sid=(window.KRAJ_SIDLO||{})[KRAJ_VZOR], so=units.find(u=>u.orp&&u.orp.name===sid); if(so) root.loc=so.loc;
-  const st={ app:APP_ID, units, people:{}, collapsed:{}, nextPid:1, vzorKraj:KRAJ_VZOR, vzorKrajV:3, chartRoot:root.id, view:'chart' }; addVariant2(st); return st; }
+  const st={ app:APP_ID, units, people:{}, collapsed:{}, nextPid:1, vzorKraj:KRAJ_VZOR, vzorKrajV:3, var2V:1, chartRoot:root.id, view:'chart' }; return st; }
 // územní pracoviště podle ORP: dnešní zaměstnanci = místa delimitace, rozdíl do cílové potřeby = nadpožadavek
 function orpUnits(root,kraj,list){ return (list||[]).map(o=>{ const u={id:newUid(),parent:root.id,name:'Územní pracoviště '+o.name,level:'up',src:'Obec',kraj,orp:{...o},loc:'orp'+o.kod,positions:[]};
   const dnes=Math.max(1,o.dnes||0), cil=Math.ceil(o.potreba||0), nad=Math.max(0,cil-dnes); const hl=HEAD_LBL.up;
@@ -71,7 +76,7 @@ function applyVzorKraj(st){ if(!KRAJ_VZOR||st.vzorKraj===KRAJ_VZOR) return null;
   st.vzorKraj=KRAJ_VZOR; st.chartRoot=root.id;
   return `Modelový kraj převeden na ${KRAJ_VZOR}: ${ORP_VZOR.length} územních pracovišť podle ORP (místa = dnešní zaměstnanci + nadpožadavek do cílové potřeby).`+(keep.length?` Obsazená zástupná pracoviště ponechána: ${keep.map(u=>u.name).join(', ')}.`:''); }
 // varianta 2 modelového kraje (Vysočina 2) – samostatný organigram vedle původního návrhu, založí se jen jednou (var2V)
-function addVariant2(st){ const V=window.KRAJ_VARIANTA2; if(!V||st.var2V) return null; st.var2V=1;
+function addVariant2(st){ const V=window.KRAJ_VARIANTA2; if(!V||st.var2V) return null; st.var2V=1; if(!st.ws) return null; // varianta žije jen ve vlastním (sdíleném) řádku
   if(st.units.some(u=>!u.parent&&u.variant===V.nazev)) return null;
   const idmap={}; V.units.forEach(t=>idmap[t.id]=newUid());
   const us=V.units.map(t=>{ const u={id:idmap[t.id],parent:t.parent?idmap[t.parent]:null,name:t.name,level:t.level,src:'Nové',kraj:V.kraj,positions:[]};
@@ -81,7 +86,7 @@ function addVariant2(st){ const V=window.KRAJ_VARIANTA2; if(!V||st.var2V) return
   const orp=orpUnits(root,V.kraj,ORP_VZOR); orp.forEach(u=>u.parent=up);
   const sid=(window.KRAJ_SIDLO||{})[V.kraj], so=orp.find(u=>u.orp.name===sid); if(so) root.loc=so.loc;
   st.units.push(...us,...orp);
-  return `Založen organigram ${V.nazev} (varianta podle podkladu kolegyň z KÚ Středočeského kraje a Kraje Vysočina): ${us.length} útvarů centrály a ${orp.length} územních pracovišť pod Odborem územních pracovišť. Původní návrh Vysočiny zůstal beze změny – mezi organigramy se přepíná výběrem nad diagramem.`; }
+  return `Založen organigram ${V.nazev} (varianta podle podkladu kolegyň z KÚ Středočeského kraje a Kraje Vysočina): ${us.length} útvarů centrály a ${orp.length} územních pracovišť pod Odborem územních pracovišť. Původní návrh Vysočiny zůstává v hlavním krajském organigramu.`; }
 // doplnění obslužných útvarů (personální, ekonomické, provozní a IT) do modelového kraje – jen jednou (vzorKrajV 2)
 function addServiceUnits(st){ if((st.vzorKrajV||1)>=2) return null; st.vzorKrajV=2;
   const root=st.units.find(u=>!u.parent&&u.vzor); if(!root) return null;
@@ -125,12 +130,13 @@ async function flush(){
   }catch(e){ console.error(e); setDot('err','uložení selhalo: '+(e.message||e)); toast('Uložení do databáze selhalo. Zkuste to znovu, nebo použijte „Uložit stav (json)“.'); dirty=true; }
   saving=false; if(dirty){ clearTimeout(saveTimer); saveTimer=setTimeout(flush,1500); }
 }
-function logChange(action,detail){ pendingLog.push({app:APP_ID,user_email:currentUser?currentUser.email:null,action,detail}); }
+function logChange(action,detail){ pendingLog.push({app:logApp(),user_email:currentUser?currentUser.email:null,action,detail}); }
 async function loadRemote(){
   const {data,error}=await sb.from('organigram_state').select('data,version').eq('id',STATE_ID).maybeSingle();
   if(error) throw error;
   let took=null;
   if(data&&data.data&&data.data.units){ state=data.data; version=data.version||0; }
+  else if(isShared()){ state=sharedFresh(); version=0; took={state,msg:`Založen samostatně sdílený organigram ${SHARED_WS[STATE_ID].title}.`}; const r=await sb.from('organigram_state').upsert({id:STATE_ID,data:state,version:0,updated_by:currentUser.email}); if(r.error) throw r.error; }
   else { took=await takeOverFromCr(); state=took.state; version=0; const r=await sb.from('organigram_state').upsert({id:STATE_ID,data:state,version:0,updated_by:currentUser.email}); if(r.error) throw r.error; }
   state.app=APP_ID; state.view=state.view||'tree'; if(!state.zoom) state.zoom=85;
   migrateActive(state); const vz=applyVzorKraj(state), sv=addServiceUnits(state), lc=applyLocations(state), v2=addVariant2(state); markBaseline();
@@ -138,6 +144,9 @@ async function loadRemote(){
   if(took){ logChange('založení',took.msg); persist(); setTimeout(()=>alert(took.msg),300); }
   try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){}
 }
+// prázdný sdílený organigram – jen varianta (bez modelového kraje); migrace vzoru se na něj nevztahují
+function sharedFresh(){ const st={ app:APP_ID, ws:STATE_ID, units:[], people:{}, collapsed:{}, nextPid:1, vzorKraj:KRAJ_VZOR, vzorKrajV:3, view:'chart' }; addVariant2(st);
+  const r=st.units.find(u=>!u.parent); if(r) st.chartRoot=r.id; return st; }
 // první spuštění: převezme rozpracované krajské útvary z ÚRÚ ČR (krUnits). Řádek 'main' se nemění.
 async function takeOverFromCr(){
   const st=freshState(); let units=[], src={};
@@ -321,7 +330,7 @@ function structEditor(u,div,head){
     <button class="small" data-a="add" title="přidat podřízený útvar">+ útvar</button>
     <button class="small" data-a="up" title="posunout výš" ${idx<=0?'disabled':''}>↑</button><button class="small" data-a="down" title="posunout níž" ${idx>=sibs.length-1?'disabled':''}>↓</button>
     <select data-a="mv" title="přesunout pod jiný útvar"><option value="">⇄ přesunout pod…</option>${state.units.filter(x=>x!==u&&!isDesc(u,x)&&x.level!=='odd'&&x.level!=='up').map(x=>`<option value="${x.id}" ${x.id===u.parent?'disabled':''}>${esc(unitPath(x).slice(-1)[0])}</option>`).join('')}</select>
-    ${!u.parent?`<button class="small" data-a="clone" title="vytvořit kopie tohoto organigramu pro vybrané kraje">⧉ do krajů…</button>`:''}
+    ${!u.parent&&!isShared()?`<button class="small" data-a="clone" title="vytvořit kopie tohoto organigramu pro vybrané kraje">⧉ do krajů…</button>`:''}
     <button class="small" data-a="del" style="color:var(--danger)" title="zrušit útvar včetně podřízených">× zrušit</button>`;
   const chg=(action,detail)=>{ logChange&&logChange('struktura',detail); save(); render(); };
   bar.querySelector('[data-a=ren]').onclick=()=>{ const n=prompt('Název útvaru:',u.name); if(n!==null&&n.trim()){ const o=u.name; u.name=n.trim(); chg('ren',`${o} → ${u.name}`); } };
@@ -585,7 +594,7 @@ $('#btnSave').onclick=()=>download(new Blob([JSON.stringify(state,null,1)],{type
 $('#btnLoad').onclick=()=>$('#fileJson').click();
 $('#fileJson').onchange=async e=>{const f=e.target.files[0];if(!f)return;e.target.value='';
   try{const s=JSON.parse(await f.text()); if(!s.units||!s.people) throw new Error('neplatný formát'); if(s.app!==APP_ID) throw new Error('soubor není uložený stav krajských ÚRÚ (organigram ÚRÚ ČR se sem nenačítá)'); state=s; const mg=migrateActive(state); logChange('načtení','stav nahrazen ze souboru '+f.name); save(); render(); toast('Stav načten.'); reportMigration(mg); toast('Stav načten.');}catch(err){alert('Soubor se nepodařilo načíst: '+err.message);}};
-$('#btnReset').onclick=()=>{ if(confirm('Opravdu vymazat všechny krajské útvary i lidi a začít znovu od vzoru? (Doporučuji nejdřív „Uložit stav“.)')){const v=state.view,z=state.zoom;state=freshState();state.view=v;state.zoom=z;logChange('vymazání','celý stav vymazán');save();render();} };
+$('#btnReset').onclick=()=>{ if(confirm('Opravdu vymazat všechny krajské útvary i lidi a začít znovu od vzoru? (Doporučuji nejdřív „Uložit stav“.)')){const v=state.view,z=state.zoom;state=isShared()?sharedFresh():freshState();state.view=v;state.zoom=z;logChange('vymazání','celý stav vymazán');save();render();} };
 // Strom: sbalit / rozbalit vše (nejvyšší úroveň zůstává otevřená, aby bylo vidět, co je pod ní)
 $('#btnCollapseAll').onclick=()=>{ state.units.forEach(u=>{ if(u.parent) state.collapsed[u.id]=true; else delete state.collapsed[u.id]; }); render(); };
 $('#btnExpandAll').onclick=()=>{ state.collapsed={}; render(); };
@@ -854,7 +863,7 @@ $('#ovXlsx').onclick=()=>{ const rows=overviewRows().map(r=>{const o={'Útvar':r
 
 // ---------- log ----------
 $('#btnLog').onclick=async()=>{ $('#logBody').innerHTML='<div>Načítám…</div>'; $('#dlgLog').showModal();
-  const {data,error}=await sb.from('organigram_log').select('created_at,user_email,action,detail').eq('app',APP_ID).order('created_at',{ascending:false}).limit(300);
+  const {data,error}=await sb.from('organigram_log').select('created_at,user_email,action,detail').eq('app',logApp()).order('created_at',{ascending:false}).limit(300);
   if(error){ $('#logBody').innerHTML='<div>Historii se nepodařilo načíst: '+esc(error.message)+'</div>'; return; }
   $('#logBody').innerHTML=data.length?data.map(l=>`<div><time>${new Date(l.created_at).toLocaleString('cs-CZ')}</time><span><b>${esc(l.action)}</b> ${esc(l.detail||'')} <span style="color:var(--muted)">· ${esc(l.user_email||'')}</span></span></div>`).join(''):'<div>Zatím žádné změny.</div>'; };
 $('#logClose').onclick=()=>$('#dlgLog').close();
@@ -883,9 +892,12 @@ async function boot(){
   if(session){ currentUser=session.user; await start(); }
 }
 async function loadRole(){
-  try{ const {data,error}=await sb.from('organigram_roles').select('role').eq('email',(currentUser.email||'').toLowerCase()).maybeSingle(); if(error) throw error;
-    const r=(data&&data.role)||'admin'; ROLE.name=r; ROLE.org=r==='admin';
-  }catch(e){ console.warn('role',e); ROLE.name='admin'; ROLE.org=true; }
+  try{ const {data,error}=await sb.from('organigram_roles').select('role,scope').eq('email',(currentUser.email||'').toLowerCase()).maybeSingle(); if(error) throw error;
+    const r=(data&&data.role)||'admin'; ROLE.name=r; ROLE.org=r==='admin'||r==='kraj';
+    if(r==='kraj'){ ROLE.scope=data.scope; if(!SHARED_WS[data.scope]) throw new Error('neznámý rozsah přístupu'); STATE_ID=data.scope; LS_KEY='uru-kraje-v1-'+data.scope; }
+  }catch(e){ console.warn('role',e); if(ROLE.name==='kraj'){ ROLE.org=false; } else { ROLE.name='admin'; ROLE.org=true; } }
+  document.body.classList.toggle('ws-shared',isShared()); document.body.classList.toggle('role-kraj',ROLE.name==='kraj');
+  { const t=$('#wsTitle'); if(t) t.textContent=isShared()?'sdílený organigram '+SHARED_WS[STATE_ID].title:''; }
   document.body.classList.toggle('role-ro',!ROLE.org);
   $('#userMail').textContent=currentUser.email+(!ROLE.org?' · jen čtení':'');
 }
@@ -895,8 +907,8 @@ async function start(){
   try{ await loadRemote(); }catch(e){ $('#authMsg').className='msg err'; $('#authMsg').textContent='Načtení dat selhalo: '+(e.message||e)+' (zkontrolujte tabulky a RLS)'; return; }
   $('#auth').style.display='none';
   $('#zoom').value=state.zoom; $('#zoomVal').textContent=state.zoom+' %';
-  document.body.classList.toggle('ws-kr',isKraj()); { const vr=state.units.find(u=>!u.parent&&u.vzor); if(vr) state.chartRoot=vr.id; } setView('chart'); setDot('','připojeno');
-  sb.channel('organigram-'+APP_ID).on('postgres_changes',{event:'UPDATE',schema:'public',table:'organigram_state',filter:'id=eq.'+STATE_ID},payload=>{
+  document.body.classList.toggle('ws-kr',isKraj()); { const vr=state.units.find(u=>!u.parent&&u.vzor)||state.units.find(u=>!u.parent); if(vr) state.chartRoot=vr.id; } setView('chart'); setDot('','připojeno');
+  sb.channel('organigram-'+STATE_ID).on('postgres_changes',{event:'UPDATE',schema:'public',table:'organigram_state',filter:'id=eq.'+STATE_ID},payload=>{
     if(payload.new&&payload.new.version>version&&!dirty&&!saving){ const v=state.view,z=state.zoom,c=state.collapsed; state=payload.new.data; migrateActive(state); version=payload.new.version; state.view=v; state.zoom=z; state.collapsed=c; render(); toast('Stav aktualizován z jiného okna.'); } }).subscribe();
   window.addEventListener('beforeunload',e=>{ if(dirty||saving){ flush(); e.preventDefault(); e.returnValue=''; } });
 }

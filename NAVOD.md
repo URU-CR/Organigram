@@ -63,3 +63,9 @@ V aplikaci Krajské ÚRÚ vedle původního návrhu Kraje Vysočina vzniká (jed
 samostatný organigram **Kraj Vysočina 2** podle podkladu kolegyň z KÚ Středočeského kraje a Kraje Vysočina
 (`kraje/template.js`, `KRAJ_VARIANTA2`). Mezi organigramy se přepíná výběrem v liště; strom i souhrn v hlavičce
 ukazují jen vybraný organigram. Útvary mají popis činnosti (v režimu Upravit strukturu tlačítko „✎ popis“).
+
+### Sdílení Vysočiny 2 s externími kolegy
+Organigram Kraj Vysočina 2 je v samostatném řádku `kraj-vysocina-2` (admin ho otevře odkazem „Vysočina 2 (sdílená) →“
+v hlavičce krajské aplikace, tj. `kraje/?ws=kraj-vysocina-2`). Přístup jen do něj dostane uživatel záznamem
+`insert into organigram_roles(email,role,scope) values ('e-mail','kraj','kraj-vysocina-2');` – po přihlášení ho
+každá aplikace přesměruje do tohoto organigramu a databáze (RLS) mu jiná data nevydá. Viz `supabase.sql`, oddíl 7.

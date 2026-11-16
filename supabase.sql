@@ -90,3 +90,39 @@ grant select, insert, update, delete on public.organigram_roles  to authenticate
 grant select, insert, update, delete on public.organigram_roster to authenticated, service_role;
 grant select on public.organigram_roster to anon;
 grant usage, select on all sequences in schema public to authenticated, service_role;
+
+-- 7) Omezený přístup pro externí spolupracovníky (listopad 2026)
+--    Role 'kraj' + scope = id řádku organigram_state, do kterého uživatel smí (např. 'kraj-vysocina-2').
+--    Takový uživatel vidí a upravuje jen tento řádek a historii s app = scope; organigram ÚRÚ ČR, TOM,
+--    seznam osob ani ostatní role nevidí. Uživatelé bez omezení (admin/it/personalista/bez záznamu) beze změny.
+--    Přidání uživatele: insert into organigram_roles(email,role,scope) values ('jmeno@kr-vysocina.cz','kraj','kraj-vysocina-2');
+alter table organigram_roles add column if not exists scope text;
+alter table organigram_roles drop constraint if exists organigram_roles_role_check;
+alter table organigram_roles add constraint organigram_roles_role_check
+  check (role = any (array['admin','it','personalista','kraj']) and (role <> 'kraj' or scope is not null));
+create schema if not exists private;
+grant usage on schema private to authenticated;
+create or replace function private.uru_scope() returns text
+language sql stable security definer set search_path = public as $$
+  select r.scope from public.organigram_roles r
+  where lower(r.email) = lower(auth.jwt() ->> 'email') and r.role = 'kraj' limit 1
+$$;
+revoke all on function private.uru_scope() from public, anon;
+grant execute on function private.uru_scope() to authenticated;
+drop policy if exists "state: authenticated full access" on organigram_state;
+create policy "state: full access (bez omezení)" on organigram_state for all to authenticated
+  using (private.uru_scope() is null) with check (private.uru_scope() is null);
+create policy "state: kraj read own" on organigram_state for select to authenticated using (id = private.uru_scope());
+create policy "state: kraj insert own" on organigram_state for insert to authenticated with check (id = private.uru_scope());
+create policy "state: kraj update own" on organigram_state for update to authenticated
+  using (id = private.uru_scope()) with check (id = private.uru_scope());
+drop policy if exists "log: authenticated read" on organigram_log;
+drop policy if exists "log: authenticated insert" on organigram_log;
+create policy "log: read" on organigram_log for select to authenticated using (private.uru_scope() is null or app = private.uru_scope());
+create policy "log: insert" on organigram_log for insert to authenticated with check (private.uru_scope() is null or app = private.uru_scope());
+drop policy if exists "roles: authenticated read" on organigram_roles;
+create policy "roles: read own row" on organigram_roles for select to authenticated using (lower(email) = lower(auth.jwt() ->> 'email'));
+create policy "roles: authenticated read (bez omezení)" on organigram_roles for select to authenticated using (private.uru_scope() is null);
+drop policy if exists "roster: authenticated full access" on organigram_roster;
+create policy "roster: authenticated full access (bez omezení)" on organigram_roster for all to authenticated
+  using (private.uru_scope() is null) with check (private.uru_scope() is null);

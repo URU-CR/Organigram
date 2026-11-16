@@ -1,6 +1,6 @@
 // TOM krajského ÚRÚ – cílový provozní model kraje v soustavě ÚRÚ (od 2028), modelový kraj Vysočina.
 // Odvozeno z TOM ÚRÚ ČR. Model v organigram_state.id='tom-kraj'; krajský organigram ('kraje') se jen čte (živě). Pracoviště, scénáře a posouzení: kraj.js.
-const APP_VERSION='2026-10-06.4';
+const APP_VERSION='2026-11-16.1';
 const APP_ID='tom-kraj', STATE_ID='tom-kraj', ORG_ID='kraje', LS_KEY='uru-tom-kraj-v1';
 const KRAJ=(window.TOM_KRAJ||{}).kraj||'Kraj Vysočina';
 
@@ -761,7 +761,7 @@ async function boot(){
   const {data:{session}}=await sb.auth.getSession(); if(session){ currentUser=session.user; await start(); }
 }
 async function start(){
-  try{ const {data}=await sb.from('organigram_roles').select('role').eq('email',(currentUser.email||'').toLowerCase()).maybeSingle(); ROLE.name=(data&&data.role)||'admin'; }catch(e){ ROLE.name='admin'; }
+  try{ const {data}=await sb.from('organigram_roles').select('role').eq('email',(currentUser.email||'').toLowerCase()).maybeSingle(); ROLE.name=(data&&data.role)||'admin'; if(ROLE.name==='kraj'){ location.replace('../kraje/'); return; } }catch(e){ ROLE.name='admin'; }
   ROLE.org=ROLE.name==='admin'; document.body.classList.toggle('role-ro',!ROLE.org);
   $('#userMail').textContent=currentUser.email+(ROLE.org?'':' · jen čtení');
   try{ await loadOrg(); await loadRemote(); }catch(e){ $('#authMsg').className='msg err'; $('#authMsg').textContent='Načtení dat selhalo: '+(e.message||e); return; }
