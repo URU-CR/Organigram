@@ -1,6 +1,6 @@
 // Krajské ÚRÚ – organigram soustavy (2028). Samostatná aplikace, data v organigram_state.id='kraje'.
 // Organigram ÚRÚ ČR (řádek 'main') se odsud pouze jednou čte při prvním spuštění (převzetí rozpracovaných krajů).
-const APP_VERSION='2026-11-16.5';
+const APP_VERSION='2026-11-16.6';
 const APP_ID='kraje';
 
 const SOURCES = ['Obec','KÚ','ÚRÚ','Nové','Jiný'];
@@ -847,7 +847,10 @@ function drawConnectors(oc){
   svg.appendChild(path); oc.appendChild(svg);
 }
 function setupRootSel(){ const roots=state.units.filter(u=>!u.parent); const sel=$('#chartRoot'); if(!sel) return;
-  if(roots.length>1){ sel.hidden=false; sel.innerHTML=roots.map(u=>`<option value="${u.id}" ${(state.chartRoot||roots[0].id)===u.id?'selected':''}>${esc(u.name)}</option>`).join(''); sel.onchange=()=>{ state.chartRoot=sel.value; chartFresh=true; render(); }; } else sel.hidden=true; }
+  const ext=ROLE.name==='kraj'?[]:Object.entries(SHARED_WS).filter(([id])=>id!==STATE_ID).map(([id,w])=>({id,title:w.title+' (sdílená)'}));
+  if(isShared()&&ROLE.name!=='kraj') ext.unshift({id:'kraje',title:'Krajské organigramy (hlavní)'});
+  if(roots.length+ext.length>1){ sel.hidden=false; sel.innerHTML=roots.map(u=>`<option value="${u.id}" ${(state.chartRoot||roots[0].id)===u.id?'selected':''}>${esc(u.name)}</option>`).join('')+ext.map(w=>`<option value="ws:${w.id}">↗ ${esc(w.title)}</option>`).join('');
+    sel.onchange=()=>{ if(sel.value.startsWith('ws:')){ const w=sel.value.slice(3); location.href=w==='kraje'?'./':'?ws='+w; return; } state.chartRoot=sel.value; chartFresh=true; render(); }; } else sel.hidden=true; }
 function renderChart(){
   const c=$('#chart'); const sl=c.scrollLeft, st=c.scrollTop; c.innerHTML='';
   const oc=document.createElement('div'); oc.className='oc'; oc.style.transform='scale('+(state.zoom||85)/100+')';
