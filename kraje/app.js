@@ -1,6 +1,6 @@
 // Krajské ÚRÚ – organigram soustavy (2028). Samostatná aplikace, data v organigram_state.id='kraje'.
 // Organigram ÚRÚ ČR (řádek 'main') se odsud pouze jednou čte při prvním spuštění (převzetí rozpracovaných krajů).
-const APP_VERSION='2026-11-16.4';
+const APP_VERSION='2026-11-16.5';
 const APP_ID='kraje';
 
 const SOURCES = ['Obec','KÚ','ÚRÚ','Nové','Jiný'];
@@ -917,7 +917,7 @@ async function boot(){
   $('#btnLogout').onclick=async()=>{ await flush(); if(editing) await lockCall('release'); await sb.auth.signOut(); location.reload(); };
   sb.auth.onAuthStateChange(async(ev,session)=>{ if(session&&!currentUser){ currentUser=session.user; await start(); } });
   const {data:{session}}=await sb.auth.getSession(); if(session) accessToken=session.access_token;
-  if(session){ currentUser=session.user; await start(); }
+  if(session&&!currentUser){ currentUser=session.user; await start(); }
 }
 async function loadRole(){
   try{ const {data,error}=await sb.from('organigram_roles').select('role,scope').eq('email',(currentUser.email||'').toLowerCase()).maybeSingle(); if(error) throw error;
@@ -930,7 +930,8 @@ async function loadRole(){
   document.body.classList.toggle('role-ro',!ROLE.canOrg);
   $('#userMail').textContent=currentUser.email+(!ROLE.canOrg?' · jen čtení':'');
 }
-async function start(){
+let started=false, rtChannel=null;
+async function start(){ if(started) return; started=true;
   $('#userMail').textContent=currentUser.email; $('#btnUndo').onclick=undo; $('#btnRedo').onclick=redo;
   await loadRole();
   try{ await loadRemote(); }catch(e){ $('#authMsg').className='msg err'; $('#authMsg').textContent='Načtení dat selhalo: '+(e.message||e)+' (zkontrolujte tabulky a RLS)'; return; }
@@ -938,7 +939,8 @@ async function start(){
   $('#zoom').value=state.zoom; $('#zoomVal').textContent=state.zoom+' %';
   document.body.classList.toggle('ws-kr',isKraj()); { const vr=state.units.find(u=>!u.parent&&u.vzor)||state.units.find(u=>!u.parent); if(vr) state.chartRoot=vr.id; } setView('chart'); setDot('','připojeno');
   await lockCall('status'); clearInterval(lockPoll); lockPoll=setInterval(()=>{ if(!editing) lockCall('status'); },30000);
-  sb.channel('organigram-'+STATE_ID).on('postgres_changes',{event:'UPDATE',schema:'public',table:'organigram_state',filter:'id=eq.'+STATE_ID},payload=>{
+  if(rtChannel) sb.removeChannel(rtChannel);
+  rtChannel=sb.channel('organigram-'+STATE_ID).on('postgres_changes',{event:'UPDATE',schema:'public',table:'organigram_state',filter:'id=eq.'+STATE_ID},payload=>{
     if(payload.new&&'lock_by' in payload.new&&!editing) lockCall('status');
     if(payload.new&&payload.new.version>version&&!dirty&&!saving){ const v=state.view,z=state.zoom,c=state.collapsed; state=payload.new.data; migrateActive(state); version=payload.new.version; state.view=v; state.zoom=z; state.collapsed=c; render(); toast('Stav aktualizován z jiného okna.'); } }).subscribe();
   window.addEventListener('beforeunload',e=>{ if(dirty||saving){ flush(); e.preventDefault(); e.returnValue=''; } });
