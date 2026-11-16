@@ -1,6 +1,6 @@
 // Krajské ÚRÚ – organigram soustavy (2028). Samostatná aplikace, data v organigram_state.id='kraje'.
 // Organigram ÚRÚ ČR (řádek 'main') se odsud pouze jednou čte při prvním spuštění (převzetí rozpracovaných krajů).
-const APP_VERSION='2026-10-05.6';
+const APP_VERSION='2026-11-16.1';
 const APP_ID='kraje';
 
 const SOURCES = ['Obec','KÚ','ÚRÚ','Nové','Jiný'];
@@ -48,7 +48,7 @@ let pidCounter = 1;
 
 function freshState(){ const units=buildFromTemplate(KRAJ_TEMPLATE,KRAJ_VZOR); const root=units.find(u=>!u.parent); root.vzor=true; units.push(...orpUnits(root,KRAJ_VZOR,ORP_VZOR));
   const sid=(window.KRAJ_SIDLO||{})[KRAJ_VZOR], so=units.find(u=>u.orp&&u.orp.name===sid); if(so) root.loc=so.loc;
-  return { app:APP_ID, units, people:{}, collapsed:{}, nextPid:1, vzorKraj:KRAJ_VZOR, vzorKrajV:3, chartRoot:root.id, view:'chart' }; }
+  const st={ app:APP_ID, units, people:{}, collapsed:{}, nextPid:1, vzorKraj:KRAJ_VZOR, vzorKrajV:3, chartRoot:root.id, view:'chart' }; addVariant2(st); return st; }
 // územní pracoviště podle ORP: dnešní zaměstnanci = místa delimitace, rozdíl do cílové potřeby = nadpožadavek
 function orpUnits(root,kraj,list){ return (list||[]).map(o=>{ const u={id:newUid(),parent:root.id,name:'Územní pracoviště '+o.name,level:'up',src:'Obec',kraj,orp:{...o},loc:'orp'+o.kod,positions:[]};
   const dnes=Math.max(1,o.dnes||0), cil=Math.ceil(o.potreba||0), nad=Math.max(0,cil-dnes); const hl=HEAD_LBL.up;
@@ -70,6 +70,18 @@ function applyVzorKraj(st){ if(!KRAJ_VZOR||st.vzorKraj===KRAJ_VZOR) return null;
   if(!st.units.some(u=>u.parent===root.id&&u.orp)) st.units.push(...orpUnits(root,KRAJ_VZOR,ORP_VZOR));
   st.vzorKraj=KRAJ_VZOR; st.chartRoot=root.id;
   return `Modelový kraj převeden na ${KRAJ_VZOR}: ${ORP_VZOR.length} územních pracovišť podle ORP (místa = dnešní zaměstnanci + nadpožadavek do cílové potřeby).`+(keep.length?` Obsazená zástupná pracoviště ponechána: ${keep.map(u=>u.name).join(', ')}.`:''); }
+// varianta 2 modelového kraje (Vysočina 2) – samostatný organigram vedle původního návrhu, založí se jen jednou (var2V)
+function addVariant2(st){ const V=window.KRAJ_VARIANTA2; if(!V||st.var2V) return null; st.var2V=1;
+  if(st.units.some(u=>!u.parent&&u.variant===V.nazev)) return null;
+  const idmap={}; V.units.forEach(t=>idmap[t.id]=newUid());
+  const us=V.units.map(t=>{ const u={id:idmap[t.id],parent:t.parent?idmap[t.parent]:null,name:t.name,level:t.level,src:'Nové',kraj:V.kraj,positions:[]};
+    if(t.head_lbl) u.head_lbl=t.head_lbl; if(t.note) u.note=t.note; if(!t.parent) u.variant=V.nazev;
+    u.positions=makePositions(u,t.counts||[1,0,0]); if(t.refs) u.positions.filter(p=>p.kind==='ref').forEach((p,i)=>{ if(t.refs[i]) p.label=t.refs[i]; }); return u; });
+  const root=us[0], up=idmap[V.orpParent]||root.id;
+  const orp=orpUnits(root,V.kraj,ORP_VZOR); orp.forEach(u=>u.parent=up);
+  const sid=(window.KRAJ_SIDLO||{})[V.kraj], so=orp.find(u=>u.orp.name===sid); if(so) root.loc=so.loc;
+  st.units.push(...us,...orp);
+  return `Založen organigram ${V.nazev} (varianta podle podkladu kolegyň z KÚ Středočeského kraje a Kraje Vysočina): ${us.length} útvarů centrály a ${orp.length} územních pracovišť pod Odborem územních pracovišť. Původní návrh Vysočiny zůstal beze změny – mezi organigramy se přepíná výběrem nad diagramem.`; }
 // doplnění obslužných útvarů (personální, ekonomické, provozní a IT) do modelového kraje – jen jednou (vzorKrajV 2)
 function addServiceUnits(st){ if((st.vzorKrajV||1)>=2) return null; st.vzorKrajV=2;
   const root=st.units.find(u=>!u.parent&&u.vzor); if(!root) return null;
@@ -121,8 +133,8 @@ async function loadRemote(){
   if(data&&data.data&&data.data.units){ state=data.data; version=data.version||0; }
   else { took=await takeOverFromCr(); state=took.state; version=0; const r=await sb.from('organigram_state').upsert({id:STATE_ID,data:state,version:0,updated_by:currentUser.email}); if(r.error) throw r.error; }
   state.app=APP_ID; state.view=state.view||'tree'; if(!state.zoom) state.zoom=85;
-  migrateActive(state); const vz=applyVzorKraj(state), sv=addServiceUnits(state), lc=applyLocations(state); markBaseline();
-  [vz,sv,lc].filter(Boolean).forEach(m=>logChange('struktura',m)); if(vz||sv||lc){ persist(); setTimeout(()=>alert([vz,sv,lc].filter(Boolean).join('\n\n')),400); }
+  migrateActive(state); const vz=applyVzorKraj(state), sv=addServiceUnits(state), lc=applyLocations(state), v2=addVariant2(state); markBaseline();
+  [vz,sv,lc,v2].filter(Boolean).forEach(m=>logChange('struktura',m)); if(vz||sv||lc||v2){ persist(); setTimeout(()=>alert([vz,sv,lc,v2].filter(Boolean).join('\n\n')),400); }
   if(took){ logChange('založení',took.msg); persist(); setTimeout(()=>alert(took.msg),300); }
   try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){}
 }
@@ -187,7 +199,7 @@ function renderUnit(u){
   const head=document.createElement('div'); head.className='uhead';
   head.innerHTML=`<span class="bar" style="background:${SRC_DARK[u.src]||'#999'}"></span>
     <button class="tog" aria-label="Sbalit/rozbalit">${state.collapsed[u.id]?'▸':'▾'}</button>
-    <span class="uname" title="${u.head?'v organigramu uveden/a: '+esc(u.head):''}">${esc(u.name)}<span class="lvl">${LEVEL_LBL[u.level]||''}</span>${u.head?`<span class="lvl" style="font-style:italic">${esc(u.head)}</span>`:''}${u.orp?`<span class="orp" title="${esc(orpTitle(u.orp))}">${esc(orpLine(u.orp))}</span>`:''}</span>
+    <span class="uname" title="${u.head?'v organigramu uveden/a: '+esc(u.head):''}">${esc(u.name)}<span class="lvl">${LEVEL_LBL[u.level]||''}</span>${u.head?`<span class="lvl" style="font-style:italic">${esc(u.head)}</span>`:''}${u.orp?`<span class="orp" title="${esc(orpTitle(u.orp))}">${esc(orpLine(u.orp))}</span>`:''}${u.note?`<span class="unote">${esc(u.note)}</span>`:''}</span>
     <span class="srcbadge" style="background:${SRC_COLOR[u.src]}">${esc(u.src)}</span>
     <span class="fill ${filled===total&&total?'full':''}" title="obsazeno / míst · FTE obsazeno / kapacita${sub.total!==total?' (v závorce včetně podřízených)':''}">${filled}/${total}${sub.total!==total?` <span style="opacity:.7">(${sub.filled}/${sub.total})</span>`:''} <span class="ftec">${fmtF(sub.total!==total?FD.occ:F.occ)}/${fmtF(sub.total!==total?FD.cap:F.cap)}&nbsp;FTE</span></span>`;
   head.querySelector('.fill').before(locSelect(u));
@@ -235,7 +247,7 @@ function render(){
   rebuildLocs();
   normalizePositions();
   const tree=$('#tree'); const scroll=tree.scrollTop; tree.innerHTML='';
-  state.units.filter(u=>!u.parent).forEach(u=>tree.appendChild(renderUnit(u)));
+  setupRootSel(); shownRoots().forEach(u=>tree.appendChild(renderUnit(u)));
   tree.scrollTop=scroll;
   if(document.body.classList.contains('view-chart')) renderChart(); else $('#chart').innerHTML='';
   if(document.body.classList.contains('view-loc')) renderLoc(); else $('#locview').innerHTML='';
@@ -258,8 +270,11 @@ function render(){
   if(q){ document.querySelectorAll('#tree .person, #chart .person, #locview .person').forEach(el=>{const p=state.people[el.dataset.pid];const hit=matches(p,q);el.classList.toggle('hl',hit);el.classList.toggle('dim',!hit);}); }
   renderStats();
 }
+// při více organigramech (varianta Vysočina 2, kopie do krajů) ukazuje strom i souhrn jen ten vybraný nad diagramem
+function shownRoots(){ const roots=state.units.filter(u=>!u.parent); if(roots.length<2) return roots; const r=roots.find(u=>u.id===state.chartRoot)||roots.find(u=>u.vzor)||roots[0]; return [r]; }
 function renderStats(){
-  const ps=allPositions(); const total=ps.length, filled=ps.filter(x=>x.p.persons.length).length;
+  const rs=shownRoots(), inRoot=new Set(); const w=id=>{ inRoot.add(id); state.units.filter(u=>u.parent===id).forEach(u=>w(u.id)); }; rs.forEach(r=>w(r.id));
+  const ps=allPositions().filter(x=>inRoot.has(x.u.id)); const total=ps.length, filled=ps.filter(x=>x.p.persons.length).length;
   const delim=ps.filter(x=>x.p.cat==='delim'), nad=ps.filter(x=>x.p.cat==='nad');
   const assignedIds=new Set(allUnitsBoth().flatMap(u=>u.positions.flatMap(p=>p.persons||[]))); const un=Object.values(state.people).filter(h=>!assignedIds.has(h.id)).length;
   let occ=0,cap=0; ps.forEach(({u,p})=>{ occ+=posOcc(p); cap+=posCap(u,p); });
@@ -299,7 +314,7 @@ function structEditor(u,div,head){
   const m=byId(); const par=m[u.parent]; const sibs=state.units.filter(x=>x.parent===u.parent); const idx=sibs.indexOf(u);
   const bar=document.createElement('div'); bar.className='sedit';
   const cnt=k=>u.positions.filter(p=>p.kind===k).length;
-  bar.innerHTML=`<button class="small" data-a="ren" title="přejmenovat">✎ název</button>
+  bar.innerHTML=`<button class="small" data-a="ren" title="přejmenovat">✎ název</button><button class="small" data-a="note" title="popis činnosti útvaru">✎ popis</button>
     <select data-a="lvl" title="úroveň útvaru">${Object.entries(LEVEL_LBL).map(([k,v])=>`<option value="${k}" ${u.level===k?'selected':''}>${v}</option>`).join('')}</select>
     <select data-a="src" title="zdrojový úřad / barva">${SOURCES.filter(s=>s!=='Jiný').map(s=>`<option ${u.src===s?'selected':''}>${s}</option>`).join('')}</select>
     <span class="cnts" title="počet míst: vedoucí + asistenti + referenti (obsazená místa se neodebírají)">místa <input type="number" min="0" max="9" data-k="head" value="${cnt('head')}"> + <input type="number" min="0" max="9" data-k="asst" value="${cnt('asst')}"> + <input type="number" min="0" max="99" data-k="ref" value="${cnt('ref')}"></span>
@@ -310,6 +325,7 @@ function structEditor(u,div,head){
     <button class="small" data-a="del" style="color:var(--danger)" title="zrušit útvar včetně podřízených">× zrušit</button>`;
   const chg=(action,detail)=>{ logChange&&logChange('struktura',detail); save(); render(); };
   bar.querySelector('[data-a=ren]').onclick=()=>{ const n=prompt('Název útvaru:',u.name); if(n!==null&&n.trim()){ const o=u.name; u.name=n.trim(); chg('ren',`${o} → ${u.name}`); } };
+  bar.querySelector('[data-a=note]').onclick=()=>{ const n=prompt('Popis činnosti útvaru (prázdné = smazat):',u.note||''); if(n===null) return; const v=n.trim(); if(v) u.note=v; else delete u.note; chg('note',`${u.name}: popis ${v?'upraven':'smazán'}`); };
   bar.querySelector('[data-a=lvl]').onchange=e=>{ u.level=e.target.value; u.positions.filter(p=>p.kind==='head').forEach(p=>p.label=u.head_lbl||HEAD_LBL[u.level]); chg('lvl',`${u.name}: úroveň ${LEVEL_LBL[u.level]}`); };
   bar.querySelector('[data-a=src]').onchange=e=>{ u.src=e.target.value; chg('src',`${u.name}: zdroj ${u.src}`); };
   bar.querySelectorAll('.cnts input').forEach(inp=>inp.onchange=()=>{ const counts=['head','asst','ref'].map(k=>+bar.querySelector(`.cnts input[data-k=${k}]`).value||0);
@@ -615,7 +631,7 @@ function boxEl(u){
   const box=document.createElement('div'); box.className='box '+u.level; box.dataset.uid=u.id;
   normalizePositions(); const filled=u.positions.filter(p=>p.persons.length).length,total=u.positions.length,free=total-filled; const partial=Math.round(u.positions.filter(p=>p.persons.length).reduce((a,p)=>a+Math.max(0,posFree(u,p)),0)*100)/100; const FB=unitFte(u,childrenOf(u.id).length>0);
   const sub=subtreeCount(u); const crit=isCrit(u); if(crit) box.classList.add('crit'); const cs=childrenOf(u.id).length?sub:{total,filled}; const pctTxt=cs.total?Math.round(100*cs.filled/cs.total)+' %':'';
-  box.innerHTML=`<div class="bh" style="border-top-color:${SRC_DARK[u.src]||'#999'}"><div class="bn" title="${u.head?'v organigramu uveden/a: '+esc(u.head):''}">${esc(u.name)}${u.head?`<div style="font-weight:400;font-size:11px;color:var(--muted);font-style:italic">${esc(u.head)}</div>`:''}${u.orp?`<div class="orpb" title="${esc(orpTitle(u.orp))}">dnes ${u.orp.dnes} · potřeba ${String(u.orp.potreba).replace('.',',')}${u.orp.hodnoceni==='Kritické'?' · <b style="color:var(--danger)">kritické</b>':''}</div>`:''}</div>
+  box.innerHTML=`<div class="bh" style="border-top-color:${SRC_DARK[u.src]||'#999'}"><div class="bn" title="${u.note?esc(u.note):(u.head?'v organigramu uveden/a: '+esc(u.head):'')}">${esc(u.name)}${u.note?' <span class="nmark" title="'+esc(u.note)+'">ⓘ</span>':''}${u.head?`<div style="font-weight:400;font-size:11px;color:var(--muted);font-style:italic">${esc(u.head)}</div>`:''}${u.orp?`<div class="orpb" title="${esc(orpTitle(u.orp))}">dnes ${u.orp.dnes} · potřeba ${String(u.orp.potreba).replace('.',',')}${u.orp.hodnoceni==='Kritické'?' · <b style="color:var(--danger)">kritické</b>':''}</div>`:''}</div>
     <div class="bm"><span class="srcbadge" style="background:${SRC_COLOR[u.src]}">${esc(u.src)}</span><span class="pct">${pctTxt}</span><span class="fill ${filled===total&&total?'full':''}" title="obsazeno / míst${sub.total!==total?' (v závorce včetně podřízených)':''}">${filled}/${total}${sub.total!==total?` <span style="opacity:.7">(${sub.filled}/${sub.total})</span>`:''}<span class="ftec"> ${fmtF(FB.occ)} FTE</span></span></div></div>`;
   box.querySelector('.bm').insertBefore(locSelect(u),box.querySelector('.bm .fill'));
   const bp=document.createElement('div'); bp.className='bp';
@@ -793,12 +809,14 @@ function drawConnectors(oc){
   const path=document.createElementNS('http://www.w3.org/2000/svg','path'); path.setAttribute('d',d); path.setAttribute('fill','none'); path.setAttribute('stroke','#D5DAE1'); path.setAttribute('stroke-width','2'); path.setAttribute('stroke-linecap','square');
   svg.appendChild(path); oc.appendChild(svg);
 }
+function setupRootSel(){ const roots=state.units.filter(u=>!u.parent); const sel=$('#chartRoot'); if(!sel) return;
+  if(roots.length>1){ sel.hidden=false; sel.innerHTML=roots.map(u=>`<option value="${u.id}" ${(state.chartRoot||roots[0].id)===u.id?'selected':''}>${esc(u.name)}</option>`).join(''); sel.onchange=()=>{ state.chartRoot=sel.value; chartFresh=true; render(); }; } else sel.hidden=true; }
 function renderChart(){
   const c=$('#chart'); const sl=c.scrollLeft, st=c.scrollTop; c.innerHTML='';
   const oc=document.createElement('div'); oc.className='oc'; oc.style.transform='scale('+(state.zoom||85)/100+')';
   const root=document.createElement('ul'); root.className='oc-row oc-root';
   const roots=state.units.filter(u=>!u.parent); const sel=$('#chartRoot');
-  if(roots.length>1){ sel.hidden=false; sel.innerHTML=roots.map(u=>`<option value="${u.id}" ${(state.chartRoot||roots[0].id)===u.id?'selected':''}>${esc(u.name)}</option>`).join(''); sel.onchange=()=>{ state.chartRoot=sel.value; chartFresh=true; render(); }; } else sel.hidden=true;
+  setupRootSel();
   const shown=roots.length>1?roots.filter(u=>u.id===(state.chartRoot||roots[0].id)):roots;
   shown.forEach(u=>root.appendChild(chartNode(u)));
   oc.appendChild(root); c.appendChild(oc); drawConnectors(oc);

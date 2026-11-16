@@ -57,3 +57,9 @@ přejmenovat, Ext. ID OJ) jdou dělat přímo v aplikaci.
 
 Verze 5 (20. 10. 2026) = schválená systemizace od 1. 1. 2027: organigram + migrační data ISoSS
 (404 míst, 361 služebních, 43 pracovních).
+
+## Krajské ÚRÚ – varianta Vysočina 2
+V aplikaci Krajské ÚRÚ vedle původního návrhu Kraje Vysočina vzniká (jednou, při prvním načtení verze 2026-11-16.1)
+samostatný organigram **Kraj Vysočina 2** podle podkladu kolegyň z KÚ Středočeského kraje a Kraje Vysočina
+(`kraje/template.js`, `KRAJ_VARIANTA2`). Mezi organigramy se přepíná výběrem v liště; strom i souhrn v hlavičce
+ukazují jen vybraný organigram. Útvary mají popis činnosti (v režimu Upravit strukturu tlačítko „✎ popis“).
