@@ -1,6 +1,6 @@
 // Krajské ÚRÚ – organigram soustavy (2028). Samostatná aplikace, data v organigram_state.id='kraje'.
 // Organigram ÚRÚ ČR (řádek 'main') se odsud pouze jednou čte při prvním spuštění (převzetí rozpracovaných krajů).
-const APP_VERSION='2026-11-16.2';
+const APP_VERSION='2026-11-16.3';
 const APP_ID='kraje';
 
 const SOURCES = ['Obec','KÚ','ÚRÚ','Nové','Jiný'];
@@ -208,10 +208,11 @@ function renderUnit(u){
   const head=document.createElement('div'); head.className='uhead';
   head.innerHTML=`<span class="bar" style="background:${SRC_DARK[u.src]||'#999'}"></span>
     <button class="tog" aria-label="Sbalit/rozbalit">${state.collapsed[u.id]?'▸':'▾'}</button>
-    <span class="uname" title="${u.head?'v organigramu uveden/a: '+esc(u.head):''}">${esc(u.name)}<span class="lvl">${LEVEL_LBL[u.level]||''}</span>${u.head?`<span class="lvl" style="font-style:italic">${esc(u.head)}</span>`:''}${u.orp?`<span class="orp" title="${esc(orpTitle(u.orp))}">${esc(orpLine(u.orp))}</span>`:''}${u.note?`<span class="unote">${esc(u.note)}</span>`:''}</span>
+    <span class="uname" title="${u.head?'v organigramu uveden/a: '+esc(u.head):''}">${esc(u.name)}<span class="lvl">${LEVEL_LBL[u.level]||''}</span>${u.head?`<span class="lvl" style="font-style:italic">${esc(u.head)}</span>`:''}${u.orp?`<span class="orp" title="${esc(orpTitle(u.orp))}">${esc(orpLine(u.orp))}</span>`:''}${u.note?`<span class="unote" title="${ROLE.org?'klikněte pro úpravu popisu':''}">${esc(u.note)}</span>`:''}</span>
     <span class="srcbadge" style="background:${SRC_COLOR[u.src]}">${esc(u.src)}</span>
     <span class="fill ${filled===total&&total?'full':''}" title="obsazeno / míst · FTE obsazeno / kapacita${sub.total!==total?' (v závorce včetně podřízených)':''}">${filled}/${total}${sub.total!==total?` <span style="opacity:.7">(${sub.filled}/${sub.total})</span>`:''} <span class="ftec">${fmtF(sub.total!==total?FD.occ:F.occ)}/${fmtF(sub.total!==total?FD.cap:F.cap)}&nbsp;FTE</span></span>`;
   head.querySelector('.fill').before(locSelect(u));
+  { const un=head.querySelector('.unote'); if(un&&ROLE.org) un.onclick=e=>{ e.stopPropagation(); editNote(u); }; }
   head.querySelector('.tog').onclick=()=>{state.collapsed[u.id]=!state.collapsed[u.id];render();};
   // drop on header -> first free slot
   head.addEventListener('dragover',e=>{e.preventDefault();head.classList.add('over');});
@@ -317,6 +318,12 @@ function cloneSubtree(rootId,fromUnits,krajName){ const m={}; fromUnits.forEach(
   const walk=id=>{ const u=m[id]; const nid=newUid(); idmap[id]=nid; if(u.orp) return; const c={...u,id:nid,parent:u.parent&&idmap[u.parent]?idmap[u.parent]:null,name:u.name.replace(/\s*–?\s*vzor$/i,'').replace('{kraj}',krajName),kraj:krajName,positions:u.positions.map(p=>({id:newPid(),kind:p.kind,label:p.label,cat:p.cat,persons:[]}))}; delete c.vzor; delete c.head; delete c.orp; out.push(c); fromUnits.filter(x=>x.parent===id).forEach(x=>walk(x.id)); };
   walk(rootId); if(out[0]&&!/{kraj}/.test(m[rootId].name)&&!out[0].name.includes(krajName)) out[0].name=out[0].name+' – '+krajName; return out; }
 function kraje(){ return state.units.filter(u=>!u.parent); }
+// popis činnosti útvaru – větší editační okno
+function editNote(u){ if(!ROLE.org) return; const dlg=$('#dlgNote'), ta=$('#noteText'); $('#noteUnit').textContent=u.name; ta.value=u.note||'';
+  $('#noteCancel').onclick=()=>dlg.close();
+  $('#noteOk').onclick=()=>{ const v=ta.value.replace(/\s+$/,'').replace(/^\s+/,''); const old=u.note||''; if(v) u.note=v; else delete u.note; dlg.close();
+    if(v!==old){ logChange('struktura',`${u.name}: popis ${v?'upraven':'smazán'}`); save(); render(); } };
+  dlg.showModal(); setTimeout(()=>{ ta.focus(); ta.setSelectionRange(ta.value.length,ta.value.length); },30); }
 // ---------- editor struktury ----------
 let editing=false;
 function structEditor(u,div,head){
@@ -334,7 +341,7 @@ function structEditor(u,div,head){
     <button class="small" data-a="del" style="color:var(--danger)" title="zrušit útvar včetně podřízených">× zrušit</button>`;
   const chg=(action,detail)=>{ logChange&&logChange('struktura',detail); save(); render(); };
   bar.querySelector('[data-a=ren]').onclick=()=>{ const n=prompt('Název útvaru:',u.name); if(n!==null&&n.trim()){ const o=u.name; u.name=n.trim(); chg('ren',`${o} → ${u.name}`); } };
-  bar.querySelector('[data-a=note]').onclick=()=>{ const n=prompt('Popis činnosti útvaru (prázdné = smazat):',u.note||''); if(n===null) return; const v=n.trim(); if(v) u.note=v; else delete u.note; chg('note',`${u.name}: popis ${v?'upraven':'smazán'}`); };
+  bar.querySelector('[data-a=note]').onclick=()=>editNote(u);
   bar.querySelector('[data-a=lvl]').onchange=e=>{ u.level=e.target.value; u.positions.filter(p=>p.kind==='head').forEach(p=>p.label=u.head_lbl||HEAD_LBL[u.level]); chg('lvl',`${u.name}: úroveň ${LEVEL_LBL[u.level]}`); };
   bar.querySelector('[data-a=src]').onchange=e=>{ u.src=e.target.value; chg('src',`${u.name}: zdroj ${u.src}`); };
   bar.querySelectorAll('.cnts input').forEach(inp=>inp.onchange=()=>{ const counts=['head','asst','ref'].map(k=>+bar.querySelector(`.cnts input[data-k=${k}]`).value||0);
@@ -643,6 +650,7 @@ function boxEl(u){
   box.innerHTML=`<div class="bh" style="border-top-color:${SRC_DARK[u.src]||'#999'}"><div class="bn" title="${u.note?esc(u.note):(u.head?'v organigramu uveden/a: '+esc(u.head):'')}">${esc(u.name)}${u.note?' <span class="nmark" title="'+esc(u.note)+'">ⓘ</span>':''}${u.head?`<div style="font-weight:400;font-size:11px;color:var(--muted);font-style:italic">${esc(u.head)}</div>`:''}${u.orp?`<div class="orpb" title="${esc(orpTitle(u.orp))}">dnes ${u.orp.dnes} · potřeba ${String(u.orp.potreba).replace('.',',')}${u.orp.hodnoceni==='Kritické'?' · <b style="color:var(--danger)">kritické</b>':''}</div>`:''}</div>
     <div class="bm"><span class="srcbadge" style="background:${SRC_COLOR[u.src]}">${esc(u.src)}</span><span class="pct">${pctTxt}</span><span class="fill ${filled===total&&total?'full':''}" title="obsazeno / míst${sub.total!==total?' (v závorce včetně podřízených)':''}">${filled}/${total}${sub.total!==total?` <span style="opacity:.7">(${sub.filled}/${sub.total})</span>`:''}<span class="ftec"> ${fmtF(FB.occ)} FTE</span></span></div></div>`;
   box.querySelector('.bm').insertBefore(locSelect(u),box.querySelector('.bm .fill'));
+  { const nm=box.querySelector('.nmark'); if(nm&&ROLE.org){ nm.style.cursor='pointer'; nm.onclick=e=>{ e.stopPropagation(); editNote(u); }; } }
   const bp=document.createElement('div'); bp.className='bp';
   const heads=u.positions.filter(p=>p.kind==='head'), rest=u.positions.filter(p=>p.kind!=='head');
   [...heads,...rest].forEach(p=>posPersons(p).forEach(id=>{const c=personChip(state.people[id]); if(p.kind==='head') c.classList.add('lead'); c.title=p.label+'\n'+c.title; bp.appendChild(c);}));

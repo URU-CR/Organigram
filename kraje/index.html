@@ -58,7 +58,9 @@ aside .pool-head h2 span{color:var(--muted);font-weight:400}
 .uhead .tog{width:22px;height:22px;border:0;background:none;padding:0;color:var(--muted);font-size:12px;flex:none}
 .uhead .uname{font-weight:600;flex:1;min-width:0}
 .uhead .uname .lvl{font-weight:400;color:var(--muted);font-size:12px;margin-left:6px}
-.uhead .uname .unote{display:block;font-weight:400;color:var(--muted);font-size:12px;line-height:1.35;margin-top:2px;white-space:normal}
+.uhead .uname .unote{display:block;font-weight:400;color:var(--muted);font-size:12px;line-height:1.35;margin-top:2px;white-space:pre-line}
+body:not(.role-ro) .uhead .uname .unote{cursor:text}
+body:not(.role-ro) .uhead .uname .unote:hover{color:var(--ink);background:rgba(0,0,0,.03)}
 .box .nmark{color:var(--muted);font-weight:400;cursor:help}
 .uhead .fill{font-variant-numeric:tabular-nums;color:var(--muted);font-size:13px;white-space:nowrap}
 .uhead .fill.full{color:var(--ok)}
@@ -466,6 +468,9 @@ table.ov td.z{color:#B6BEC9}
 <dialog id="dlgClone"><div class="dhead"><h2>Vytvořit krajské ÚRÚ ze vzoru</h2><p>Pro každý vybraný kraj vznikne kopie centrály tohoto organigramu (s prázdnými místy). Územní pracoviště (ORP) se nekopírují – každý kraj má vlastní. Pozdější změny vzoru se do kopií nepřenášejí.</p></div>
   <div class="dbody"><div id="cloneList"></div></div>
   <div class="dfoot"><button id="cloneAll">Vybrat všechny</button><button id="cloneCancel">Zrušit</button><button id="cloneOk" class="primary">Vytvořit</button></div></dialog>
+<dialog id="dlgNote"><div class="dhead"><h2>Popis činnosti útvaru</h2><p id="noteUnit"></p></div>
+  <div class="dbody"><textarea id="noteText" rows="16" style="width:100%;box-sizing:border-box;font:inherit;line-height:1.45;padding:10px;border:1px solid var(--line);border-radius:6px;resize:vertical" placeholder="Agendy, činnosti, provazby, otevřené otázky… (prázdné = popis smazat)"></textarea></div>
+  <div class="dfoot"><button id="noteCancel">Zrušit</button><button id="noteOk" class="primary">Uložit</button></div></dialog>
 <dialog id="dlgPerson">
   <div class="dhead"><h2>Přidat osobu</h2></div>
   <div class="dbody" style="display:grid;grid-template-columns:140px 1fr;gap:8px 10px;align-items:center">
@@ -481,8 +486,8 @@ table.ov td.z{color:#B6BEC9}
 
 <script src="../vendor/xlsx.full.min.js"></script>
 <script src="../vendor/supabase.js"></script>
-<script src="../config.js?v=2026-11-16.2"></script>
-<script src="template.js?v=2026-11-16.2"></script>
-<script src="app.js?v=2026-11-16.2"></script>
+<script src="../config.js?v=2026-11-16.3"></script>
+<script src="template.js?v=2026-11-16.3"></script>
+<script src="app.js?v=2026-11-16.3"></script>
 </body
 </html>
