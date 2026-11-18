@@ -1,6 +1,6 @@
 // Krajské ÚRÚ – organigram soustavy (2028). Samostatná aplikace, data v organigram_state.id='kraje'.
 // Organigram ÚRÚ ČR (řádek 'main') se odsud pouze jednou čte při prvním spuštění (převzetí rozpracovaných krajů).
-const APP_VERSION='2026-11-16.6';
+const APP_VERSION='2026-11-18.1';
 const APP_ID='kraje';
 
 const SOURCES = ['Obec','KÚ','ÚRÚ','Nové','Jiný'];
@@ -917,6 +917,12 @@ async function boot(){
     const {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin+location.pathname,shouldCreateUser:false}});
     if(error){ $('#authMsg').className='msg err'; $('#authMsg').textContent='Nepodařilo se: '+(error.message.includes('rate limit')?'vyčerpán hodinový limit odeslaných e-mailů – zkuste to později, nebo se přihlaste heslem':error.message); } else { $('#authMsg').textContent='Hotovo – zkontrolujte e-mail a klikněte na odkaz.'; } };
   ['#authMail','#authPass'].forEach(id=>$(id).addEventListener('keydown',e=>{ if(e.key==='Enter') $('#authBtn').click(); }));
+  $('#btnPass').onclick=()=>{ $('#pass1').value=''; $('#pass2').value=''; $('#passMsg').textContent=''; $('#passMsg').className='msg'; $('#dlgPass').showModal(); setTimeout(()=>$('#pass1').focus(),30); };
+  $('#passCancel').onclick=()=>$('#dlgPass').close();
+  $('#passOk').onclick=async()=>{ const a=$('#pass1').value, b=$('#pass2').value, m=$('#passMsg'); m.className='msg err';
+    if(a.length<8){ m.textContent='Heslo musí mít alespoň 8 znaků.'; return; } if(a!==b){ m.textContent='Hesla se neshodují.'; return; }
+    const {error}=await sb.auth.updateUser({password:a}); if(error){ m.textContent='Nepodařilo se: '+error.message; return; }
+    $('#dlgPass').close(); toast('Heslo bylo změněno. Příště se můžete přihlásit e-mailem a tímto heslem.'); };
   $('#btnLogout').onclick=async()=>{ await flush(); if(editing) await lockCall('release'); await sb.auth.signOut(); location.reload(); };
   sb.auth.onAuthStateChange(async(ev,session)=>{ if(session&&!currentUser){ currentUser=session.user; await start(); } });
   const {data:{session}}=await sb.auth.getSession(); if(session) accessToken=session.access_token;

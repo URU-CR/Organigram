@@ -425,7 +425,7 @@ table.ov td.z{color:#B6BEC9}
     <button id="btnLog">Historie</button>
     <button id="btnPresent">Prezentace</button>
     <button id="btnReset" class="adm" title="Vrátí prázdný organigram">Vymazat vše</button>
-    <button id="btnLogout">Odhlásit</button>
+    <button id="btnPass" title="Nastavit nebo změnit vlastní heslo k přihlášení">Změnit heslo</button><button id="btnLogout">Odhlásit</button>
     <input type="file" id="fileXlsx" accept=".xlsx,.xlsm,.xls,.csv" hidden>
     <input type="file" id="fileJson" accept=".json" hidden>
   </div>
@@ -474,6 +474,9 @@ table.ov td.z{color:#B6BEC9}
 <dialog id="dlgClone"><div class="dhead"><h2>Vytvořit krajské ÚRÚ ze vzoru</h2><p>Pro každý vybraný kraj vznikne kopie centrály tohoto organigramu (s prázdnými místy). Územní pracoviště (ORP) se nekopírují – každý kraj má vlastní. Pozdější změny vzoru se do kopií nepřenášejí.</p></div>
   <div class="dbody"><div id="cloneList"></div></div>
   <div class="dfoot"><button id="cloneAll">Vybrat všechny</button><button id="cloneCancel">Zrušit</button><button id="cloneOk" class="primary">Vytvořit</button></div></dialog>
+<dialog id="dlgPass"><div class="dhead"><h2>Změnit heslo</h2><p>Nové heslo pro přihlášení e-mailem a heslem (alespoň 8 znaků).</p></div>
+  <div class="dbody"><input type="password" id="pass1" placeholder="Nové heslo" autocomplete="new-password" style="width:100%;box-sizing:border-box;margin-bottom:8px"><input type="password" id="pass2" placeholder="Nové heslo znovu" autocomplete="new-password" style="width:100%;box-sizing:border-box"><p id="passMsg" class="msg"></p></div>
+  <div class="dfoot"><button id="passCancel">Zrušit</button><button id="passOk" class="primary">Uložit heslo</button></div></dialog>
 <dialog id="dlgNote"><div class="dhead"><h2>Popis činnosti útvaru</h2><p id="noteUnit"></p></div>
   <div class="dbody"><textarea id="noteText" rows="16" style="width:100%;box-sizing:border-box;font:inherit;line-height:1.45;padding:10px;border:1px solid var(--line);border-radius:6px;resize:vertical" placeholder="Agendy, činnosti, provazby, otevřené otázky… (prázdné = popis smazat)"></textarea></div>
   <div class="dfoot"><button id="noteCancel">Zrušit</button><button id="noteOk" class="primary">Uložit</button></div></dialog>
@@ -492,8 +495,8 @@ table.ov td.z{color:#B6BEC9}
 
 <script src="../vendor/xlsx.full.min.js"></script>
 <script src="../vendor/supabase.js"></script>
-<script src="../config.js?v=2026-11-16.6"></script>
-<script src="template.js?v=2026-11-16.6"></script>
-<script src="app.js?v=2026-11-16.6"></script>
+<script src="../config.js?v=2026-11-18.1"></script>
+<script src="template.js?v=2026-11-18.1"></script>
+<script src="app.js?v=2026-11-18.1"></script>
 </body
 </html>
