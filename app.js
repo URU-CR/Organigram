@@ -1,4 +1,4 @@
-const APP_VERSION='2026-11-16.1';
+const APP_VERSION='2026-11-26.1';
 
 const STRUCTURE = window.STRUCTURE;
 const SOURCES = ['DESÚ','MMR','ÚÚR','MD','MPO','Nové','Jiný'];
@@ -1068,6 +1068,12 @@ async function boot(){
     const {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin+location.pathname,shouldCreateUser:false}});
     if(error){ $('#authMsg').className='msg err'; $('#authMsg').textContent='Nepodařilo se: '+(error.message.includes('rate limit')?'vyčerpán hodinový limit odeslaných e-mailů – zkuste to později, nebo se přihlaste heslem':error.message); } else { $('#authMsg').textContent='Hotovo – zkontrolujte e-mail a klikněte na odkaz.'; } };
   ['#authMail','#authPass'].forEach(id=>$(id).addEventListener('keydown',e=>{ if(e.key==='Enter') $('#authBtn').click(); }));
+  $('#btnPass').onclick=()=>{ $('#pass1').value=''; $('#pass2').value=''; $('#passMsg').textContent=''; $('#passMsg').className='msg'; $('#dlgPass').showModal(); setTimeout(()=>$('#pass1').focus(),30); };
+  $('#passCancel').onclick=()=>$('#dlgPass').close();
+  $('#passOk').onclick=async()=>{ const a=$('#pass1').value, b=$('#pass2').value, m=$('#passMsg'); m.className='msg err';
+    if(a.length<8){ m.textContent='Heslo musí mít alespoň 8 znaků.'; return; } if(a!==b){ m.textContent='Hesla se neshodují.'; return; }
+    const {error}=await sb.auth.updateUser({password:a}); if(error){ m.textContent='Nepodařilo se: '+error.message; return; }
+    $('#dlgPass').close(); toast('Heslo bylo změněno. Příště se můžete přihlásit e-mailem a tímto heslem.'); };
   $('#btnLogout').onclick=async()=>{ await flush(); await sb.auth.signOut(); location.reload(); };
   sb.auth.onAuthStateChange(async(ev,session)=>{ if(session&&!currentUser){ currentUser=session.user; await start(); } });
   const {data:{session}}=await sb.auth.getSession();
@@ -1108,6 +1114,7 @@ const HELP=[
   ['🗺️','Diagram','Grafický organigram vybraného útvaru. Kořen vyberete v rozbalovací nabídce, velikost posuvníkem <b>Zvětšení</b>.'],
   ['📍','Lokality','Rozdělení lidí podle pracovišť. Osobu přetažením přesunete do jiné lokality.'],
   ['📊','Systemizace','Systemizace služebních a pracovních míst podle formuláře MV. Od verze 2026-10-20 odpovídá <b>schválené systemizaci od 1. 1. 2027</b> (404 míst: 361 služebních, 43 pracovních) – místa mají z migračních dat ISoSS <b>Ext. ID místa</b>, typ, úvazek, platovou třídu, obor služby, kód činností a stupeň řízení. Místo obsazené nad rámec systemizace je označeno „mimo systemizaci“.'],
+  ['🔑','Změnit heslo','Tlačítkem <b>Změnit heslo</b> vedle „Odhlásit“ si nastavíte vlastní heslo (např. místo počátečního hesla od správce); pak se přihlásíte e-mailem a heslem.'],
   ['🔒','Omezený přístup','Uživatel s rolí <b>kraj</b> (v tabulce organigram_roles s vyplněným rozsahem <code>scope</code>) vidí jen svůj sdílený krajský organigram (např. Kraj Vysočina 2) – do ÚRÚ ČR a TOM se nedostane, aplikace ho přesměruje. Omezení hlídá i databáze (RLS).'],
   ['🔢','Ext. ID OJ','Útvary mají číslo <b>Ext. ID OJ</b> z ISoSS – zobrazuje se ve stromu u názvu, v Systemizaci a v exportech. V režimu <b>Upravit strukturu</b> ho změníte tlačítkem <b>Ext. ID</b>.'],
   ['💻','IT','Přehled a úpravy IT vybavení osob (dostupné správci a roli IT).'],
